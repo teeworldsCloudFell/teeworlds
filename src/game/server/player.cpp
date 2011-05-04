@@ -155,6 +155,13 @@ void CPlayer::OnDisconnect(const char *pReason)
 
 		str_format(aBuf, sizeof(aBuf), "leave player='%d:%s'", m_ClientID, Server()->ClientName(m_ClientID));
 		GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "game", aBuf);
+		/* inQ */
+		if(m_Muted>0 && !g_Config.m_SvLeaveMuted)
+		{
+			str_format(aBuf, sizeof(aBuf),  "ban %d %d", m_ClientID, (m_Muted/Server()->TickSpeed())/60);
+			GameServer()->Console()->ExecuteLine(aBuf);
+		}
+		/* inQ */
 	}
 }
 

@@ -54,14 +54,21 @@ protected:
 
 	int m_aTeamscore[2];
 
-	int m_Warmup;
 	int m_RoundCount;
 
 	int m_GameFlags;
 	int m_UnbalancedTick;
 	bool m_ForceBalanced;
+	/* inQ */
+	bool m_pInstagib;
+	bool m_pinQ;
+	/* inQ */
 
 public:
+	/* inQ */
+	int m_Warmup;
+	int m_FakeWarmup;
+	/* inQ */
 	const char *m_pGameType;
 
 	bool IsTeamplay() const;
@@ -141,7 +148,12 @@ public:
 	bool CheckTeamBalance();
 	bool CanChangeTeam(CPlayer *pPplayer, int JoinTeam);
 	int ClampTeam(int Team);
-
+	/* inQ */
+	bool IsInstagib();
+	void MakeInstagib(bool Option);
+	bool IsinQ();
+	void MakeinQ(const char *Gametype, bool Option);
+	/* inQ */
 	virtual void PostReset();
 };
 

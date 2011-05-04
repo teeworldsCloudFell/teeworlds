@@ -17,6 +17,7 @@ IGameController::IGameController(class CGameContext *pGameServer)
 	m_pGameType = "unknown";
 
 	//
+	m_FakeWarmup = 0;
 	DoWarmup(g_Config.m_SvWarmup);
 	m_GameOverTick = -1;
 	m_SuddenDeath = 0;
@@ -208,14 +209,14 @@ bool IGameController::OnEntity(int Index, vec2 Pos)
 		Type = POWERUP_NINJA;
 		SubType = WEAPON_NINJA;
 	}
-
-	if(Type != -1)
+	/* inQ */
+	if(Type != -1 && !IsInstagib())
 	{
 		CPickup *pPickup = new CPickup(&GameServer()->m_World, Type, SubType);
 		pPickup->m_Pos = Pos;
 		return true;
 	}
-
+	/* inQ */
 	return false;
 }
 
@@ -405,10 +406,14 @@ void IGameController::OnCharacterSpawn(class CCharacter *pChr)
 {
 	// default health
 	pChr->IncreaseHealth(10);
-
-	// give default weapons
-	pChr->GiveWeapon(WEAPON_HAMMER, -1);
-	pChr->GiveWeapon(WEAPON_GUN, 10);
+	/* inQ */
+	if(IsInstagib()) {
+		pChr->GiveWeapon(WEAPON_RIFLE, -1); }
+	else {
+		// give default weapons
+		pChr->GiveWeapon(WEAPON_HAMMER, -1);
+		pChr->GiveWeapon(WEAPON_GUN, 10); }
+	/* inQ */
 }
 
 void IGameController::DoWarmup(int Seconds)
@@ -461,7 +466,19 @@ void IGameController::Tick()
 		if(!m_Warmup)
 			StartRound();
 	}
+	/* inQ */
+	// fake warmup aka. restart timer
+	if(m_FakeWarmup)
+	{
+		m_FakeWarmup--;
+		if(!m_FakeWarmup && GameServer()->m_World.m_Paused)
+		{
+			GameServer()->m_World.m_Paused = 0;
+			GameServer()->SendChat(-1, CGameContext::CHAT_ALL, "Game started");
 
+		}
+	}
+	/* inQ */
 	if(m_GameOverTick != -1)
 	{
 		// game over.. wait for restart
@@ -591,8 +608,12 @@ void IGameController::Snap(int SnappingClient)
 	if(GameServer()->m_World.m_Paused)
 		pGameInfoObj->m_GameStateFlags |= GAMESTATEFLAG_PAUSED;
 	pGameInfoObj->m_RoundStartTick = m_RoundStartTick;
-	pGameInfoObj->m_WarmupTimer = m_Warmup;
-
+	/* inQ */
+	if(m_FakeWarmup)
+		pGameInfoObj->m_WarmupTimer = m_FakeWarmup;
+	else
+		pGameInfoObj->m_WarmupTimer = m_Warmup;
+	/* inQ */
 	pGameInfoObj->m_ScoreLimit = g_Config.m_SvScorelimit;
 	pGameInfoObj->m_TimeLimit = g_Config.m_SvTimelimit;
 
@@ -763,3 +784,25 @@ int IGameController::ClampTeam(int Team)
 		return Team&1;
 	return 0;
 }
+/* inQ */
+void IGameController::MakeInstagib(bool Option)
+{
+	m_pInstagib = Option;
+}
+
+bool IGameController::IsInstagib()
+{
+	return m_pInstagib;
+}
+
+void IGameController::MakeinQ(const char *Gametype, bool Option)
+{
+	m_pinQ = Option;
+	m_pGameType = Gametype;
+}
+
+bool IGameController::IsinQ()
+{
+	return m_pinQ;
+}
+/* inQ */

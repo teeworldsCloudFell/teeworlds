@@ -60,6 +60,14 @@ class CGameContext : public IGameServer
 	static void ConClearVotes(IConsole::IResult *pResult, void *pUserData);
 	static void ConVote(IConsole::IResult *pResult, void *pUserData);
 	static void ConchainSpecialMotdupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	/* inQ */
+	static void ConAllSpec(IConsole::IResult *pResult, void *pUserData);
+	static void ConAllRed(IConsole::IResult *pResult, void *pUserData);
+	static void ConAllBlue(IConsole::IResult *pResult, void *pUserData);
+	static void ConSayTo(IConsole::IResult *pResult, void *pUserData);
+	static void ConSetName(IConsole::IResult *pResult, void *pUserData);
+	static void ConMute(IConsole::IResult *pResult, void *pUserData);
+	/* inQ */
 
 	CGameContext(int Resetting);
 	void Construct(int Resetting);

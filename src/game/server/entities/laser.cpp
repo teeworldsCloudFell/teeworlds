@@ -3,6 +3,7 @@
 #include <game/generated/protocol.h>
 #include <game/server/gamecontext.h>
 #include "laser.h"
+#include <engine/shared/config.h>
 
 CLaser::CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEnergy, int Owner)
 : CEntity(pGameWorld, CGameWorld::ENTTYPE_LASER)
@@ -68,6 +69,10 @@ void CLaser::DoBounce()
 				m_Energy = -1;
 
 			GameServer()->CreateSound(m_Pos, SOUND_RIFLE_BOUNCE);
+			/* inQ */
+			if(m_Bounces == 1 && g_Config.m_SvLaserjumps && GameServer()->m_pController->IsInstagib())
+				GameServer()->CreateExplosion(m_Pos, m_Owner, WEAPON_GAME, false);
+			/* inQ */
 		}
 	}
 	else
