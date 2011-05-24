@@ -71,6 +71,8 @@ public:
 	CCollision *Collision() { return &m_Collision; }
 	CTuningParams *Tuning() { return &m_Tuning; }
 
+	class CGameControllerZESC *zESCController() { return (CGameControllerZESC*)m_pController; }
+
 	CGameContext();
 	~CGameContext();
 

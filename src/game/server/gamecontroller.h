@@ -39,6 +39,7 @@ protected:
 
 	float EvaluateSpawnPos(CSpawnEval *pEval, vec2 Pos);
 	void EvaluateSpawnType(CSpawnEval *pEval, int Type);
+	void EvaluateSpawnTypeZombie(CSpawnEval *pEval, int Type);
 	void FindFreeSpawn(CSpawnEval *pEval, int Type);
 	bool EvaluateSpawn(class CPlayer *pP, vec2 *pPos);
 
@@ -47,12 +48,8 @@ protected:
 
 	char m_aMapWish[128];
 
-
 	int m_RoundStartTick;
 	int m_GameOverTick;
-	int m_SuddenDeath;
-
-	int m_aTeamscore[2];
 
 	int m_Warmup;
 	int m_RoundCount;
@@ -60,6 +57,9 @@ protected:
 	int m_GameFlags;
 	int m_UnbalancedTick;
 	bool m_ForceBalanced;
+
+	int m_LastZomb;
+	int m_LastZomb2;
 
 public:
 	const char *m_pGameType;
@@ -70,7 +70,10 @@ public:
 	virtual ~IGameController();
 
 	void DoTeamScoreWincheck();
-	void DoPlayerScoreWincheck();
+
+	int m_aTeamscore[2];
+	int m_ZombWarmup;
+	int m_SuddenDeath;
 
 	void DoWarmup(int Seconds);
 
@@ -131,6 +134,7 @@ public:
 
 	//
 	virtual bool CanSpawn(int Team, vec2 *pPos);
+	virtual bool ZombieSpawn(vec2 *pOutPos);
 
 	/*
 
@@ -138,9 +142,9 @@ public:
 	virtual const char *GetTeamName(int Team);
 	virtual int GetAutoTeam(int NotThisID);
 	virtual bool CanJoinTeam(int Team, int NotThisID);
-	bool CheckTeamBalance();
-	bool CanChangeTeam(CPlayer *pPplayer, int JoinTeam);
 	int ClampTeam(int Team);
+	void ZombWarmup(int W);
+	void RandomZomb();
 
 	virtual void PostReset();
 };

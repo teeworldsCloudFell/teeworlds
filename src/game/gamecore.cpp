@@ -330,8 +330,23 @@ void CCharacterCore::Tick(bool UseInput)
 				m_Vel += Dir*a*(Velocity*0.75f);
 				m_Vel *= 0.85f;
 			}
+		}
+	}
+	// I like player hooking :)
+	if(m_pWorld && m_pWorld->m_Tuning.m_PlayerHooking)
+	{
+		for(int i = 0; i < MAX_CLIENTS; i++)
+		{
+			CCharacterCore *pCharCore = m_pWorld->m_apCharacters[i];
+			if(!pCharCore)
+				continue;
 
+			//player *p = (player*)ent;
+			if(pCharCore == this) // || !(p->flags&FLAG_ALIVE)
+				continue; // make sure that we don't nudge our self
 			// handle hook influence
+			float Distance = distance(m_Pos, pCharCore->m_Pos);
+			vec2 Dir = normalize(m_Pos - pCharCore->m_Pos);
 			if(m_HookedPlayer == i)
 			{
 				if(Distance > PhysSize*1.50f) // TODO: fix tweakable variable
@@ -350,7 +365,6 @@ void CCharacterCore::Tick(bool UseInput)
 			}
 		}
 	}
-
 	// clamp the velocity to something sane
 	if(length(m_Vel) > 6000)
 		m_Vel = normalize(m_Vel) * 6000;

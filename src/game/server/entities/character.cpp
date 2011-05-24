@@ -5,6 +5,8 @@
 #include <game/server/gamecontext.h>
 #include <game/mapitems.h>
 
+#include "../gamemodes/zesc.h"
+
 #include "character.h"
 #include "laser.h"
 #include "projectile.h"
@@ -57,6 +59,8 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 	m_EmoteStop = -1;
 	m_LastAction = -1;
 	m_ActiveWeapon = WEAPON_GUN;
+	if(pPlayer->GetTeam() == TEAM_RED)
+		m_ActiveWeapon = WEAPON_HAMMER;
 	m_LastWeapon = WEAPON_HAMMER;
 	m_QueuedWeapon = -1;
 
@@ -75,6 +79,8 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 	GameServer()->m_World.InsertEntity(this);
 	m_Alive = true;
 
+	m_LastSpeedup = -1;
+
 	GameServer()->m_pController->OnCharacterSpawn(this);
 
 	return true;
@@ -88,7 +94,7 @@ void CCharacter::Destroy()
 
 void CCharacter::SetWeapon(int W)
 {
-	if(W == m_ActiveWeapon)
+	if(W == m_ActiveWeapon || m_pPlayer->GetTeam() == TEAM_RED)
 		return;
 
 	m_LastWeapon = m_ActiveWeapon;
@@ -282,39 +288,67 @@ void CCharacter::FireWeapon()
 
 	switch(m_ActiveWeapon)
 	{
-		case WEAPON_HAMMER:
+	case WEAPON_HAMMER:
 		{
 			// reset objects Hit
 			m_NumObjectsHit = 0;
 			GameServer()->CreateSound(m_Pos, SOUND_HAMMER_FIRE);
-
 			CCharacter *apEnts[MAX_CLIENTS];
 			int Hits = 0;
-			int Num = GameServer()->m_World.FindEntities(ProjStartPos, m_ProximityRadius*0.5f, (CEntity**)apEnts,
-														MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
-
-			for (int i = 0; i < Num; ++i)
+			if(m_pPlayer->GetTeam() == TEAM_RED)
 			{
-				CCharacter *pTarget = apEnts[i];
+				int Num = GameServer()->m_World.FindEntities(ProjStartPos, m_ProximityRadius*1.5f, (CEntity**)apEnts, 
+					MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
 
-				if ((pTarget == this) || GameServer()->Collision()->IntersectLine(ProjStartPos, pTarget->m_Pos, NULL, NULL))
-					continue;
+				for (int i = 0; i < Num; ++i)
+				{
+					CCharacter *pTarget = apEnts[i];
 
-				// set his velocity to fast upward (for now)
-				if(length(pTarget->m_Pos-ProjStartPos) > 0.0f)
-					GameServer()->CreateHammerHit(pTarget->m_Pos-normalize(pTarget->m_Pos-ProjStartPos)*m_ProximityRadius*0.5f);
-				else
-					GameServer()->CreateHammerHit(ProjStartPos);
+					if ((pTarget == this) || GameServer()->Collision()->IntersectLine(ProjStartPos, pTarget->m_Pos, NULL, NULL) || pTarget->m_pPlayer->GetTeam() == TEAM_RED)
+						continue;
 
-				vec2 Dir;
-				if (length(pTarget->m_Pos - m_Pos) > 0.0f)
-					Dir = normalize(pTarget->m_Pos - m_Pos);
-				else
-					Dir = vec2(0.f, -1.f);
+					// set his velocity to fast upward (for now)
+					if(length(pTarget->m_Pos-ProjStartPos) > 0.0f)
+						GameServer()->CreateHammerHit(pTarget->m_Pos-normalize(pTarget->m_Pos-ProjStartPos)*m_ProximityRadius*1.5f);
+					else
+						GameServer()->CreateHammerHit(ProjStartPos);
 
-				pTarget->TakeDamage(vec2(0.f, -1.f) + normalize(Dir + vec2(0.f, -1.1f)) * 10.0f, g_pData->m_Weapons.m_Hammer.m_pBase->m_Damage,
-					m_pPlayer->GetCID(), m_ActiveWeapon);
-				Hits++;
+					GameServer()->m_apPlayers[pTarget->m_pPlayer->GetCID()]->SetZomb(m_pPlayer->GetCID());
+
+					// a nice sound
+					GameServer()->CreateSound(pTarget->m_Pos, SOUND_PLAYER_PAIN_LONG);
+
+					Hits++;
+				}
+			}
+			else
+			{
+				int Num = GameServer()->m_World.FindEntities(ProjStartPos, m_ProximityRadius*0.5f, (CEntity**)apEnts, 
+					MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
+
+				for (int i = 0; i < Num; ++i)
+				{
+					CCharacter *pTarget = apEnts[i];
+
+					if ((pTarget == this) || GameServer()->Collision()->IntersectLine(ProjStartPos, pTarget->m_Pos, NULL, NULL))
+						continue;
+
+					// set his velocity to fast upward (for now)
+					if(length(pTarget->m_Pos-ProjStartPos) > 0.0f)
+						GameServer()->CreateHammerHit(pTarget->m_Pos-normalize(pTarget->m_Pos-ProjStartPos)*m_ProximityRadius*0.5f);
+					else
+						GameServer()->CreateHammerHit(ProjStartPos);
+
+					vec2 Dir;
+					if (length(pTarget->m_Pos - m_Pos) > 0.0f)
+						Dir = normalize(pTarget->m_Pos - m_Pos);
+					else
+						Dir = vec2(0.f, -1.f);
+
+					pTarget->TakeDamage(vec2(0.f, -1.f) + normalize(Dir + vec2(0.f, -1.1f)) * 10.0f, g_pData->m_Weapons.m_Hammer.m_pBase->m_Damage,
+						m_pPlayer->GetCID(), m_ActiveWeapon);
+					Hits++;
+				}
 			}
 
 			// if we Hit anything, we have to wait for the reload
@@ -330,7 +364,7 @@ void CCharacter::FireWeapon()
 				ProjStartPos,
 				Direction,
 				(int)(Server()->TickSpeed()*GameServer()->Tuning()->m_GunLifetime),
-				1, 0, 0, -1, WEAPON_GUN);
+				1, 0, 20, -1, WEAPON_GUN);
 
 			// pack the Projectile and send it to the client Directly
 			CNetObj_Projectile p;
@@ -365,7 +399,7 @@ void CCharacter::FireWeapon()
 					ProjStartPos,
 					vec2(cosf(a), sinf(a))*Speed,
 					(int)(Server()->TickSpeed()*GameServer()->Tuning()->m_ShotgunLifetime),
-					1, 0, 0, -1, WEAPON_SHOTGUN);
+					1, 0, 15, -1, WEAPON_SHOTGUN);
 
 				// pack the Projectile and send it to the client Directly
 				CNetObj_Projectile p;
@@ -424,7 +458,7 @@ void CCharacter::FireWeapon()
 
 	m_AttackTick = Server()->Tick();
 
-	if(m_aWeapons[m_ActiveWeapon].m_Ammo > 0) // -1 == unlimited
+	if(m_aWeapons[m_ActiveWeapon].m_Ammo > 0 && !g_Config.m_SvInfiniteAmmo) // -1 == unlimited
 		m_aWeapons[m_ActiveWeapon].m_Ammo--;
 
 	if(!m_ReloadTimer)
@@ -542,15 +576,125 @@ void CCharacter::Tick()
 		m_pPlayer->m_ForceBalanced = false;
 	}
 
+	// save jumping state
+	int Jumped = m_Core.m_Jumped;
+
 	m_Core.m_Input = m_Input;
 	m_Core.Tick(true);
 
+	CGameControllerZESC *pzESC = GameServer()->zESCController();
+
+	if(g_Config.m_SvRegen > 0 && (Server()->Tick()%g_Config.m_SvRegen) == 0)
+	{
+		if(m_Health < 10)
+			m_Health++;
+		else if(m_Armor < 10)
+			m_Armor++;
+	}
+
+	// tile index
+	int TileIndex = GameServer()->Collision()->GetIndex(m_PrevPos, m_Pos);
+
+	int z = GameServer()->Collision()->IsHoldpoint(TileIndex);
+	if(z != -1 && (m_PrevPos != vec2(0, 0) || m_PrevPos != m_Pos))
+		pzESC->OnHoldpoint(z);
+
+	else if(TileIndex != -1 && GameServer()->Collision()->GetCollision(TileIndex) == TILE_STOPL)
+	{
+		if(m_Core.m_Vel.x > 0)
+		{
+			if((int)GameServer()->Collision()->GetPos(TileIndex).x < (int)m_Core.m_Pos.x)
+				m_Core.m_Pos.x = m_PrevPos.x;
+			m_Core.m_Vel.x = 0;
+		}
+	}
+	else if(TileIndex != -1 && GameServer()->Collision()->GetCollision(TileIndex) == TILE_STOPR)
+	{
+		if(m_Core.m_Vel.x < 0)
+		{
+			if((int)GameServer()->Collision()->GetPos(TileIndex).x > (int)m_Core.m_Pos.x)
+				m_Core.m_Pos.x = m_PrevPos.x;
+			m_Core.m_Vel.x = 0;
+		}
+	}
+	else if(TileIndex != -1 && GameServer()->Collision()->GetCollision(TileIndex) == TILE_STOPB)
+	{
+		if(m_Core.m_Vel.y < 0)
+		{
+			if((int)GameServer()->Collision()->GetPos(TileIndex).y > (int)m_Core.m_Pos.y)
+				m_Core.m_Pos.y = m_PrevPos.y;
+			m_Core.m_Vel.y = 0;
+		}
+	}
+	else if(TileIndex != -1 && GameServer()->Collision()->GetCollision(TileIndex) == TILE_STOPT)
+	{
+		if(m_Core.m_Vel.y > 0)
+		{
+			if((int)GameServer()->Collision()->GetPos(TileIndex).y < (int)m_Core.m_Pos.y)
+				m_Core.m_Pos.y = m_PrevPos.y;
+			if(Jumped&3 && m_Core.m_Jumped != Jumped) // check double jump
+				m_Core.m_Jumped = Jumped;
+			m_Core.m_Vel.y = 0;
+		}
+	}
+
+	// handle speedup tiles
+	int CurrentSpeedup = GameServer()->Collision()->IsSpeedup(TileIndex);
+	bool SpeedupTouch = false;
+	if(m_LastSpeedup != CurrentSpeedup && CurrentSpeedup > -1)
+	{
+		vec2 Direction;
+		int Force;
+		GameServer()->Collision()->GetSpeedup(TileIndex, &Direction, &Force);
+
+		m_Core.m_Vel += Direction*Force;
+
+		SpeedupTouch = true;
+	}
+
+	m_LastSpeedup = CurrentSpeedup;
+
+	// handle teleporter
+	z = GameServer()->Collision()->IsTeleport(TileIndex);
+	if(g_Config.m_SvTeleport && z)
+	{
+		// check double jump
+		if(Jumped&3 && m_Core.m_Jumped != Jumped)
+			m_Core.m_Jumped = Jumped;
+
+		m_Core.m_HookedPlayer = -1;
+		m_Core.m_HookState = HOOK_RETRACTED;
+		m_Core.m_TriggeredEvents |= COREEVENT_HOOK_RETRACT;
+		m_Core.m_HookState = HOOK_RETRACTED;
+		m_Core.m_Pos = pzESC->m_pTeleporter[z-1];
+		m_Core.m_HookPos = m_Core.m_Pos;
+		//Resetting velocity to prevent exploit
+		if(g_Config.m_SvTeleportVelReset)
+			m_Core.m_Vel = vec2(0,0);
+		if(g_Config.m_SvStrip)
+		{
+			m_ActiveWeapon = WEAPON_HAMMER;
+			m_LastWeapon = WEAPON_HAMMER;
+			m_aWeapons[0].m_Got = true;
+			for(int i = 1; i < NUM_WEAPONS; i++)
+				m_aWeapons[i].m_Got = false;
+		}
+	}
+
+	if(m_FreezeTick > Server()->Tick()) {
+		m_Core.m_Vel = vec2(0.f, 0.f);
+		m_Core.m_Pos = m_PrevPos; }
+
+	// set Position just in case it was changed
+	m_Pos = m_Core.m_Pos;
+
 	// handle death-tiles and leaving gamelayer
-	if(GameServer()->Collision()->GetCollisionAt(m_Pos.x+m_ProximityRadius/3.f, m_Pos.y-m_ProximityRadius/3.f)&CCollision::COLFLAG_DEATH ||
+	if(!SpeedupTouch &&
+		(GameServer()->Collision()->GetCollisionAt(m_Pos.x+m_ProximityRadius/3.f, m_Pos.y-m_ProximityRadius/3.f)&CCollision::COLFLAG_DEATH ||
 		GameServer()->Collision()->GetCollisionAt(m_Pos.x+m_ProximityRadius/3.f, m_Pos.y+m_ProximityRadius/3.f)&CCollision::COLFLAG_DEATH ||
 		GameServer()->Collision()->GetCollisionAt(m_Pos.x-m_ProximityRadius/3.f, m_Pos.y-m_ProximityRadius/3.f)&CCollision::COLFLAG_DEATH ||
 		GameServer()->Collision()->GetCollisionAt(m_Pos.x-m_ProximityRadius/3.f, m_Pos.y+m_ProximityRadius/3.f)&CCollision::COLFLAG_DEATH ||
-		GameLayerClipped(m_Pos))
+		GameLayerClipped(m_Pos)))
 	{
 		Die(m_pPlayer->GetCID(), WEAPON_WORLD);
 	}
@@ -560,6 +704,8 @@ void CCharacter::Tick()
 
 	// Previnput
 	m_PrevInput = m_Input;
+
+	m_PrevPos = m_Core.m_Pos;
 	return;
 }
 
@@ -696,7 +842,16 @@ void CCharacter::Die(int Killer, int Weapon)
 
 bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 {
-	m_Core.m_Vel += Force;
+	if((m_pPlayer->GetTeam() == TEAM_BLUE && (Weapon == WEAPON_GRENADE || Weapon == WEAPON_HAMMER)) || m_pPlayer->GetTeam() == TEAM_RED)
+		m_Core.m_Vel += Force;
+
+	if(m_pPlayer->GetTeam() == TEAM_RED)
+	{
+		if(Weapon == WEAPON_RIFLE)
+			m_FreezeTick = Server()->Tick() + Server()->TickSpeed()*1.5;
+
+		return false;
+	}
 
 	if(GameServer()->m_pController->IsFriendlyFire(m_pPlayer->GetCID(), From) && !g_Config.m_SvTeamdamage)
 		return false;
@@ -704,6 +859,9 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 	// m_pPlayer only inflicts half damage on self
 	if(From == m_pPlayer->GetCID())
 		Dmg = max(1, Dmg/2);
+
+	if(From == m_pPlayer->GetCID() && !g_Config.m_SvRocketJumpDamage)
+		Dmg = 0;
 
 	m_DamageTaken++;
 
@@ -778,6 +936,21 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 	m_EmoteStop = Server()->Tick() + 500 * Server()->TickSpeed() / 1000;
 
 	return true;
+}
+
+void CCharacter::SetZomb()
+{
+	m_ActiveWeapon = WEAPON_HAMMER;
+	m_LastWeapon = WEAPON_HAMMER;
+	m_QueuedWeapon = -1;
+	m_aWeapons[WEAPON_HAMMER].m_Got = true;
+	m_aWeapons[WEAPON_GUN].m_Got = false;
+	m_aWeapons[WEAPON_SHOTGUN].m_Got = false;
+	m_aWeapons[WEAPON_GRENADE].m_Got = false;
+	m_aWeapons[WEAPON_RIFLE].m_Got = false;
+	m_aWeapons[WEAPON_NINJA].m_Got = false;
+	m_ActiveWeapon = WEAPON_HAMMER;
+	m_LastWeapon = WEAPON_HAMMER;
 }
 
 void CCharacter::Snap(int SnappingClient)

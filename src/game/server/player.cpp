@@ -3,6 +3,7 @@
 #include <new>
 #include <engine/shared/config.h>
 #include "player.h"
+#include "gamemodes/zesc.h"
 
 
 MACRO_ALLOC_POOL_ID_IMPL(CPlayer, MAX_CLIENTS)
@@ -217,6 +218,20 @@ void CPlayer::SetTeam(int Team)
 	Team = GameServer()->m_pController->ClampTeam(Team);
 	if(m_Team == Team)
 		return;
+	if(m_Team == TEAM_RED) {
+		GameServer()->SendBroadcast("Zombies can't change team.", m_ClientID);
+		return; }
+	if(GameServer()->zESCController()->ZombStarted() && Team == TEAM_BLUE) {
+		GameServer()->SendBroadcast("You only can join the human team when round hasn't started.", m_ClientID);
+		return; }
+	if(Team == TEAM_RED && (!GameServer()->zESCController()->ZombStarted() || GameServer()->m_pController->m_ZombWarmup)) {
+		GameServer()->SendBroadcast("Zombie will be choosen randomly.", m_ClientID);
+		return; }
+	if(Team == TEAM_RED && GameServer()->zESCController()->CountHumans() < 2) {
+		GameServer()->SendBroadcast("You are the last human.", m_ClientID);
+		return; }
+	if(Team == TEAM_RED)
+		SetZomb(-1);
 
 	char aBuf[512];
 	str_format(aBuf, sizeof(aBuf), "'%s' joined the %s", Server()->ClientName(m_ClientID), GameServer()->m_pController->GetTeamName(Team));
@@ -232,6 +247,7 @@ void CPlayer::SetTeam(int Team)
 	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
 
 	GameServer()->m_pController->OnPlayerInfoChange(GameServer()->m_apPlayers[m_ClientID]);
+	GameServer()->zESCController()->CheckZomb();
 
 	if(Team == TEAM_SPECTATORS)
 	{
@@ -255,4 +271,47 @@ void CPlayer::TryRespawn()
 	m_pCharacter = new(m_ClientID) CCharacter(&GameServer()->m_World);
 	m_pCharacter->Spawn(this, SpawnPos);
 	GameServer()->CreatePlayerSpawn(SpawnPos);
+}
+
+void CPlayer::SetZomb(int From)
+{
+	if(!m_pCharacter || (!m_pCharacter && !m_pCharacter->IsAlive()))
+		return;
+	if(From != -1) {
+		// send a nice message
+		CNetMsg_Sv_KillMsg Msg;
+		Msg.m_Killer = From;
+		Msg.m_Victim = m_ClientID;
+		Msg.m_Weapon = WEAPON_HAMMER;
+		Msg.m_ModeSpecial = 0;
+		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, -1);
+		GameServer()->m_apPlayers[From]->m_Score++; }
+	m_Team = TEAM_RED;
+	if(From == -1)
+	{
+		char aBuf[512];
+		GameServer()->CreateSound(m_ViewPos, SOUND_PLAYER_PAIN_LONG);
+		str_format(aBuf, sizeof(aBuf), "'%s' wants your brain! Run away.", Server()->ClientName(m_ClientID));
+		GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+
+		vec2 SpawnPos;
+		if(GameServer()->m_pController->ZombieSpawn(&SpawnPos))
+		{
+			m_pCharacter->m_Core.m_Pos = SpawnPos;
+			m_pCharacter->m_PrevPos = SpawnPos; 
+			m_pCharacter->m_PrevDoorPos = SpawnPos;
+		}
+	}
+
+	m_pCharacter->SetZomb();
+	GameServer()->m_pController->m_aTeamscore[TEAM_RED]++;
+	GameServer()->m_pController->m_aTeamscore[TEAM_BLUE]--;
+	GameServer()->m_pController->OnPlayerInfoChange(GameServer()->m_apPlayers[m_ClientID]);
+	GameServer()->zESCController()->CheckZomb();
+	GameServer()->SendChatTarget(m_ClientID, "You are now a zombie! Eat some brains.");
+}
+
+void CPlayer::ResetZomb()
+{
+	m_Team = TEAM_BLUE;
 }

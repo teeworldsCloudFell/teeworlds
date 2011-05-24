@@ -9,10 +9,8 @@
 #include <game/version.h>
 #include <game/collision.h>
 #include <game/gamecore.h>
-#include "gamemodes/dm.h"
-#include "gamemodes/tdm.h"
-#include "gamemodes/ctf.h"
-#include "gamemodes/mod.h"
+
+#include "gamemodes/zesc.h"
 
 enum
 {
@@ -515,6 +513,13 @@ void CGameContext::OnClientEnter(int ClientID)
 	Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
 
 	m_VoteUpdate = true;
+
+	if(!zESCController()->ZombStarted())
+		zESCController()->CheckZomb();
+	if(zESCController()->CountHumans() < 2 && !zESCController()->ZombStarted() && !m_pController->m_ZombWarmup)
+		m_pController->m_SuddenDeath = 1;
+	else
+		m_pController->m_SuddenDeath = 0;
 }
 
 void CGameContext::OnClientConnected(int ClientID)
@@ -525,8 +530,6 @@ void CGameContext::OnClientConnected(int ClientID)
 	m_apPlayers[ClientID] = new(ClientID) CPlayer(this, ClientID, StartTeam);
 	//players[client_id].init(client_id);
 	//players[client_id].client_id = client_id;
-
-	(void)m_pController->CheckTeamBalance();
 
 #ifdef CONF_DEBUG
 	if(g_Config.m_DbgDummies)
@@ -553,7 +556,16 @@ void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 	delete m_apPlayers[ClientID];
 	m_apPlayers[ClientID] = 0;
 
-	(void)m_pController->CheckTeamBalance();
+	if(zESCController()->CountPlayers() < 2) {
+		zESCController()->StartZomb(0);
+		m_pController->ZombWarmup(0);
+		zESCController()->CheckZomb();
+		m_pController->m_SuddenDeath = 1; }
+	else if(!zESCController()->CountZombs() && zESCController()->ZombStarted() && !m_pController->m_ZombWarmup)
+		m_pController->RandomZomb();
+	else
+		m_pController->m_SuddenDeath = 0;
+
 	m_VoteUpdate = true;
 
 	// update spectator modes
@@ -587,20 +599,42 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 			Team = CGameContext::CHAT_ALL;
 
 		if(g_Config.m_SvSpamprotection && pPlayer->m_LastChat && pPlayer->m_LastChat+Server()->TickSpeed() > Server()->Tick())
-			return;
-
-		pPlayer->m_LastChat = Server()->Tick();
-
-		// check for invalid chars
-		unsigned char *pMessage = (unsigned char *)pMsg->m_pMessage;
-		while (*pMessage)
+			pPlayer->m_LastChat = Server()->Tick();
+		else
 		{
-			if(*pMessage < 32)
-				*pMessage = ' ';
-			pMessage++;
-		}
+			pPlayer->m_LastChat = Server()->Tick();
 
-		SendChat(ClientID, Team, pMsg->m_pMessage);
+			if(!str_comp(pMsg->m_pMessage, "/info"))
+			{
+				char aBuf[128];
+				str_format(aBuf, sizeof(aBuf), "Zombie Escape mod %s by BotoX.", ZESC_VERSION);
+				SendChatTarget(ClientID, aBuf);
+				SendChatTarget(ClientID, "Teleport system taken from the race mod (C)Rajh, Redix & SushiTee.");
+			}
+			else if(!str_comp(pMsg->m_pMessage, "/cmdlist"))
+			{
+				SendChatTarget(ClientID, "---Command List---");
+				SendChatTarget(ClientID, "\"/info\" information about the mod");
+			}
+			else if(!str_comp_num(pMsg->m_pMessage, "/", 1))
+			{
+				SendChatTarget(ClientID, "Wrong command.");
+				SendChatTarget(ClientID, "Say \"/cmdlist\" for list of command available.");
+			}
+			else
+			{
+				// check for invalid chars
+				unsigned char *pMessage = (unsigned char *)pMsg->m_pMessage;
+				while (*pMessage)
+				{
+					if(*pMessage < 32)
+						*pMessage = ' ';
+					pMessage++;
+				}
+
+				SendChat(ClientID, Team, pMsg->m_pMessage);
+			}
+		}
 	}
 	else if(MsgID == NETMSGTYPE_CL_CALLVOTE)
 	{
@@ -776,16 +810,10 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 		// Switch team on given client and kill/respawn him
 		if(m_pController->CanJoinTeam(pMsg->m_Team, ClientID))
 		{
-			if(m_pController->CanChangeTeam(pPlayer, pMsg->m_Team))
-			{
-				pPlayer->m_LastSetTeam = Server()->Tick();
-				if(pPlayer->GetTeam() == TEAM_SPECTATORS || pMsg->m_Team == TEAM_SPECTATORS)
-					m_VoteUpdate = true;
-				pPlayer->SetTeam(pMsg->m_Team);
-				(void)m_pController->CheckTeamBalance();
-			}
-			else
-				SendBroadcast("Teams must be balanced, please join other team", ClientID);
+			pPlayer->m_LastSetTeam = Server()->Tick();
+			if(pPlayer->GetTeam() == TEAM_SPECTATORS || pMsg->m_Team == TEAM_SPECTATORS)
+				m_VoteUpdate = true;
+			pPlayer->SetTeam(pMsg->m_Team);
 		}
 		else
 		{
@@ -945,7 +973,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 	}
 	else if (MsgID == NETMSGTYPE_CL_KILL && !m_World.m_Paused)
 	{
-		if(pPlayer->m_LastKill && pPlayer->m_LastKill+Server()->TickSpeed()*3 > Server()->Tick())
+		if((pPlayer->m_LastKill && pPlayer->m_LastKill+Server()->TickSpeed()*3 > Server()->Tick()) || 1)
 			return;
 
 		pPlayer->m_LastKill = Server()->Tick();
@@ -1033,7 +1061,6 @@ void CGameContext::ConSetTeam(IConsole::IResult *pResult, void *pUserData)
 		return;
 
 	pSelf->m_apPlayers[ClientID]->SetTeam(Team);
-	(void)pSelf->m_pController->CheckTeamBalance();
 }
 
 void CGameContext::ConSetTeamAll(IConsole::IResult *pResult, void *pUserData)
@@ -1048,8 +1075,6 @@ void CGameContext::ConSetTeamAll(IConsole::IResult *pResult, void *pUserData)
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 		if(pSelf->m_apPlayers[i])
 			pSelf->m_apPlayers[i]->SetTeam(Team);
-
-	(void)pSelf->m_pController->CheckTeamBalance();
 }
 
 void CGameContext::ConAddVote(IConsole::IResult *pResult, void *pUserData)
@@ -1337,15 +1362,9 @@ void CGameContext::OnInit(/*class IKernel *pKernel*/)
 	//world = new GAMEWORLD;
 	//players = new CPlayer[MAX_CLIENTS];
 
-	// select gametype
-	if(str_comp(g_Config.m_SvGametype, "mod") == 0)
-		m_pController = new CGameControllerMOD(this);
-	else if(str_comp(g_Config.m_SvGametype, "ctf") == 0)
-		m_pController = new CGameControllerCTF(this);
-	else if(str_comp(g_Config.m_SvGametype, "tdm") == 0)
-		m_pController = new CGameControllerTDM(this);
-	else
-		m_pController = new CGameControllerDM(this);
+	// zESC only gametype
+	m_pController = new CGameControllerZESC(this);
+	zESCController()->InitTeleporter();
 
 	// setup core world
 	//for(int i = 0; i < MAX_CLIENTS; i++)

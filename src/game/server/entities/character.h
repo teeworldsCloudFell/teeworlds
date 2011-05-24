@@ -48,6 +48,13 @@ public:
 	void Die(int Killer, int Weapon);
 	bool TakeDamage(vec2 Force, int Dmg, int From, int Weapon);
 
+	void SetZomb();
+	vec2 m_PrevPos;
+	vec2 m_PrevDoorPos;
+	int m_FreezeTick;
+	// the player core for the physics
+	CCharacterCore m_Core;
+
 	bool Spawn(class CPlayer *pPlayer, vec2 Pos);
 	bool Remove();
 
@@ -120,14 +127,12 @@ private:
 		int m_OldVelAmount;
 	} m_Ninja;
 
-	// the player core for the physics
-	CCharacterCore m_Core;
-
 	// info for dead reckoning
 	int m_ReckoningTick; // tick that we are performing dead reckoning From
 	CCharacterCore m_SendCore; // core that we should send
 	CCharacterCore m_ReckoningCore; // the dead reckoning core
 
+	int m_LastSpeedup;
 };
 
 #endif
