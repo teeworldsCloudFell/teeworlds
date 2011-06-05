@@ -37,28 +37,11 @@ IGameController::IGameController(class CGameContext *pGameServer)
 	m_aNumSpawnPoints[0] = 0;
 	m_aNumSpawnPoints[1] = 0;
 	m_aNumSpawnPoints[2] = 0;
+	m_aZSpawn = vec2(-42, -42);
 }
 
 IGameController::~IGameController()
 {
-}
-
-float IGameController::EvaluateSpawnPos(CSpawnEval *pEval, vec2 Pos)
-{
-	float Score = 0.0f;
-	CCharacter *pC = static_cast<CCharacter *>(GameServer()->m_World.FindFirst(CGameWorld::ENTTYPE_CHARACTER));
-	for(; pC; pC = (CCharacter *)pC->TypeNext())
-	{
-		// team mates are not as dangerous as enemies
-		float Scoremod = 1.0f;
-		if(pEval->m_FriendlyTeam != -1 && pC->GetPlayer()->GetTeam() == pEval->m_FriendlyTeam)
-			Scoremod = 0.5f;
-
-		float d = distance(Pos, pC->m_Pos);
-		Score += Scoremod * (d == 0 ? 1000000000.0f : 1.0f/d);
-	}
-
-	return Score;
 }
 
 void IGameController::EvaluateSpawnType(CSpawnEval *pEval, int Type)
@@ -71,67 +54,10 @@ void IGameController::EvaluateSpawnType(CSpawnEval *pEval, int Type)
 			continue;
 
 		vec2 P = m_aaSpawnPoints[Type][i];
-		float S = EvaluateSpawnPos(pEval, P);
-		if(!pEval->m_Got || pEval->m_Score > S)
-		{
-			pEval->m_Got = true;
-			pEval->m_Score = S;
-			pEval->m_Pos = P;
-		}
-	}
-}
-
-void IGameController::EvaluateSpawnTypeZombie(CSpawnEval *pEval, int Type)
-{
-	// get spawn point
-	for(int i = 0; i < m_aNumSpawnPoints[Type]; i++)
-	{
-		vec2 P = m_aaSpawnPoints[Type][i];
 		if(!pEval->m_Got)
 		{
 			pEval->m_Got = true;
 			pEval->m_Pos = P;
-		}
-	}
-}
-
-void IGameController::FindFreeSpawn(CSpawnEval *pEval, int Type)
-{
-	// pick the spawn point that is least occupied and has free space for spawning around it
-	for(int i = 0; i < m_aNumSpawnPoints[Type]; i++)
-	{
-
-		CCharacter *aEnts[MAX_CLIENTS];
-		int Num = GameServer()->m_World.FindEntities(m_aaSpawnPoints[Type][i], 64, (CEntity**)aEnts, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
-		float Score = 0.0f;
-		for(int c = 0; c < Num; ++c)
-			Score += 96.0f - distance(aEnts[c]->m_Pos, m_aaSpawnPoints[Type][i]);
-
-		if(!pEval->m_Got || pEval->m_Score > Score)
-		{
-			// start, left, up, right, down
-			vec2 Positions[5] = { vec2(0.0f, 0.0f), vec2(-32.0f, 0.0f), vec2(0.0f, -32.0f), vec2(32.0f, 0.0f), vec2(0.0f, 32.0f) };
-
-			// check for free space
-			int Result = -1;
-			for(int Index = 0; Index < 5 && Result == -1; ++Index)
-			{
-				Result = Index;
-				for(int c = 0; c < Num; ++c)
-					if(GameServer()->Collision()->CheckPoint(m_aaSpawnPoints[Type][i]+Positions[Index]) ||
-						distance(aEnts[c]->m_Pos, m_aaSpawnPoints[Type][i]+Positions[Index]) <= aEnts[c]->m_ProximityRadius)
-					{
-						Result = -1;
-						break;
-					}
-			}
-
-			if(Result == -1)
-				continue;	// try next spawn point
-
-			pEval->m_Got = true;
-			pEval->m_Score = Score;
-			pEval->m_Pos = m_aaSpawnPoints[Type][i]+Positions[Result];
 		}
 	}
 }
@@ -143,48 +69,18 @@ bool IGameController::CanSpawn(int Team, vec2 *pOutPos)
 	// spectators can't spawn
 	if(Team == TEAM_SPECTATORS)
 		return false;
+	if(Team == TEAM_RED)
+		return ZombieSpawn(pOutPos);
 
-	if(IsTeamplay())
-	{
-		Eval.m_FriendlyTeam = Team;
+	Eval.m_FriendlyTeam = Team;
 
-		// first try own team spawn, then normal spawn and then enemy
-		EvaluateSpawnType(&Eval, 1+(Team&1));
-		if(!Eval.m_Got)
-		{
-			EvaluateSpawnType(&Eval, 0);
-			if(!Eval.m_Got)
-				EvaluateSpawnType(&Eval, 1+((Team+1)&1));
-		}
-	}
-	else
-	{
-		EvaluateSpawnType(&Eval, 0);
-		EvaluateSpawnType(&Eval, 1);
-		EvaluateSpawnType(&Eval, 2);
-	}
-
-	// handle crappy maps
+	EvaluateSpawnType(&Eval, 0);
 	if(!Eval.m_Got)
-	{
-		if(IsTeamplay())
-		{
-			// first try own team spawn, then normal spawn and then enemy
-			FindFreeSpawn(&Eval, 1+(Team&1));
-			if(!Eval.m_Got)
-			{
-				FindFreeSpawn(&Eval, 0);
-				if(!Eval.m_Got)
-					FindFreeSpawn(&Eval, 1+((Team+1)&1));
-			}
-		}
-		else
-		{
-			FindFreeSpawn(&Eval, 0);
-			FindFreeSpawn(&Eval, 1);
-			FindFreeSpawn(&Eval, 2);
-		}
-	}
+		EvaluateSpawnType(&Eval, 2);
+	if(!Eval.m_Got)
+		EvaluateSpawnType(&Eval, 0);
+	if(!Eval.m_Got)
+		EvaluateSpawnType(&Eval, 2);
 
 	*pOutPos = Eval.m_Pos;
 	return Eval.m_Got;
@@ -192,17 +88,11 @@ bool IGameController::CanSpawn(int Team, vec2 *pOutPos)
 
 bool IGameController::ZombieSpawn(vec2 *pOutPos)
 {
-	CSpawnEval Eval;
-
-	Eval.m_FriendlyTeam = TEAM_RED;
-
-	// search for zombie spawn
-	EvaluateSpawnTypeZombie(&Eval, 1);
-	if(!Eval.m_Got)
+	if(m_aZSpawn == vec2(-42, -42))
 		return false;
 
-	*pOutPos = Eval.m_Pos;
-	return Eval.m_Got;
+	*pOutPos = m_aZSpawn;
+	return true;
 }
 
 bool IGameController::OnEntity(int Index, vec2 Pos)
@@ -213,7 +103,7 @@ bool IGameController::OnEntity(int Index, vec2 Pos)
 	if(Index == ENTITY_SPAWN)
 		m_aaSpawnPoints[0][m_aNumSpawnPoints[0]++] = Pos;
 	else if(Index == ENTITY_SPAWN_RED)
-		m_aaSpawnPoints[1][m_aNumSpawnPoints[1]++] = Pos;
+		m_aZSpawn = Pos;
 	else if(Index == ENTITY_SPAWN_BLUE)
 		m_aaSpawnPoints[2][m_aNumSpawnPoints[2]++] = Pos;
 	/*else if(Index == ENTITY_ARMOR_1)

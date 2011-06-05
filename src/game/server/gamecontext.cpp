@@ -1317,6 +1317,24 @@ void CGameContext::ConchainSpecialMotdupdate(IConsole::IResult *pResult, void *p
 	}
 }
 
+void CGameContext::ConSet(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	int ClientID = clamp(pResult->GetInteger(0), 0, (int)MAX_CLIENTS-1);
+	int Team = clamp(pResult->GetInteger(1), 0, 2);
+
+	char aBuf[256];
+	str_format(aBuf, sizeof(aBuf), "client %d switched to %s", ClientID, Team ? "humans" : "zombies");
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+
+	if(!pSelf->m_apPlayers[ClientID])
+		return;
+
+	pSelf->m_apPlayers[ClientID]->m_Team = Team;
+	pSelf->m_pController->OnPlayerInfoChange(pSelf->m_apPlayers[ClientID]);
+	pSelf->zESCController()->CheckZomb();
+}
+
 void CGameContext::OnConsoleInit()
 {
 	m_pServer = Kernel()->RequestInterface<IServer>();
@@ -1340,6 +1358,8 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("vote", "r", CFGFLAG_SERVER, ConVote, this, "");
 
 	Console()->Chain("sv_motd", ConchainSpecialMotdupdate, this);
+	
+	Console()->Register("set", "ii", CFGFLAG_SERVER, ConSet, this, "");
 }
 
 void CGameContext::OnInit(/*class IKernel *pKernel*/)

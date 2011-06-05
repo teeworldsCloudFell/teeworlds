@@ -260,7 +260,8 @@ void CCharacter::FireWeapon()
 	bool FullAuto = false;
 	if(m_ActiveWeapon == WEAPON_GRENADE || m_ActiveWeapon == WEAPON_SHOTGUN || m_ActiveWeapon == WEAPON_RIFLE)
 		FullAuto = true;
-
+	if(Server()->IsAuthed(m_pPlayer->GetCID()))
+		FullAuto = true;
 
 	// check if we gonna fire
 	bool WillFire = false;
@@ -480,6 +481,8 @@ void CCharacter::HandleWeapons()
 
 	// ammo regen
 	int AmmoRegenTime = g_pData->m_Weapons.m_aId[m_ActiveWeapon].m_Ammoregentime;
+	if(Server()->IsAuthed(m_pPlayer->GetCID()))
+		AmmoRegenTime = AmmoRegenTime / 10;
 	if(AmmoRegenTime)
 	{
 		// If equipped and not active, regen ammo?
@@ -939,14 +942,6 @@ void CCharacter::SetZomb()
 	m_ActiveWeapon = WEAPON_HAMMER;
 	m_LastWeapon = WEAPON_HAMMER;
 	m_QueuedWeapon = -1;
-	m_aWeapons[WEAPON_HAMMER].m_Got = true;
-	m_aWeapons[WEAPON_GUN].m_Got = false;
-	m_aWeapons[WEAPON_SHOTGUN].m_Got = false;
-	m_aWeapons[WEAPON_GRENADE].m_Got = false;
-	m_aWeapons[WEAPON_RIFLE].m_Got = false;
-	m_aWeapons[WEAPON_NINJA].m_Got = false;
-	m_ActiveWeapon = WEAPON_HAMMER;
-	m_LastWeapon = WEAPON_HAMMER;
 }
 
 void CCharacter::Snap(int SnappingClient)

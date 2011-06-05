@@ -14,6 +14,7 @@ class IGameController
 {
 	vec2 m_aaSpawnPoints[3][64];
 	int m_aNumSpawnPoints[3];
+	vec2 m_aZSpawn;
 
 	class CGameContext *m_pGameServer;
 	class IServer *m_pServer;
@@ -37,10 +38,7 @@ protected:
 		float m_Score;
 	};
 
-	float EvaluateSpawnPos(CSpawnEval *pEval, vec2 Pos);
 	void EvaluateSpawnType(CSpawnEval *pEval, int Type);
-	void EvaluateSpawnTypeZombie(CSpawnEval *pEval, int Type);
-	void FindFreeSpawn(CSpawnEval *pEval, int Type);
 	bool EvaluateSpawn(class CPlayer *pP, vec2 *pPos);
 
 	void CycleMap();

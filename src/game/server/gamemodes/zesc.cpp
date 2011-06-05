@@ -13,7 +13,7 @@ CGameControllerZESC::CGameControllerZESC(class CGameContext *pGameServer) : IGam
 {
 	m_pGameType = "zESC";
 	m_GameFlags = GAMEFLAG_TEAMS;
-	m_apFlags[TEAM_BLUE] = 0;
+	m_apFlags[2] = 0;
 	m_RoundStarted = 0;
 	for(int i = 0; i < 32; i++) {
 		m_DoorState[i] = true;
@@ -65,7 +65,7 @@ bool CGameControllerZESC::OnEntity(int Index, vec2 Pos)
 
 	CFlag *F = new CFlag(&GameServer()->m_World, TEAM_BLUE);
 	F->m_StandPos = Pos;
-	F->m_Pos = Pos;
+	F->m_Pos = F->m_StandPos;
 	m_apFlags[TEAM_BLUE] = F;
 	GameServer()->m_World.InsertEntity(F);
 	return true;
@@ -148,7 +148,6 @@ void CGameControllerZESC::Snap(int SnappingClient)
 	else {
 		pGameDataObj->m_TeamscoreRed = m_aTeamscore[TEAM_RED];
 		pGameDataObj->m_TeamscoreBlue = m_aTeamscore[TEAM_BLUE]; }
-
 	pGameDataObj->m_FlagCarrierRed = FLAG_MISSING;
 	if(m_apFlags[TEAM_BLUE])
 		pGameDataObj->m_FlagCarrierBlue = FLAG_ATSTAND;
