@@ -67,10 +67,8 @@ bool IGameController::CanSpawn(int Team, vec2 *pOutPos)
 	CSpawnEval Eval;
 
 	// spectators can't spawn
-	if(Team == TEAM_SPECTATORS)
+	if(Team == TEAM_SPECTATORS || Team == TEAM_RED)
 		return false;
-	if(Team == TEAM_RED)
-		return ZombieSpawn(pOutPos);
 
 	Eval.m_FriendlyTeam = Team;
 
@@ -556,8 +554,19 @@ void IGameController::ZombWarmup(int W)
 void IGameController::RandomZomb()
 {
 	int ZombCID = rand()%MAX_CLIENTS;
-	while(!GameServer()->m_apPlayers[ZombCID] || (GameServer()->m_apPlayers[ZombCID] && GameServer()->m_apPlayers[ZombCID]->GetTeam() == TEAM_SPECTATORS) || m_LastZomb == ZombCID || (GameServer()->zESCController()->CountPlayers() > 2 && m_LastZomb2 == ZombCID))
+	int WTF = 100;
+	while(!GameServer()->m_apPlayers[ZombCID] || (GameServer()->m_apPlayers[ZombCID] && GameServer()->m_apPlayers[ZombCID]->GetTeam() == TEAM_SPECTATORS) ||
+			m_LastZomb == ZombCID || (GameServer()->zESCController()->CountPlayers() > 2 && m_LastZomb2 == ZombCID) || !GameServer()->m_apPlayers[ZombCID]->GetCharacter() ||
+			(GameServer()->m_apPlayers[ZombCID]->GetCharacter() && !GameServer()->m_apPlayers[ZombCID]->GetCharacter()->IsAlive()))	// <- End ^^
+	{
 		ZombCID = rand()%MAX_CLIENTS;
+		WTF--;
+		if(!WTF)
+		{
+			StartRound();
+			return;
+		}
+	}
 	GameServer()->m_apPlayers[ZombCID]->SetZomb(-1);
 	GameServer()->zESCController()->StartZomb(1);
 	m_LastZomb2 = m_LastZomb;

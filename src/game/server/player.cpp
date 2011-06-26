@@ -303,9 +303,6 @@ void CPlayer::TryRespawn()
 
 void CPlayer::SetZomb(int From)
 {
-	if(!m_pCharacter) {
-		GameServer()->m_pController->RandomZomb();
-		return; }
 	if(From > -1)
 	{
 		// send a nice message
@@ -331,12 +328,14 @@ void CPlayer::SetZomb(int From)
 		vec2 SpawnPos;
 		if(GameServer()->m_pController->ZombieSpawn(&SpawnPos))
 		{
-			m_pCharacter->m_Core.m_Pos = SpawnPos;
 			m_pCharacter->m_Core.m_Vel = vec2(0,0);
+			m_pCharacter->m_Core.m_Pos = SpawnPos;
+			m_pCharacter->m_Pos = SpawnPos;
 			m_pCharacter->m_PrevPos = SpawnPos;
 			m_pCharacter->m_PrevDoorPos = SpawnPos;
 			m_pCharacter->m_Core.m_Pos = SpawnPos;
 			m_pCharacter->m_Core.m_Vel = vec2(0,0);
+			m_pCharacter->m_Pos = SpawnPos;
 			GameServer()->CreatePlayerSpawn(SpawnPos);
 		}
 	}

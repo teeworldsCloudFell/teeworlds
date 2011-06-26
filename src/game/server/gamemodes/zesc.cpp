@@ -13,7 +13,7 @@ CGameControllerZESC::CGameControllerZESC(class CGameContext *pGameServer) : IGam
 {
 	m_pGameType = "zESC";
 	m_GameFlags = GAMEFLAG_TEAMS;
-	m_apFlags[2] = 0;
+	m_apFlags[TEAM_BLUE] = 0;
 	m_RoundStarted = 0;
 	for(int i = 0; i < 32; i++) {
 		m_DoorState[i] = true;
@@ -100,10 +100,9 @@ void CGameControllerZESC::Tick()
 	DoTeamScoreWincheck();
 
 	//Flag
-	CFlag *F = m_apFlags[TEAM_BLUE];
-
-	if(!F)
+	if(!m_apFlags[TEAM_BLUE])
 		return;
+	CFlag *F = m_apFlags[TEAM_BLUE];
 
 	CCharacter *apCloseCCharacters[MAX_CLIENTS];
 	int Num = GameServer()->m_World.FindEntities(F->m_Pos, CFlag::ms_PhysSize, (CEntity**)apCloseCCharacters, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);

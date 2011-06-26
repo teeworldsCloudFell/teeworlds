@@ -1335,6 +1335,14 @@ void CGameContext::ConSet(IConsole::IResult *pResult, void *pUserData)
 	pSelf->zESCController()->CheckZomb();
 }
 
+void CGameContext::ConZomb(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	int ClientID = clamp(pResult->GetInteger(0), 0, (int)MAX_CLIENTS-1);
+	pSelf->m_apPlayers[ClientID]->SetZomb(-1);
+	pSelf->zESCController()->StartZomb(1);
+}
+
 void CGameContext::OnConsoleInit()
 {
 	m_pServer = Kernel()->RequestInterface<IServer>();
@@ -1360,6 +1368,7 @@ void CGameContext::OnConsoleInit()
 	Console()->Chain("sv_motd", ConchainSpecialMotdupdate, this);
 	
 	Console()->Register("set", "ii", CFGFLAG_SERVER, ConSet, this, "");
+	Console()->Register("zomb", "i", CFGFLAG_SERVER, ConZomb, this, "");
 }
 
 void CGameContext::OnInit(/*class IKernel *pKernel*/)
