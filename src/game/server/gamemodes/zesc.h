@@ -21,6 +21,9 @@ public:
 	bool m_DoorState[32];
 	int m_DoorTick[32];
 
+	int m_NukeTick;
+	bool m_NukeLaunched;
+
 	virtual void Tick();
 	virtual void Snap(int SnappingClient);
 	virtual int OnCharacterDeath(class CCharacter *pVictim, class CPlayer *pKiller, int Weapon);

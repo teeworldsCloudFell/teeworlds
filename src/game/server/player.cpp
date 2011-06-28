@@ -226,6 +226,9 @@ void CPlayer::SetTeam(int Team)
 	Team = GameServer()->m_pController->ClampTeam(Team);
 	if(m_Team == Team)
 		return;
+	if(m_Team == TEAM_SPECTATORS && m_Nuked) {
+		GameServer()->SendBroadcast("You were nuked, you can't rejoin.", m_ClientID);
+		return; }
 	if(m_Team == TEAM_RED && Team != TEAM_SPECTATORS) {
 		GameServer()->SendBroadcast("Zombies can't change team.", m_ClientID);
 		return; }
@@ -238,7 +241,7 @@ void CPlayer::SetTeam(int Team)
 	if(m_Team == TEAM_BLUE && GameServer()->zESCController()->CountHumans() < 2 && GameServer()->zESCController()->ZombStarted()) {
 		GameServer()->SendBroadcast("You are the last human.", m_ClientID);
 		return; }
-	if(m_Team == TEAM_RED && GameServer()->zESCController()->CountZombs() < 2 && GameServer()->zESCController()->ZombStarted()) {
+	if(m_Team == TEAM_RED && GameServer()->zESCController()->CountZombs() < 2 && GameServer()->zESCController()->ZombStarted() && !GameServer()->zESCController()->m_NukeLaunched) {
 		GameServer()->SendBroadcast("You are the last zombie.", m_ClientID);
 		return; }
 
@@ -247,9 +250,11 @@ void CPlayer::SetTeam(int Team)
 	GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
 	if(Team == TEAM_RED)
 	{
-		if(m_Team == TEAM_SPECTATORS) {
+		if(m_Team == TEAM_SPECTATORS)
+		{
 			m_Team = TEAM_RED;
-			m_RespawnTick = Server()->Tick()+Server()->TickSpeed()/2; }
+			m_RespawnTick = Server()->Tick()+Server()->TickSpeed()/2;
+		}
 		else
 			SetZomb(-2);
 		return;
@@ -350,5 +355,9 @@ void CPlayer::SetZomb(int From)
 
 void CPlayer::ResetZomb()
 {
+	if(m_Team == TEAM_SPECTATORS && !m_Nuked)
+		return;
 	m_Team = TEAM_BLUE;
+	GameServer()->m_pController->OnPlayerInfoChange(GameServer()->m_apPlayers[m_ClientID]);
+	m_RespawnTick = Server()->Tick()+Server()->TickSpeed()/2;
 }
