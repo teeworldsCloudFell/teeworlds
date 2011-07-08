@@ -1,4 +1,4 @@
-/* copyright (c) 2007 rajh and gregwar. Score stuff */
+/* copyright (c) 2011 BotoX, zombie escape mod */
 #ifndef GAME_SERVER_GAMEMODES_ZESC_H
 #define GAME_SERVER_GAMEMODES_ZESC_H
 
@@ -23,6 +23,7 @@ public:
 
 	int m_NukeTick;
 	bool m_NukeLaunched;
+	bool m_Hotfix;
 
 	virtual void Tick();
 	virtual void Snap(int SnappingClient);

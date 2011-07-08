@@ -75,7 +75,7 @@ void CPlayer::Tick()
 			m_pCharacter = 0;
 		}
 	}
-	else if(m_Spawning && m_RespawnTick <= Server()->Tick())
+	else if(m_Spawning && m_RespawnTick <= Server()->Tick() && !GameServer()->zESCController()->m_NukeLaunched)
 		TryRespawn();
 }
 
@@ -226,8 +226,13 @@ void CPlayer::SetTeam(int Team)
 	Team = GameServer()->m_pController->ClampTeam(Team);
 	if(m_Team == Team)
 		return;
-	if(m_Team == TEAM_SPECTATORS && m_Nuked) {
+	if(m_Nuked) {
 		GameServer()->SendBroadcast("You were nuked, you can't rejoin.", m_ClientID);
+		return; }
+	if(GameServer()->zESCController()->m_NukeLaunched) {
+		GameServer()->SendBroadcast("Nuke allready launched, wait for gameend.", m_ClientID);
+		m_Nuked = true;
+		m_RespawnTick = Server()->Tick()+Server()->TickSpeed()/2;
 		return; }
 	if(m_Team == TEAM_RED && Team != TEAM_SPECTATORS) {
 		GameServer()->SendBroadcast("Zombies can't change team.", m_ClientID);
@@ -241,7 +246,7 @@ void CPlayer::SetTeam(int Team)
 	if(m_Team == TEAM_BLUE && GameServer()->zESCController()->CountHumans() < 2 && GameServer()->zESCController()->ZombStarted()) {
 		GameServer()->SendBroadcast("You are the last human.", m_ClientID);
 		return; }
-	if(m_Team == TEAM_RED && GameServer()->zESCController()->CountZombs() < 2 && GameServer()->zESCController()->ZombStarted() && !GameServer()->zESCController()->m_NukeLaunched) {
+	if(m_Team == TEAM_RED && GameServer()->zESCController()->CountZombs() < 2 && GameServer()->zESCController()->ZombStarted()) {
 		GameServer()->SendBroadcast("You are the last zombie.", m_ClientID);
 		return; }
 
@@ -359,5 +364,19 @@ void CPlayer::ResetZomb()
 		return;
 	m_Team = TEAM_BLUE;
 	GameServer()->m_pController->OnPlayerInfoChange(GameServer()->m_apPlayers[m_ClientID]);
+}
+
+void CPlayer::Nuke()
+{
+	KillCharacter(WEAPON_WORLD);
+	m_Nuked = true;
+	m_Team = TEAM_SPECTATORS;
+	GameServer()->m_pController->OnPlayerInfoChange(GameServer()->m_apPlayers[m_ClientID]);
 	m_RespawnTick = Server()->Tick()+Server()->TickSpeed()/2;
+	// update spectator modes
+	for(int i = 0; i < MAX_CLIENTS; ++i)
+	{
+		if(GameServer()->m_apPlayers[i] && GameServer()->m_apPlayers[i]->m_SpectatorID == m_ClientID)
+			GameServer()->m_apPlayers[i]->m_SpectatorID = SPEC_FREEVIEW;
+	}
 }

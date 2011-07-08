@@ -23,6 +23,7 @@ public:
 	void SetTeam(int Team);
 	void SetZomb(int From);
 	void ResetZomb();
+	void Nuke();
 	int GetTeam() const { return m_Team; };
 	int GetCID() const { return m_ClientID; };
 

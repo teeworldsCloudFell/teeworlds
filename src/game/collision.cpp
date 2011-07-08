@@ -56,7 +56,7 @@ void CCollision::Init(class CLayers *pLayers)
 		}
 
 		// race tiles
-		if(Index >= 28 && Index <= 79)
+		if(Index >= 15 && Index <= 79)
 			m_pTiles[i].m_Index = Index;
 	}
 }
@@ -173,6 +173,45 @@ int CCollision::IsSpeedup(int Index)
 		return Index;
 
 	return -1;
+}
+
+bool CCollision::IsBunker(vec2 Pos)
+{
+	int x = Pos.x;
+	int y = Pos.y;
+	for(int i=0; i < 4; i++)
+	{
+		int Nx = clamp(x/32, 0, m_Width-1);
+		int Ny = clamp(y/32, 0, m_Height-1);
+
+		int Tile = m_pTiles[Ny*m_Width+Nx].m_Index > 128 ? 0 : m_pTiles[Ny*m_Width+Nx].m_Index;
+		if(Tile == TILE_BUNKER)
+			return true;
+		switch(i)
+		{
+			case 0:
+			{
+				x = x+28/3.0f;
+				y = y-28/3.0f;
+			}
+			case 1:
+			{
+				x = x+28/3.0f;
+				y = y+28/3.0f;
+			}
+			case 2:
+			{
+				x = x-28/3.0f;
+				y = y-28/3.0f;
+			}
+			case 3:
+			{
+				x = x-28/3.0f;
+				y = y+28/3.0f;
+			}
+		}
+	}
+	return false;
 }
 
 void CCollision::GetSpeedup(int Index, vec2 *Dir, int *Force)

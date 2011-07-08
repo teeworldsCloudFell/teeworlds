@@ -698,6 +698,9 @@ void CCharacter::Tick()
 		Die(m_pPlayer->GetCID(), WEAPON_WORLD);
 	}
 
+	if(pzESC->m_NukeLaunched && !GameServer()->Collision()->IsBunker(m_Pos))
+		m_pPlayer->Nuke();
+
 	// handle Weapons
 	HandleWeapons();
 

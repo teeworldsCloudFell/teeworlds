@@ -1,9 +1,8 @@
-/* copyright (c) 2007 rajh, race mod stuff */
+/* copyright (c) 2007 rajh, teleporter */
 /* copyright (c) 2011 BotoX, zombie escape mod */
 #include <engine/shared/config.h>
 #include <game/server/entities/character.h>
 #include <game/server/player.h>
-#include <game/server/gamecontext.h>
 #include <stdio.h>
 #include <string.h>
 #include <game/server/entities/flag.h>
@@ -112,6 +111,11 @@ void CGameControllerZESC::Tick()
 
 	if(!ZombStarted() || GameServer()->m_pController->m_ZombWarmup || GameServer()->m_World.m_Paused)
 		return;
+
+	// update flag position
+	if(m_apFlags[TEAM_RED]->m_pCarryingCharacter)
+		m_apFlags[TEAM_RED]->m_Pos = m_apFlags[TEAM_RED]->m_pCarryingCharacter->m_Core.m_Pos;
+
 	for(int i = 0; i < 32; i++)
 	{
 		if(m_DoorTick[i] > 0)
@@ -137,20 +141,13 @@ void CGameControllerZESC::Tick()
 	{
 		m_NukeTick--;
 		char bBuf[128];
-		str_format(bBuf, sizeof(bBuf), "Tango down in %.2f seconds!", m_NukeTick/(float)Server()->TickSpeed());
+		str_format(bBuf, sizeof(bBuf), "Tango down in %.2f seconds!\n      Stay in the bunker!!!", m_NukeTick/(float)Server()->TickSpeed());
 		GameServer()->SendBroadcast(bBuf, -1);
 		if(!m_NukeTick)
 		{
+			GameServer()->SendBroadcast("", -1);
 			m_NukeLaunched = true;
-			for(int i = 0; i < MAX_CLIENTS; i++)
-			{
-				if(GameServer()->m_apPlayers[i] && GameServer()->m_apPlayers[i]->GetCharacter())
-				{
-					GameServer()->m_apPlayers[i]->GetCharacter()->Die(i, WEAPON_WORLD);
-					GameServer()->m_apPlayers[i]->m_Nuked = true;
-					GameServer()->m_apPlayers[i]->SetTeam(-1);
-				}
-			}
+			m_Hotfix = false;
 			CheckZomb();
 		}
 	}
@@ -214,7 +211,7 @@ void CGameControllerZESC::Tick()
 				F->m_GrabTick = Server()->Tick();
 				F->m_pCarryingCharacter = apCloseCCharacters[i];
 				F->m_pCarryingCharacter->GetPlayer()->m_Score += 100;
-				m_NukeTick = Server()->TickSpeed()*10;
+				m_NukeTick = Server()->TickSpeed()*15;
 
 				char aBuf[256];
 				str_format(aBuf, sizeof(aBuf), "flag_grab player='%d:%s'",
@@ -295,9 +292,9 @@ void CGameControllerZESC::StartZomb(int x)
 void CGameControllerZESC::CheckZomb()
 {
 	/* FUCKING COMPLEX */
-	if(m_NukeLaunched && m_RoundStarted == 1)
+	if(m_NukeLaunched && m_RoundStarted == 1 && !m_Hotfix)
 	{
-		bool OK;
+		bool OK = false;
 		if(!CountZombs())
 		{
 			m_aTeamscore[TEAM_BLUE] = 100;
@@ -313,7 +310,10 @@ void CGameControllerZESC::CheckZomb()
 			OK = true;
 		}
 		if(!OK)
-			m_NukeLaunched = false;
+		{
+			m_Hotfix = true;
+			CheckZomb();
+		}
 		return;
 	}
 	if(CountPlayers() < 2 && m_RoundStarted != 2)
@@ -372,6 +372,8 @@ void CGameControllerZESC::Reset()
 		m_DoorTick[i] = 0; }
 	m_NukeLaunched = false;
 	m_NukeTick = 0;
+	m_Hotfix = false;
+	GameServer()->SendBroadcast("", -1);
 }
 
 bool CGameControllerZESC::DoorState(int Index)

@@ -44,6 +44,7 @@ public:
 	int IsSpeedup(int Index);
 	void GetSpeedup(int Index, vec2 *Dir, int *Force);
 	int IsHoldpoint(int Index);
+	bool IsBunker(vec2 Pos);
 	class CTeleTile *m_pTele;
 	class CSpeedupTile *m_pSpeedup;
 
