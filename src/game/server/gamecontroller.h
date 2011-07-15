@@ -67,8 +67,6 @@ public:
 	IGameController(class CGameContext *pGameServer);
 	virtual ~IGameController();
 
-	void DoTeamScoreWincheck();
-
 	int m_aTeamscore[2];
 	int m_ZombWarmup;
 	int m_SuddenDeath;

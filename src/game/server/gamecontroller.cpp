@@ -50,10 +50,25 @@ void IGameController::EvaluateSpawnType(CSpawnEval *pEval, int Type)
 	for(int i = 0; i < m_aNumSpawnPoints[Type]; i++)
 	{
 		// check if the position is occupado
-		if(GameServer()->m_World.FindEntities(m_aaSpawnPoints[Type][i], 64, 0, 1, CGameWorld::ENTTYPE_CHARACTER))
-			continue;
+		CCharacter *aEnts[MAX_CLIENTS];
+		int Num = GameServer()->m_World.FindEntities(m_aaSpawnPoints[Type][i], 64, (CEntity**)aEnts, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
+		vec2 Positions[5] = { vec2(0.0f, 0.0f), vec2(-32.0f, 0.0f), vec2(0.0f, -32.0f), vec2(32.0f, 0.0f), vec2(0.0f, 32.0f) };	// start, left, up, right, down
+		int Result = -1;
+		for(int Index = 0; Index < 5 && Result == -1; ++Index)
+		{
+			Result = Index;
+			for(int c = 0; c < Num; ++c)
+				if(GameServer()->Collision()->CheckPoint(m_aaSpawnPoints[Type][i]+Positions[Index]) ||
+					distance(aEnts[c]->m_Pos, m_aaSpawnPoints[Type][i]+Positions[Index]) <= aEnts[c]->m_ProximityRadius)
+				{
+					Result = -1;
+					break;
+				}
+		}
+		if(Result == -1)
+			continue;	// try next spawn point
 
-		vec2 P = m_aaSpawnPoints[Type][i];
+		vec2 P = m_aaSpawnPoints[Type][i]+Positions[Result];
 		if(!pEval->m_Got)
 		{
 			pEval->m_Got = true;
@@ -79,6 +94,7 @@ bool IGameController::CanSpawn(int Team, vec2 *pOutPos)
 		EvaluateSpawnType(&Eval, 0);
 	if(!Eval.m_Got)
 		EvaluateSpawnType(&Eval, 2);
+
 
 	*pOutPos = Eval.m_Pos;
 	return Eval.m_Got;
@@ -519,20 +535,6 @@ bool IGameController::CanJoinTeam(int Team, int NotThisID)
 	}
 
 	return (aNumplayers[0] + aNumplayers[1]) < g_Config.m_SvMaxClients-g_Config.m_SvSpectatorSlots;
-}
-
-void IGameController::DoTeamScoreWincheck()
-{
-	if(m_GameOverTick == -1 && !m_Warmup)
-	{
-		// check score win condition
-		if((g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !m_SuddenDeath)
-		{
-			//GameServer()->SendBroadcast("Humans win!", -1);
-			m_aTeamscore[TEAM_BLUE] += 100;
-			EndRound();
-		}
-	}
 }
 
 int IGameController::ClampTeam(int Team)

@@ -138,13 +138,15 @@ struct CMapItemGroup_v1
 
 struct CMapItemGroup : public CMapItemGroup_v1
 {
-	enum { CURRENT_VERSION=2 };
+	enum { CURRENT_VERSION=3 };
 
 	int m_UseClipping;
 	int m_ClipX;
 	int m_ClipY;
 	int m_ClipW;
 	int m_ClipH;
+
+	int m_aName[3];
 } ;
 
 struct CMapItemLayer
@@ -173,6 +175,7 @@ struct CMapItemLayerTilemap
 	int m_Tele;
 
 	int m_Speedup;
+	int m_aName[3];
 } ;
 
 struct CMapItemLayerQuads
@@ -183,6 +186,8 @@ struct CMapItemLayerQuads
 	int m_NumQuads;
 	int m_Data;
 	int m_Image;
+
+	int m_aName[3];
 } ;
 
 struct CMapItemVersion

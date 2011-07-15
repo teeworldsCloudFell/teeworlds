@@ -180,8 +180,6 @@ void CGameControllerZESC::Tick()
 		}
 	}
 
-	DoTeamScoreWincheck();
-
 	// Flag
 	if(m_apFlags[TEAM_BLUE])
 	{
