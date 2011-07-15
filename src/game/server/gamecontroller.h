@@ -72,6 +72,7 @@ public:
 	int m_SuddenDeath;
 
 	void DoWarmup(int Seconds);
+	void DoTeamScoreWincheck();
 
 	void StartRound();
 	void EndRound();

@@ -475,8 +475,22 @@ void IGameController::Tick()
 			}
 		}
 	}
+	DoTeamScoreWincheck();
 }
 
+void IGameController::DoTeamScoreWincheck()
+{
+	if(m_GameOverTick == -1 && !m_Warmup)
+	{
+		// check score win condition
+		if((g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !m_SuddenDeath)
+		{
+			//GameServer()->SendBroadcast("Humans win!", -1);
+			m_aTeamscore[TEAM_BLUE] += 100;
+			EndRound();
+		}
+	}
+}
 
 bool IGameController::IsTeamplay() const
 {

@@ -272,7 +272,7 @@ void CGameControllerZESC::Snap(int SnappingClient)
 		pGameDataObj->m_TeamscoreBlue = CountHumans(); }
 	else {
 		pGameDataObj->m_TeamscoreRed = m_aTeamscore[TEAM_RED];
-		pGameDataObj->m_TeamscoreBlue = m_aTeamscore[TEAM_BLUE]; }
+		pGameDataObj->m_TeamscoreBlue = 0/*m_aTeamscore[TEAM_BLUE]*/; }
 
 	if(m_apFlags[TEAM_BLUE])
 		pGameDataObj->m_FlagCarrierBlue = FLAG_ATSTAND;
