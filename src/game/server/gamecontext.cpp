@@ -514,12 +514,7 @@ void CGameContext::OnClientEnter(int ClientID)
 
 	m_VoteUpdate = true;
 
-	if(!zESCController()->ZombStarted())
-		zESCController()->CheckZomb();
-	if(zESCController()->CountHumans() < 2 && !zESCController()->ZombStarted() && !m_pController->m_ZombWarmup)
-		m_pController->m_SuddenDeath = 1;
-	else
-		m_pController->m_SuddenDeath = 0;
+	zESCController()->CheckZomb();
 }
 
 void CGameContext::OnClientConnected(int ClientID)
@@ -530,6 +525,9 @@ void CGameContext::OnClientConnected(int ClientID)
 	m_apPlayers[ClientID] = new(ClientID) CPlayer(this, ClientID, StartTeam);
 	//players[client_id].init(client_id);
 	//players[client_id].client_id = client_id;
+
+	if(zESCController()->m_NukeLaunched || zESCController()->m_NukeTick)
+		m_apPlayers[ClientID]->Nuke();
 
 #ifdef CONF_DEBUG
 	if(g_Config.m_DbgDummies)
@@ -556,15 +554,10 @@ void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 	delete m_apPlayers[ClientID];
 	m_apPlayers[ClientID] = 0;
 
-	if(zESCController()->CountPlayers() < 2) {
-		zESCController()->StartZomb(0);
-		m_pController->ZombWarmup(0);
-		zESCController()->CheckZomb();
-		m_pController->m_SuddenDeath = 1; }
-	else if(!zESCController()->CountZombs() && zESCController()->ZombStarted() && !m_pController->m_ZombWarmup)
+	if(!zESCController()->CountZombs() && zESCController()->ZombStarted() && !m_pController->m_ZombWarmup && !zESCController()->NukeLaunched())
 		m_pController->RandomZomb();
-	else
-		m_pController->m_SuddenDeath = 0;
+
+	zESCController()->CheckZomb();
 
 	m_VoteUpdate = true;
 

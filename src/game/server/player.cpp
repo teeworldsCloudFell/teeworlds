@@ -231,8 +231,7 @@ void CPlayer::SetTeam(int Team)
 		return; }
 	if(GameServer()->zESCController()->m_NukeLaunched) {
 		GameServer()->SendBroadcast("Nuke allready launched, wait for gameend.", m_ClientID);
-		m_Nuked = true;
-		m_RespawnTick = Server()->Tick()+Server()->TickSpeed()/2;
+		Nuke();
 		return; }
 	if(m_Team == TEAM_RED && Team != TEAM_SPECTATORS) {
 		GameServer()->SendBroadcast("Zombies can't change team.", m_ClientID);
@@ -295,7 +294,10 @@ void CPlayer::TryRespawn()
 	if(m_Team == TEAM_RED)
 	{
 		if(!GameServer()->m_pController->ZombieSpawn(&SpawnPos))
-			return;
+		{
+			if(!GameServer()->m_pController->CanSpawn(TEAM_BLUE, &SpawnPos))
+				return;
+		}
 	}
 	else if(m_Team == TEAM_BLUE)
 	{
@@ -379,4 +381,5 @@ void CPlayer::Nuke()
 		if(GameServer()->m_apPlayers[i] && GameServer()->m_apPlayers[i]->m_SpectatorID == m_ClientID)
 			GameServer()->m_apPlayers[i]->m_SpectatorID = SPEC_FREEVIEW;
 	}
+	GameServer()->zESCController()->CheckZomb();
 }

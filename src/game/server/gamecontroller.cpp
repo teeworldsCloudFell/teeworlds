@@ -105,9 +105,9 @@ bool IGameController::OnEntity(int Index, vec2 Pos)
 	else if(Index == ENTITY_SPAWN_BLUE)
 		m_aaSpawnPoints[2][m_aNumSpawnPoints[2]++] = Pos;
 	/*else if(Index == ENTITY_ARMOR_1)
-		Type = POWERUP_ARMOR;*/
+		Type = POWERUP_ARMOR;
 	else if(Index == ENTITY_HEALTH_1)
-		Type = POWERUP_HEALTH;
+		Type = POWERUP_HEALTH;*/
 	else if(Index == ENTITY_WEAPON_SHOTGUN)
 	{
 		Type = POWERUP_WEAPON;
@@ -128,14 +128,13 @@ bool IGameController::OnEntity(int Index, vec2 Pos)
 		Type = POWERUP_NINJA;
 		SubType = WEAPON_NINJA;
 	}
-	else if(Index >= 17 && Index <= 48)
+	else if(Index >= 17 && Index <= 48 && g_Config.m_SvDoors)
 	{
 		CDoor *pDoor = new CDoor(&GameServer()->m_World, Index-17);
 		pDoor->m_Pos = Pos;
 		return true;
 	}
-
-	if(Type != -1 && !g_Config.m_SvNoItems)
+	if(Type != -1)
 	{
 		CPickup *pPickup = new CPickup(&GameServer()->m_World, Type, SubType);
 		pPickup->m_Pos = Pos;
@@ -188,9 +187,9 @@ void IGameController::StartRound()
 	m_SuddenDeath = 0;
 	m_GameOverTick = -1;
 
-	GameServer()->zESCController()->StartZomb(0);
+	GameServer()->zESCController()->StartZomb(false);
 	if(GameServer()->zESCController()->CountPlayers() > 1) {
-		GameServer()->zESCController()->StartZomb(1);
+		GameServer()->zESCController()->StartZomb(true);
 		GameServer()->m_pController->ZombWarmup(15); }
 	else
 		m_SuddenDeath = 1;
@@ -531,8 +530,7 @@ void IGameController::DoTeamScoreWincheck()
 		{
 			//GameServer()->SendBroadcast("Humans win!", -1);
 			m_aTeamscore[TEAM_BLUE] += 100;
-			GameServer()->zESCController()->StartZomb(2);
-			GameServer()->zESCController()->CheckZomb();
+			EndRound();
 		}
 	}
 }
@@ -561,14 +559,14 @@ void IGameController::RandomZomb()
 	{
 		ZombCID = rand()%MAX_CLIENTS;
 		WTF--;
-		if(!WTF)
+		if(!WTF) // Anti 100% CPU :D
 		{
 			StartRound();
 			return;
 		}
 	}
 	GameServer()->m_apPlayers[ZombCID]->SetZomb(-1);
-	GameServer()->zESCController()->StartZomb(1);
+	GameServer()->zESCController()->StartZomb(true);
 	m_LastZomb2 = m_LastZomb;
 	m_LastZomb = ZombCID;
 }

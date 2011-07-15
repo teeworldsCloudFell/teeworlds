@@ -420,7 +420,7 @@ void CCharacter::FireWeapon()
 				ProjStartPos,
 				Direction,
 				(int)(Server()->TickSpeed()*GameServer()->Tuning()->m_GrenadeLifetime),
-				1, true, 0, SOUND_GRENADE_EXPLODE, WEAPON_GRENADE);
+				1, true, 5, SOUND_GRENADE_EXPLODE, WEAPON_GRENADE);
 
 			// pack the Projectile and send it to the client Directly
 			CNetObj_Projectile p;
@@ -594,9 +594,34 @@ void CCharacter::Tick()
 	// tile index
 	int TileIndex = GameServer()->Collision()->GetIndex(m_PrevPos, m_Pos);
 
-	int z = GameServer()->Collision()->IsHoldpoint(TileIndex);
-	if(z != -1 && (m_PrevPos != vec2(0, 0) || m_PrevPos != m_Pos))
+	int z = GameServer()->Collision()->IsHoldpoint(m_Pos);
+	if(z != -1)
 		pzESC->OnHoldpoint(z);
+
+	z = GameServer()->Collision()->IsZStop(m_Pos);
+	if(z != -1 && m_pPlayer->GetTeam() == TEAM_BLUE)
+		pzESC->OnZStop(z);
+
+	if(GameServer()->Collision()->IsWeaponStrip(m_Pos))
+	{
+		if(m_ActiveWeapon != WEAPON_HAMMER && m_ActiveWeapon != WEAPON_GUN)
+		{
+			m_ActiveWeapon = WEAPON_GUN;
+			m_LastWeapon = WEAPON_HAMMER;
+		}
+		for(int i = 2; i < NUM_WEAPONS; i++)
+			m_aWeapons[i].m_Got = false;
+	}
+
+	if(m_ActiveWeapon == WEAPON_NINJA && GameServer()->Collision()->IsKatanaStrip(m_Pos))
+	{
+		m_aWeapons[WEAPON_NINJA].m_Got = false;
+		m_ActiveWeapon = m_LastWeapon;
+		if(m_ActiveWeapon == WEAPON_NINJA)
+			m_ActiveWeapon = WEAPON_GUN;
+
+		SetWeapon(m_ActiveWeapon);
+	}
 
 	else if(TileIndex != -1 && GameServer()->Collision()->GetCollision(TileIndex) == TILE_STOPL)
 	{
@@ -672,10 +697,11 @@ void CCharacter::Tick()
 			m_Core.m_Vel = vec2(0,0);
 		if(g_Config.m_SvStrip)
 		{
-			m_ActiveWeapon = WEAPON_HAMMER;
+			m_ActiveWeapon = WEAPON_GUN;
 			m_LastWeapon = WEAPON_HAMMER;
-			m_aWeapons[0].m_Got = true;
-			for(int i = 1; i < NUM_WEAPONS; i++)
+			m_aWeapons[WEAPON_HAMMER].m_Got = true;
+			m_aWeapons[WEAPON_GUN].m_Got = true;
+			for(int i = 2; i < NUM_WEAPONS; i++)
 				m_aWeapons[i].m_Got = false;
 		}
 	}
@@ -698,9 +724,6 @@ void CCharacter::Tick()
 		Die(m_pPlayer->GetCID(), WEAPON_WORLD);
 	}
 
-	if(pzESC->m_NukeLaunched && !GameServer()->Collision()->IsBunker(m_Pos))
-		m_pPlayer->Nuke();
-
 	// handle Weapons
 	HandleWeapons();
 
@@ -708,6 +731,9 @@ void CCharacter::Tick()
 	m_PrevInput = m_Input;
 
 	m_PrevPos = m_Core.m_Pos;
+
+	if(pzESC->m_NukeLaunched && !GameServer()->Collision()->IsBunker(m_Pos))
+		m_pPlayer->Nuke();
 	return;
 }
 
@@ -844,12 +870,16 @@ void CCharacter::Die(int Killer, int Weapon)
 
 bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 {
-	if((m_pPlayer->GetTeam() == TEAM_BLUE && (Weapon == WEAPON_GRENADE || Weapon == WEAPON_HAMMER)) || m_pPlayer->GetTeam() == TEAM_RED)
+	if(m_pPlayer->GetTeam() == TEAM_BLUE && (Weapon == WEAPON_GRENADE || Weapon == WEAPON_HAMMER))
 		m_Core.m_Vel += Force;
 
 	if(m_pPlayer->GetTeam() == TEAM_RED)
 	{
-		if(Weapon == WEAPON_RIFLE)
+		if(Weapon == WEAPON_GRENADE)
+			m_Core.m_Vel += Force*2;
+		else if(Weapon == WEAPON_SHOTGUN || Weapon == WEAPON_GUN)
+			m_Core.m_Vel += Force;
+		else if(Weapon == WEAPON_RIFLE)
 			m_FreezeTick = Server()->Tick() + Server()->TickSpeed()*1.5;
 
 		return false;

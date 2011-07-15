@@ -19,20 +19,20 @@ CDoor::CDoor(CGameWorld *pGameWorld, int Index)
 
 void CDoor::Reset()
 {
-
 }
 
 void CDoor::Tick()
 {
-	if(!GameServer()->zESCController()->DoorState(m_Index))
+	m_State = GameServer()->zESCController()->DoorState(m_Index);
+	if(!m_State || m_State == 2 || m_State == 4)
 		return;
 	CCharacter *apCloseCCharacters[MAX_CLIENTS];
 	int Num = GameServer()->m_World.FindEntities(m_Pos, 16.0f, (CEntity**)apCloseCCharacters, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
 	for(int i = 0; i < Num; i++)
 	{
-		if(!apCloseCCharacters[i]->IsAlive() || apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_SPECTATORS || GameServer()->Collision()->IntersectLine(m_Pos, apCloseCCharacters[i]->m_Pos, NULL, NULL))
+		if(!apCloseCCharacters[i]->IsAlive() || apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_SPECTATORS || GameServer()->Collision()->IntersectLine(m_Pos, apCloseCCharacters[i]->m_Pos, NULL, NULL) || (m_State == 3 && apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_BLUE))
 			continue;
-		if(apCloseCCharacters[i]->m_PrevDoorPos == vec2(0.0f, 0.0f) || distance(apCloseCCharacters[i]->m_PrevDoorPos, apCloseCCharacters[i]->m_Core.m_Pos) > (16.0f * 2.0f))
+		if(apCloseCCharacters[i]->m_PrevDoorPos == vec2(0.0f, 0.0f) || distance(apCloseCCharacters[i]->m_PrevDoorPos, apCloseCCharacters[i]->m_Core.m_Pos) > 32.0f)
 			apCloseCCharacters[i]->m_PrevDoorPos = apCloseCCharacters[i]->m_PrevPos;
 		apCloseCCharacters[i]->m_Core.m_Pos = apCloseCCharacters[i]->m_PrevDoorPos;
 		apCloseCCharacters[i]->m_Core.m_Vel = vec2(0.f, 0.f);
@@ -41,7 +41,7 @@ void CDoor::Tick()
 
 void CDoor::Snap(int SnappingClient)
 {
-	if(!GameServer()->zESCController()->DoorState(m_Index) || NetworkClipped(SnappingClient))
+	if(!m_State || m_State == 2 || m_State == 4 || NetworkClipped(SnappingClient))
 		return;
 
 	CNetObj_Pickup *pP = static_cast<CNetObj_Pickup *>(Server()->SnapNewItem(NETOBJTYPE_PICKUP, m_ID, sizeof(CNetObj_Pickup)));
@@ -50,6 +50,9 @@ void CDoor::Snap(int SnappingClient)
 
 	pP->m_X = (int)m_Pos.x;
 	pP->m_Y = (int)m_Pos.y;
-	pP->m_Type = POWERUP_ARMOR;
+	if(m_State == 3)
+		pP->m_Type = POWERUP_HEALTH;
+	else
+		pP->m_Type = POWERUP_ARMOR;
 	pP->m_Subtype = 0;
 }

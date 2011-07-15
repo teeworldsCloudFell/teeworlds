@@ -81,16 +81,16 @@ MACRO_CONFIG_INT(SvVoteKickBantime, sv_vote_kick_bantime, 5, 0, 1440, CFGFLAG_SE
 MACRO_CONFIG_INT(SvRegen, sv_regen, 0, 0, 50, CFGFLAG_SERVER, "Set regeneration")
 MACRO_CONFIG_INT(SvStrip, sv_strip, 0, 0, 1, CFGFLAG_SERVER, "Enable or disable keeping weapon after teleporting")
 MACRO_CONFIG_INT(SvInfiniteAmmo, sv_infinite_ammo, 0, 0, 1, CFGFLAG_SERVER, "Enable or disable infinite ammo")
-MACRO_CONFIG_INT(SvNoItems, sv_no_items, 0, 0, 1, CFGFLAG_SERVER, "removes any items from the map if there are any")
 MACRO_CONFIG_INT(SvTeleport, sv_teleport, 1, 0, 1, CFGFLAG_SERVER, "Enable or disable teleportation")
 MACRO_CONFIG_INT(SvTeleportGrenade, sv_teleport_grenade, 1, 0, 1, CFGFLAG_SERVER, "Enable or disable teleport of grenade")
 MACRO_CONFIG_INT(SvTeleportKill, sv_teleport_kill, 0, 0, 1, CFGFLAG_SERVER, "Teleporting one someone kills him")
 MACRO_CONFIG_INT(SvTeleportVelReset, sv_teleport_vel_reset, 0, 0, 1, CFGFLAG_SERVER, "Reset velocity after teleport")
-MACRO_CONFIG_INT(SvRocketJumpDamage, sv_rocket_jump_damage, 1, 0, 1, CFGFLAG_SERVER, "Enable or disable rocket jump damage")
+MACRO_CONFIG_INT(SvRocketJumpDamage, sv_rocket_jump_damage, 0, 0, 1, CFGFLAG_SERVER, "Enable or disable rocket jump damage")
 MACRO_CONFIG_INT(SvPickupRespawn, sv_pickup_respawn, 1, -1, 120, CFGFLAG_SERVER, "Time before a pickup respawn")
 MACRO_CONFIG_INT(SvSpeedupMult, sv_speedup_mult, 10, 1, 100, CFGFLAG_SERVER, "Boost power by multiplication")
 MACRO_CONFIG_INT(SvSpeedupAdd, sv_speedup_add, 0, -100, 100, CFGFLAG_SERVER, "Boost power")
 MACRO_CONFIG_INT(SvJumperAdd, sv_jumper_add, 0, -100, 100, CFGFLAG_SERVER, "Jumper power")
+MACRO_CONFIG_INT(SvDoors, sv_doors, 1, 0, 1, CFGFLAG_SERVER, "Activate Doors")
 
 // debug
 #ifdef CONF_DEBUG // this one can crash the server if not used correctly

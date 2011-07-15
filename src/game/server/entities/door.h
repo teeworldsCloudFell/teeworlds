@@ -4,6 +4,14 @@
 #define GAME_SERVER_ENTITIES_DOOR_H
 
 #include <game/server/entity.h>
+/**********************************************************************************************
+	Door States:
+				0 = Open
+				1 = Closed
+				2 = Closing for zombies
+				3 = Closed for zombies
+				4 = Reopened
+***********************************************************************************************/
 
 class CDoor : public CEntity
 {

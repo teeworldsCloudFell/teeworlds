@@ -17,28 +17,29 @@ public:
 
 	void InitTeleporter();
 
-	int m_RoundStarted;
-	bool m_DoorState[32];
+	bool m_RoundStarted;
+	int m_DoorState[32];
 	int m_DoorTick[32];
 
 	int m_NukeTick;
 	bool m_NukeLaunched;
-	bool m_Hotfix;
 
 	virtual void Tick();
 	virtual void Snap(int SnappingClient);
 	virtual int OnCharacterDeath(class CCharacter *pVictim, class CPlayer *pKiller, int Weapon);
 	virtual bool OnEntity(int Index, vec2 Pos);
 	virtual void OnHoldpoint(int Index);
-	virtual int ZombStarted();
-	virtual void StartZomb(int x);
+	virtual void OnZStop(int Index);
+	virtual bool ZombStarted();
+	virtual void StartZomb(bool Value);
 	virtual void CheckZomb();
 	virtual int CountPlayers();
 	virtual int CountZombs();
 	virtual int CountHumans();
 	virtual void Reset();
-	virtual bool DoorState(int Index);
-	virtual void SetDoorState(int Index, bool State);
+	virtual int DoorState(int Index);
+	virtual void SetDoorState(int Index, int State);
+	virtual bool NukeLaunched();
 };
 
 #endif
