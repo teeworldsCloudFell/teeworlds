@@ -52,7 +52,7 @@ void IGameController::EvaluateSpawnType(CSpawnEval *pEval, int Type)
 		// check if the position is occupado
 		CCharacter *aEnts[MAX_CLIENTS];
 		int Num = GameServer()->m_World.FindEntities(m_aaSpawnPoints[Type][i], 64, (CEntity**)aEnts, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
-		vec2 Positions[5] = { vec2(0.0f, 0.0f), vec2(-32.0f, 0.0f), vec2(0.0f, -32.0f), vec2(32.0f, 0.0f), vec2(0.0f, 32.0f) };	// start, left, up, right, down
+		vec2 Positions[5] = { vec2(0.0f, 0.0f), vec2(-6.0f, 0.0f), vec2(0.0f, -6.0f), vec2(6.0f, 0.0f), vec2(0.0f, 6.0f) };	// start, left, up, right, down
 		int Result = -1;
 		for(int Index = 0; Index < 5 && Result == -1; ++Index)
 		{
@@ -204,11 +204,7 @@ void IGameController::StartRound()
 	m_GameOverTick = -1;
 
 	GameServer()->zESCController()->StartZomb(false);
-	if(GameServer()->zESCController()->CountPlayers() > 1) {
-		GameServer()->zESCController()->StartZomb(true);
-		GameServer()->m_pController->ZombWarmup(15); }
-	else
-		m_SuddenDeath = 1;
+	GameServer()->zESCController()->CheckZomb();
 
 	GameServer()->m_World.m_Paused = false;
 	m_aTeamscore[TEAM_RED] = 0;
@@ -475,7 +471,6 @@ void IGameController::Tick()
 			}
 		}
 	}
-	DoTeamScoreWincheck();
 }
 
 void IGameController::DoTeamScoreWincheck()
@@ -486,7 +481,8 @@ void IGameController::DoTeamScoreWincheck()
 		if((g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !m_SuddenDeath)
 		{
 			//GameServer()->SendBroadcast("Humans win!", -1);
-			m_aTeamscore[TEAM_BLUE] += 100;
+			m_aTeamscore[TEAM_BLUE] = 100;
+			m_aTeamscore[TEAM_RED] = 0;
 			EndRound();
 		}
 	}
@@ -568,14 +564,14 @@ void IGameController::ZombWarmup(int W)
 void IGameController::RandomZomb()
 {
 	int ZombCID = rand()%MAX_CLIENTS;
-	int WTF = 100;
+	int WTF = 100; // 100 Trys should be enough
 	while(!GameServer()->m_apPlayers[ZombCID] || (GameServer()->m_apPlayers[ZombCID] && GameServer()->m_apPlayers[ZombCID]->GetTeam() == TEAM_SPECTATORS) ||
 			m_LastZomb == ZombCID || (GameServer()->zESCController()->CountPlayers() > 2 && m_LastZomb2 == ZombCID) || !GameServer()->m_apPlayers[ZombCID]->GetCharacter() ||
 			(GameServer()->m_apPlayers[ZombCID]->GetCharacter() && !GameServer()->m_apPlayers[ZombCID]->GetCharacter()->IsAlive()))	// <- End ^^
 	{
 		ZombCID = rand()%MAX_CLIENTS;
 		WTF--;
-		if(!WTF) // Anti 100% CPU :D
+		if(!WTF) // Anti 100% CPU :D (Very crappy coded xD, but it's a fix :P)
 		{
 			StartRound();
 			return;

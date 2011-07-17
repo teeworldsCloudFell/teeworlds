@@ -114,6 +114,8 @@ void CGameControllerZESC::Tick()
 	if(!ZombStarted() || GameServer()->m_pController->m_ZombWarmup > 14*Server()->TickSpeed() || GameServer()->m_World.m_Paused)
 		return;
 
+	GameServer()->m_pController->DoTeamScoreWincheck();
+
 	// update flag position
 	if(m_apFlags[TEAM_RED] && m_apFlags[TEAM_RED]->m_pCarryingCharacter)
 		m_apFlags[TEAM_RED]->m_Pos = m_apFlags[TEAM_RED]->m_pCarryingCharacter->m_Core.m_Pos;
@@ -267,17 +269,22 @@ void CGameControllerZESC::Snap(int SnappingClient)
 	if(!pGameDataObj)
 		return;
 
-	if(m_aTeamscore[TEAM_RED] < 100 && m_aTeamscore[TEAM_BLUE] < 100) {
+	if(m_aTeamscore[TEAM_RED] < 100 && m_aTeamscore[TEAM_BLUE] < 100)
+	{
 		pGameDataObj->m_TeamscoreRed = CountZombs();
-		pGameDataObj->m_TeamscoreBlue = CountHumans(); }
-	else {
+		pGameDataObj->m_TeamscoreBlue = CountHumans();
+	}
+	else
+	{
 		pGameDataObj->m_TeamscoreRed = m_aTeamscore[TEAM_RED];
-		pGameDataObj->m_TeamscoreBlue = 0/*m_aTeamscore[TEAM_BLUE]*/; }
+		pGameDataObj->m_TeamscoreBlue = m_aTeamscore[TEAM_BLUE];
+	}
 
 	if(m_apFlags[TEAM_BLUE])
 		pGameDataObj->m_FlagCarrierBlue = FLAG_ATSTAND;
 	else
 		pGameDataObj->m_FlagCarrierBlue = FLAG_MISSING;
+
 	if(m_apFlags[TEAM_RED] && !m_apFlags[TEAM_BLUE])
 	{
 		if(m_apFlags[TEAM_RED]->m_AtStand)
@@ -350,9 +357,15 @@ void CGameControllerZESC::CheckZomb()
 		if(m_NukeLaunched || (!m_apFlags[TEAM_RED] && !m_apFlags[TEAM_BLUE]))
 		{
 			if(!CountHumans())
+			{
 				m_aTeamscore[TEAM_RED] = 100;
+				m_aTeamscore[TEAM_BLUE] = 0;
+			}
 			if(!CountZombs())
+			{
 				m_aTeamscore[TEAM_BLUE] = 100;
+				m_aTeamscore[TEAM_RED] = 0;
+			}
 		}
 		return;
 	}
