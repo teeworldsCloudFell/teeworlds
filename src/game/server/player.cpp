@@ -377,6 +377,7 @@ void CPlayer::ResetZomb()
 		return;
 	m_Team = TEAM_BLUE;
 	GameServer()->m_pController->OnPlayerInfoChange(GameServer()->m_apPlayers[m_ClientID]);
+	m_Nuked = false;
 }
 
 void CPlayer::Nuke()
