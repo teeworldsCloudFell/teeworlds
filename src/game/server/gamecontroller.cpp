@@ -52,7 +52,7 @@ void IGameController::EvaluateSpawnType(CSpawnEval *pEval, int Type)
 		// check if the position is occupado
 		CCharacter *aEnts[MAX_CLIENTS];
 		int Num = GameServer()->m_World.FindEntities(m_aaSpawnPoints[Type][i], 64, (CEntity**)aEnts, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
-		vec2 Positions[5] = { vec2(0.0f, 0.0f), vec2(-6.0f, 0.0f), vec2(0.0f, -6.0f), vec2(6.0f, 0.0f), vec2(0.0f, 6.0f) };	// start, left, up, right, down
+		vec2 Positions[5] = { vec2(0.0f, 0.0f), vec2(-2.0f, 0.0f), vec2(0.0f, -2.0f), vec2(2.0f, 0.0f), vec2(0.0f, 2.0f) };	// start, left, up, right, down
 		int Result = -1;
 		for(int Index = 0; Index < 5 && Result == -1; ++Index)
 		{
@@ -81,7 +81,7 @@ bool IGameController::CanSpawn(int Team, vec2 *pOutPos)
 {
 	CSpawnEval Eval;
 
-	// spectators can't spawn
+	// spectators can't spawn, zombies also
 	if(Team == TEAM_SPECTATORS || Team == TEAM_RED)
 		return false;
 
