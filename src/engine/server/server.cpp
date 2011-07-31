@@ -1234,7 +1234,6 @@ int CServer::Run()
 
 	m_Econ.Init(Console());
 
->>>>>>> 50edfd37c0ed57ff793b79d06edd0bde1f6cf1bd
 	char aBuf[256];
 	str_format(aBuf, sizeof(aBuf), "server name is '%s'", g_Config.m_SvName);
 	Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
