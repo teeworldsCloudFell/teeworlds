@@ -53,10 +53,24 @@ void CLayers::Init(class IKernel *pKernel)
 
 					//break;
 				}
-				if(pTilemap->m_Flags&2)
+				else if(pTilemap->m_Flags&2)
+				{
+					if(pTilemap->m_Version < 3) // get the right values for tele layer
+					{
+						int *pTele = (int*)(pTilemap)+15;
+						pTilemap->m_Tele = *pTele;
+					}
 					m_pTeleLayer = pTilemap;
-				if(pTilemap->m_Flags&4)
+				}
+				else if(pTilemap->m_Flags&4)
+				{
+					if(pTilemap->m_Version < 3) // get the right values for speedup layer
+					{
+						int *pSpeedup = (int*)(pTilemap)+16;
+						pTilemap->m_Speedup = *pSpeedup;
+					}
 					m_pSpeedupLayer = pTilemap;
+				}
 			}
 		}
 	}

@@ -11,7 +11,18 @@
 				2 = Closing for zombies
 				3 = Closed for zombies
 				4 = Reopened
+	Doors:
+				0-32 = Normal Doors
+				32-48 = Zombie Doors
 ***********************************************************************************************/
+enum
+{
+	DOOR_OPEN = 0,
+	DOOR_CLOSED,
+	DOOR_ZCLOSING,
+	DOOR_ZCLOSED,
+	DOOR_REOPEN
+};
 
 class CDoor : public CEntity
 {

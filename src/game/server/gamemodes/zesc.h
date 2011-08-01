@@ -18,8 +18,8 @@ public:
 	void InitTeleporter();
 
 	bool m_RoundStarted;
-	int m_DoorState[32];
-	int m_DoorTick[32];
+	int m_DoorState[48];
+	int m_DoorTick[48];
 
 	int m_NukeTick;
 	bool m_NukeLaunched;
@@ -40,6 +40,7 @@ public:
 	virtual int DoorState(int Index);
 	virtual void SetDoorState(int Index, int State);
 	virtual bool NukeLaunched();
+	virtual int GetDoorTime(int Index);
 };
 
 #endif

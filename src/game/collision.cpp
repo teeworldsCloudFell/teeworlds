@@ -24,6 +24,10 @@ CCollision::CCollision()
 
 void CCollision::Init(class CLayers *pLayers)
 {
+	// reset race specific pointers
+	m_pTele = 0;
+	m_pSpeedup = 0;
+
 	m_pLayers = pLayers;
 	m_Width = m_pLayers->GameLayer()->m_Width;
 	m_Height = m_pLayers->GameLayer()->m_Height;
@@ -56,7 +60,7 @@ void CCollision::Init(class CLayers *pLayers)
 		}
 
 		// race tiles
-		if(Index >= 14 && Index <= 111)
+		if(Index >= 14 && Index <= 127)
 			m_pTiles[i].m_Index = Index;
 	}
 }
@@ -95,7 +99,7 @@ int CCollision::GetIndex(vec2 PrevPos, vec2 Pos)
 		int Nx = clamp((int)Pos.x/32, 0, m_Width-1);
 		int Ny = clamp((int)Pos.y/32, 0, m_Height-1);
 		
-		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_STOPL && m_pTiles[Ny*m_Width+Nx].m_Index <= 111) ||
+		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_STOPL && m_pTiles[Ny*m_Width+Nx].m_Index <= 127) ||
 			(m_pTele && (m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEIN || m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEOUT)) ||
 			(m_pSpeedup && m_pSpeedup[Ny*m_Width+Nx].m_Force > 0))
 		{
@@ -114,7 +118,7 @@ int CCollision::GetIndex(vec2 PrevPos, vec2 Pos)
 		Tmp = mix(PrevPos, Pos, a);
 		Nx = clamp((int)Tmp.x/32, 0, m_Width-1);
 		Ny = clamp((int)Tmp.y/32, 0, m_Height-1);
-		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_STOPL && m_pTiles[Ny*m_Width+Nx].m_Index <= 111) ||
+		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_STOPL && m_pTiles[Ny*m_Width+Nx].m_Index <= 127) ||
 			(m_pTele && (m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEIN || m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEOUT)) ||
 			(m_pSpeedup && m_pSpeedup[Ny*m_Width+Nx].m_Force > 0))
 		{
@@ -202,7 +206,7 @@ int CCollision::IsZStop(vec2 Pos)
 		int Ny = clamp(y/32, 0, m_Height-1);
 
 		int Tile = m_pTiles[Ny*m_Width+Nx].m_Index > 128 ? 0 : m_pTiles[Ny*m_Width+Nx].m_Index;
-		if(Tile >= 80 && Tile <= 111)
+		if(Tile >= 80 && Tile <= 127)
 			return Tile-80;
 		switch(i)
 		{

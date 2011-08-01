@@ -56,6 +56,8 @@ enum
 	TILE_STOPR,
 	TILE_STOPB,
 	TILE_STOPT,
+	TILE_BEGIN,
+	TILE_END,
 
 	TILEFLAG_VFLIP=1,
 	TILEFLAG_HFLIP=2,
@@ -113,6 +115,16 @@ public:
 	unsigned char m_Force;
 	short m_Angle;
 };
+
+struct CMapItemInfo
+{
+	int m_Version;
+	int m_Author;
+	int m_MapVersion;
+	int m_Credits;
+	int m_License;
+	int m_Settings;
+} ;
 
 struct CMapItemImage
 {
@@ -173,10 +185,11 @@ struct CMapItemLayerTilemap
 	int m_Image;
 	int m_Data;
 
-	int m_Tele;
-
-	int m_Speedup;
 	int m_aName[3];
+
+	int m_Tele;
+	
+	int m_Speedup;
 } ;
 
 struct CMapItemLayerQuads

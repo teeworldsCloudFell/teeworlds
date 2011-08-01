@@ -144,7 +144,7 @@ bool IGameController::OnEntity(int Index, vec2 Pos)
 		Type = POWERUP_NINJA;
 		SubType = WEAPON_NINJA;
 	}
-	else if(Index >= 17 && Index <= 48 && g_Config.m_SvDoors)
+	else if(Index >= 17 && Index <= 64 && g_Config.m_SvDoors)
 	{
 		CDoor *pDoor = new CDoor(&GameServer()->m_World, Index-17);
 		pDoor->m_Pos = Pos;
@@ -180,9 +180,9 @@ const char *IGameController::GetTeamName(int Team)
 	if(IsTeamplay())
 	{
 		if(Team == TEAM_RED)
-			return "red team";
+			return "zombies";
 		else if(Team == TEAM_BLUE)
-			return "blue team";
+			return "humans";
 	}
 	else
 	{
@@ -301,8 +301,8 @@ void IGameController::PostReset()
 		if(GameServer()->m_apPlayers[i])
 		{
 			GameServer()->m_apPlayers[i]->Respawn();
-			GameServer()->m_apPlayers[i]->m_Score = 0;
-			GameServer()->m_apPlayers[i]->m_ScoreStartTick = Server()->Tick();
+			//GameServer()->m_apPlayers[i]->m_Score = 0;
+			//GameServer()->m_apPlayers[i]->m_ScoreStartTick = Server()->Tick();
 			GameServer()->m_apPlayers[i]->m_RespawnTick = Server()->Tick()+Server()->TickSpeed()/2;
 		}
 	}
@@ -572,7 +572,7 @@ void IGameController::RandomZomb()
 	{
 		ZombCID = rand()%MAX_CLIENTS;
 		WTF--;
-		if(!WTF) // Anti 100% CPU :D (Very crappy coded xD, but it's a fix :P)
+		if(!WTF) // Anti 100% CPU :D (Very crappy, but it's a fix :P)
 		{
 			StartRound();
 			return;
