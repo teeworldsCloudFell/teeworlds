@@ -66,6 +66,7 @@ public:
 	int m_LastEmote;
 	int m_LastKill;
 	int m_Team;
+	char m_OriginSkinName[64];
 	
 	bool m_Nuked;
 

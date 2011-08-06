@@ -18,8 +18,24 @@ public:
 	void InitTeleporter();
 
 	bool m_RoundStarted;
+	bool m_LevelEarned;
+	int m_RoundEndTick;
+
 	int m_DoorState[48];
 	int m_DoorTick[48];
+
+	struct DoorTime
+	{
+		int m_OpenTime;
+		int m_CloseTime;
+		int m_ReopenTime;
+	} m_DoorTime[32];
+
+	struct ZDoorTime
+	{
+		int m_CloseTime;
+		int m_ReopenTime;
+	} m_ZDoorTime[16];
 
 	int m_NukeTick;
 	bool m_NukeLaunched;
@@ -33,6 +49,7 @@ public:
 	virtual bool ZombStarted();
 	virtual void StartZomb(bool Value);
 	virtual void CheckZomb();
+	virtual void OnEndRound();
 	virtual int CountPlayers();
 	virtual int CountZombs();
 	virtual int CountHumans();

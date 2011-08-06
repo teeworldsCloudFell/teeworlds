@@ -12,8 +12,8 @@
 */
 class IGameController
 {
-	vec2 m_aaSpawnPoints[3][64];
-	int m_aNumSpawnPoints[3];
+	vec2 m_aaSpawnPoints[64];
+	int m_aNumSpawnPoints;
 	vec2 m_aZSpawn;
 
 	class CGameContext *m_pGameServer;
@@ -38,15 +38,13 @@ protected:
 		float m_Score;
 	};
 
-	void EvaluateSpawnType(CSpawnEval *pEval, int Type);
-	bool EvaluateSpawn(class CPlayer *pP, vec2 *pPos);
+	void EvaluateSpawnType(CSpawnEval *pEval);
 
 	void CycleMap();
 	void ResetGame();
 
 	char m_aMapWish[128];
 
-	int m_RoundStartTick;
 	int m_GameOverTick;
 
 	int m_Warmup;
@@ -60,6 +58,19 @@ protected:
 	int m_LastZomb2;
 
 public:
+	char m_pTimedEventCmd[32][512];
+	int m_TimedEventTick[32];
+	int m_TimedEventTime[32];
+	int m_NumTimedEvents;
+
+	char m_pTriggeredEventCmd[32][512];
+	bool m_TriggeredEventState[32];
+
+	char m_pOnTeamWinEventCmd[2][512];
+
+	int m_CustomTeleport[16];
+	int m_CustomTeleportTeam[16];
+
 	const char *m_pGameType;
 
 	bool IsTeamplay() const;
@@ -70,6 +81,7 @@ public:
 	int m_aTeamscore[2];
 	int m_ZombWarmup;
 	int m_SuddenDeath;
+	int m_RoundStartTick;
 
 	void DoWarmup(int Seconds);
 	void DoTeamScoreWincheck();
@@ -81,6 +93,12 @@ public:
 	bool IsFriendlyFire(int ClientID1, int ClientID2);
 
 	bool IsForceBalanced();
+
+	bool RegisterTimedEvent(int Time, const char *pCommand);
+	void ResetEvents();
+	bool RegisterTriggeredEvent(int ID, const char *pCommand);
+	void OnTrigger(int ID);
+	int OnCustomTeleporter(int ID, int Team);
 
 	/*
 

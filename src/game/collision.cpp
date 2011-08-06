@@ -60,7 +60,7 @@ void CCollision::Init(class CLayers *pLayers)
 		}
 
 		// race tiles
-		if(Index >= 14 && Index <= 127)
+		if(Index >= 14 && Index <= 175)
 			m_pTiles[i].m_Index = Index;
 	}
 }
@@ -99,7 +99,7 @@ int CCollision::GetIndex(vec2 PrevPos, vec2 Pos)
 		int Nx = clamp((int)Pos.x/32, 0, m_Width-1);
 		int Ny = clamp((int)Pos.y/32, 0, m_Height-1);
 		
-		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_STOPL && m_pTiles[Ny*m_Width+Nx].m_Index <= 127) ||
+		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_STOPL && m_pTiles[Ny*m_Width+Nx].m_Index <= 159) ||
 			(m_pTele && (m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEIN || m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEOUT)) ||
 			(m_pSpeedup && m_pSpeedup[Ny*m_Width+Nx].m_Force > 0))
 		{
@@ -118,7 +118,7 @@ int CCollision::GetIndex(vec2 PrevPos, vec2 Pos)
 		Tmp = mix(PrevPos, Pos, a);
 		Nx = clamp((int)Tmp.x/32, 0, m_Width-1);
 		Ny = clamp((int)Tmp.y/32, 0, m_Height-1);
-		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_STOPL && m_pTiles[Ny*m_Width+Nx].m_Index <= 127) ||
+		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_STOPL && m_pTiles[Ny*m_Width+Nx].m_Index <= 159) ||
 			(m_pTele && (m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEIN || m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEOUT)) ||
 			(m_pSpeedup && m_pSpeedup[Ny*m_Width+Nx].m_Force > 0))
 		{
@@ -361,6 +361,84 @@ bool CCollision::IsKatanaStrip(vec2 Pos)
 		}
 	}
 	return false;
+}
+
+int CCollision::IsTrigger(vec2 Pos, int Team)
+{
+	int x = Pos.x;
+	int y = Pos.y;
+	for(int i=0; i < 4; i++)
+	{
+		int Nx = clamp(x/32, 0, m_Width-1);
+		int Ny = clamp(y/32, 0, m_Height-1);
+
+		int Tile = m_pTiles[Ny*m_Width+Nx].m_Index > 159 ? 0 : m_pTiles[Ny*m_Width+Nx].m_Index;
+		if((Tile >= 128 && Tile <= 143) || (!Team && Tile >= 144 && Tile <= 151) || (Team && Tile >= 152 && Tile <= 159))
+			return Tile-128;
+		switch(i)
+		{
+			case 0:
+			{
+				x = x+28/3.0f;
+				y = y-28/3.0f;
+			}
+			case 1:
+			{
+				x = x+28/3.0f;
+				y = y+28/3.0f;
+			}
+			case 2:
+			{
+				x = x-28/3.0f;
+				y = y-28/3.0f;
+			}
+			case 3:
+			{
+				x = x-28/3.0f;
+				y = y+28/3.0f;
+			}
+		}
+	}
+	return -1;
+}
+
+int CCollision::IsCustomTeleport(vec2 Pos)
+{
+	int x = Pos.x;
+	int y = Pos.y;
+	for(int i=0; i < 4; i++)
+	{
+		int Nx = clamp(x/32, 0, m_Width-1);
+		int Ny = clamp(y/32, 0, m_Height-1);
+
+		int Tile = m_pTiles[Ny*m_Width+Nx].m_Index > 175 ? 0 : m_pTiles[Ny*m_Width+Nx].m_Index;
+		if(Tile >= 160 && Tile <= 175)
+			return Tile-160;
+		switch(i)
+		{
+			case 0:
+			{
+				x = x+28/3.0f;
+				y = y-28/3.0f;
+			}
+			case 1:
+			{
+				x = x+28/3.0f;
+				y = y+28/3.0f;
+			}
+			case 2:
+			{
+				x = x-28/3.0f;
+				y = y-28/3.0f;
+			}
+			case 3:
+			{
+				x = x-28/3.0f;
+				y = y+28/3.0f;
+			}
+		}
+	}
+	return -1;
 }
 
 void CCollision::GetSpeedup(int Index, vec2 *Dir, int *Force)

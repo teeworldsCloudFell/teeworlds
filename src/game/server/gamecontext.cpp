@@ -603,17 +603,13 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 				char aBuf[128];
 				str_format(aBuf, sizeof(aBuf), "Zombie Escape mod %s by BotoX.", ZESC_VERSION);
 				SendChatTarget(ClientID, aBuf);
-				SendChatTarget(ClientID, "Teleport system taken from the race mod (C)Rajh, Redix & SushiTee.");
+				SendChatTarget(ClientID, "Teleport system taken from the race mod (C)Rajh, Redix & SushiTee. Thx for other cool stuff from SushiTee :*");
 			}
-			else if(!str_comp(pMsg->m_pMessage, "/cmdlist"))
+			else if(!str_comp(pMsg->m_pMessage, "/help"))
 			{
-				SendChatTarget(ClientID, "---Command List---");
+				SendChatTarget(ClientID, "---HELP---");
 				SendChatTarget(ClientID, "\"/info\" information about the mod");
-			}
-			else if(!str_comp_num(pMsg->m_pMessage, "/", 1))
-			{
-				SendChatTarget(ClientID, "Wrong command.");
-				SendChatTarget(ClientID, "Say \"/cmdlist\" for list of command available.");
+				SendChatTarget(ClientID, "The human goal is to survive in the given time. Zombies have to infect all humans.");
 			}
 			else
 			{
@@ -854,6 +850,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 		Server()->SetClientClan(ClientID, pMsg->m_pClan);
 		Server()->SetClientCountry(ClientID, pMsg->m_Country);
 		str_copy(pPlayer->m_TeeInfos.m_SkinName, pMsg->m_pSkin, sizeof(pPlayer->m_TeeInfos.m_SkinName));
+		str_copy(pPlayer->m_OriginSkinName, pMsg->m_pSkin, sizeof(pPlayer->m_OriginSkinName));
 		pPlayer->m_TeeInfos.m_UseCustomColor = pMsg->m_UseCustomColor;
 		pPlayer->m_TeeInfos.m_ColorBody = pMsg->m_ColorBody;
 		pPlayer->m_TeeInfos.m_ColorFeet = pMsg->m_ColorFeet;
@@ -1330,30 +1327,227 @@ void CGameContext::ConchainSpecialMotdupdate(IConsole::IResult *pResult, void *p
 	}
 }
 
-void CGameContext::ConSet(IConsole::IResult *pResult, void *pUserData)
+void CGameContext::ConDoorOpenTime(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	int ClientID = clamp(pResult->GetInteger(0), 0, (int)MAX_CLIENTS-1);
-	int Team = clamp(pResult->GetInteger(1), 0, 2);
+	int Door = clamp(pResult->GetInteger(0), 1, 32);
+	int Time = clamp(pResult->GetInteger(1), 1, 60);
 
-	char aBuf[256];
-	str_format(aBuf, sizeof(aBuf), "client %d switched to %s", ClientID, Team ? "humans" : "zombies");
+	pSelf->zESCController()->m_DoorTime[Door-1].m_OpenTime = Time;
+
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "changed door %d opentime to %d seconds", Door, Time);
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
-
-	if(!pSelf->m_apPlayers[ClientID])
-		return;
-
-	pSelf->m_apPlayers[ClientID]->m_Team = Team;
-	pSelf->m_pController->OnPlayerInfoChange(pSelf->m_apPlayers[ClientID]);
-	pSelf->zESCController()->CheckZomb();
 }
 
-void CGameContext::ConZomb(IConsole::IResult *pResult, void *pUserData)
+void CGameContext::ConDoorCloseTime(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	int ClientID = clamp(pResult->GetInteger(0), 0, (int)MAX_CLIENTS-1);
-	pSelf->m_apPlayers[ClientID]->SetZomb(-1);
-	pSelf->zESCController()->StartZomb(1);
+	int Door = clamp(pResult->GetInteger(0), 1, 32);
+	int Time = clamp(pResult->GetInteger(1), 1, 60);
+
+	pSelf->zESCController()->m_DoorTime[Door-1].m_CloseTime = Time;
+
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "changed door %d closetime to %d seconds", Door, Time);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+}
+
+void CGameContext::ConDoorReopenTime(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	int Door = clamp(pResult->GetInteger(0), 1, 32);
+	int Time = clamp(pResult->GetInteger(1), 1, 60);
+
+	pSelf->zESCController()->m_DoorTime[Door-1].m_ReopenTime = Time;
+
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "changed door %d reopentime to %d seconds", Door, Time);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+}
+
+void CGameContext::ConZDoorCloseTime(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	int Door = clamp(pResult->GetInteger(0), 1, 16);
+	int Time = clamp(pResult->GetInteger(1), 1, 60);
+
+	pSelf->zESCController()->m_ZDoorTime[Door-1].m_CloseTime = Time;
+
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "changed zdoor %d closetime to %d seconds", Door, Time);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+}
+
+void CGameContext::ConZDoorReopenTime(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	int Door = clamp(pResult->GetInteger(0), 1, 16);
+	int Time = clamp(pResult->GetInteger(1), 1, 60);
+
+	pSelf->zESCController()->m_ZDoorTime[Door-1].m_ReopenTime = Time;
+
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "changed zdoor %d reopentime to %d seconds", Door, Time);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+}
+
+void CGameContext::ConRegisterTimedEvent(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	int Time = pResult->GetInteger(0);
+	const char *pCommand = pResult->GetString(1);
+
+	if(pSelf->m_pController->RegisterTimedEvent(Time, pCommand))
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Timed event registered");
+	else
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Couldn't register timed event");
+}
+
+void CGameContext::ConListTimedEvents(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+
+	char aBuf[512];
+	str_format(aBuf, sizeof(aBuf), "Registered timed events: %d", pSelf->m_pController->m_NumTimedEvents);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+	for(int i = 0; i < pSelf->m_pController->m_NumTimedEvents; i++)
+	{
+		str_format(aBuf, sizeof(aBuf), "%d. \"%s\"", i+1, pSelf->m_pController->m_pTimedEventCmd[i]);
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+	}
+}
+
+void CGameContext::ConFlushTimedEvents(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+
+	for(int i = 0; i < pSelf->m_pController->m_NumTimedEvents; i++)
+	{
+		pSelf->m_pController->m_pTimedEventCmd[i][0] = '\0';
+		pSelf->m_pController->m_TimedEventTick[i] = 0;
+		pSelf->m_pController->m_TimedEventTime[i] = 0;
+	}
+	pSelf->m_pController->m_NumTimedEvents = 0;
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Timed events flushed");
+}
+
+void CGameContext::ConRegisterTriggeredEvent(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	int ID = pResult->GetInteger(0);
+	const char *pCommand = pResult->GetString(1);
+
+	if(pSelf->m_pController->RegisterTriggeredEvent(ID-1, pCommand))
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Triggered event registered");
+	else
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Couldn't register triggered event");
+}
+
+void CGameContext::ConListTriggeredEvents(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	char aBuf[512];
+	int NumTriggeredEvents = 0;
+
+	for(int i = 0; i < 32; i++)
+	{
+		if(pSelf->m_pController->m_pTriggeredEventCmd[i][0])
+			NumTriggeredEvents++;
+	}
+	str_format(aBuf, sizeof(aBuf), "Registered triggered events: %d", NumTriggeredEvents);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+
+	for(int i = 0; i < 32; i++)
+	{
+		if(pSelf->m_pController->m_pTriggeredEventCmd[i][0])
+		{
+			str_format(aBuf, sizeof(aBuf), "%d. \"%s\"", i+1, pSelf->m_pController->m_pTriggeredEventCmd[i]);
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+		}
+	}
+}
+
+void CGameContext::ConFlushTriggeredEvents(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+
+	for(int i = 0; i < 32; i++)
+	{
+		pSelf->m_pController->m_pTriggeredEventCmd[i][0] = '\0';
+		pSelf->m_pController->m_TriggeredEventState[i] = false;
+	}
+
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Triggered events flushed");
+}
+
+void CGameContext::ConRegisterOnTeamWinEvent(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	int Team = clamp(pResult->GetInteger(0), 0, 1);
+	const char *pCommand = pResult->GetString(1);
+
+	str_copy(pSelf->m_pController->m_pOnTeamWinEventCmd[Team], pCommand, sizeof(pSelf->m_pController->m_pOnTeamWinEventCmd[Team]));
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "On-teamwin event registered");
+}
+
+void CGameContext::ConFlushOnTeamWinEvent(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+
+	pSelf->m_pController->m_pOnTeamWinEventCmd[0][0] = '\0';
+	pSelf->m_pController->m_pOnTeamWinEventCmd[1][0] = '\0';
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "On-teamwin events flushed");
+}
+
+void CGameContext::ConCustomTeleporterRegister(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	int ID = clamp(pResult->GetInteger(0), 1, 16)-1;
+	int ToX = clamp(pResult->GetInteger(1), 1, 255)-1;
+
+	pSelf->m_pController->m_CustomTeleport[ID] = ToX;
+	if(pResult->NumArguments() > 2)
+		pSelf->m_pController->m_CustomTeleportTeam[ID] = clamp(pResult->GetInteger(2), 0, 1);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Custom teleporter registered");
+}
+
+void CGameContext::ConCustomTeleporterFlush(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+
+	for(int i = 0; i < 16; i++)
+	{
+		pSelf->m_pController->m_CustomTeleport[i] = -1;
+		pSelf->m_pController->m_CustomTeleportTeam[i] = -1;
+	}	
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Custom teleports flushed");
+}
+
+void CGameContext::ConCustomTeleporterList(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	int NumCTeleports = 0;
+	char aBuf[128];
+
+	for(int i = 0; i < 16; i++)
+	{
+		if(pSelf->m_pController->m_CustomTeleport[i] != -1)
+			NumCTeleports++;
+	}
+	str_format(aBuf, sizeof(aBuf), "Custom teleports: %d", NumCTeleports);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+	for(int i = 0; i < 16; i++)
+	{
+		if(pSelf->m_pController->m_CustomTeleport[i] != -1)
+		{
+			if(pSelf->m_pController->m_CustomTeleportTeam[i] != -1)
+				str_format(aBuf, sizeof(aBuf), "%d: %d, Team: %d", i+1, pSelf->m_pController->m_CustomTeleport[i]+1, pSelf->m_pController->m_CustomTeleportTeam[i]);
+			else
+				str_format(aBuf, sizeof(aBuf), "%d: %d", i+1, pSelf->m_pController->m_CustomTeleport[i]+1);
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+		}
+	}
 }
 
 void CGameContext::OnConsoleInit()
@@ -1379,9 +1573,27 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("vote", "r", CFGFLAG_SERVER, ConVote, this, "Force a vote to yes/no");
 
 	Console()->Chain("sv_motd", ConchainSpecialMotdupdate, this);
-	
-	Console()->Register("set", "ii", CFGFLAG_SERVER, ConSet, this, "Force player to a team");
-	Console()->Register("zomb", "i", CFGFLAG_SERVER, ConZomb, this, "infect a player");
+
+	Console()->Register("door_opentime", "ii", CFGFLAG_SERVER, ConDoorOpenTime, this, "Adjust the door opentime: door_opentime <id> <seconds>");
+	Console()->Register("door_closetime", "ii", CFGFLAG_SERVER, ConDoorCloseTime, this, "Adjust the door closetime: door_closetime <id> <seconds>");
+	Console()->Register("door_reopentime", "ii", CFGFLAG_SERVER, ConDoorReopenTime, this, "Adjust the door reopentime: door_reopentime <id> <seconds>");
+	Console()->Register("zdoor_closetime", "ii", CFGFLAG_SERVER, ConZDoorCloseTime, this, "Adjust the zdoor closetime: zdoor_closetime <id> <seconds>");
+	Console()->Register("zdoor_reopentime", "ii", CFGFLAG_SERVER, ConZDoorReopenTime, this, "Adjust the zdoor reopentime: zdoor_reopentime <id> <seconds>");
+
+	Console()->Register("event_timed_register", "is", CFGFLAG_SERVER, ConRegisterTimedEvent, this, "Register a timed event: event_timed_register <seconds> <command>");
+	Console()->Register("event_timed_list", "", CFGFLAG_SERVER, ConListTimedEvents, this, "List all timed events");
+	Console()->Register("event_timed_flush", "", CFGFLAG_SERVER, ConFlushTimedEvents, this, "Delete all timed events");
+
+	Console()->Register("event_triggered_register", "is", CFGFLAG_SERVER, ConRegisterTriggeredEvent, this, "Register a triggered event: event_triggered_register <id> <command>");
+	Console()->Register("event_triggered_list", "", CFGFLAG_SERVER, ConListTriggeredEvents, this, "List all triggered events");
+	Console()->Register("event_triggered_flush", "", CFGFLAG_SERVER, ConFlushTriggeredEvents, this, "Delete all triggered events");
+
+	Console()->Register("event_onteamwin_register", "is", CFGFLAG_SERVER, ConRegisterOnTeamWinEvent, this, "Register a on-teamwin event: event_onteamwin_register <team> <command>");
+	Console()->Register("event_onteamwin_flush", "", CFGFLAG_SERVER, ConFlushOnTeamWinEvent, this, "Flush on-teamwin events");
+
+	Console()->Register("cteleporter_register", "ii?i", CFGFLAG_SERVER, ConCustomTeleporterRegister, this, "Assign teleport to a custom teleporter: cteleport_register <id> <to X> (<team>)");
+	Console()->Register("cteleporter_list", "", CFGFLAG_SERVER, ConCustomTeleporterList, this, "List custom teleports");
+	Console()->Register("cteleporter_flush", "", CFGFLAG_SERVER, ConCustomTeleporterFlush, this, "Flush custom teleports");
 }
 
 void CGameContext::OnInit(/*class IKernel *pKernel*/)
@@ -1399,9 +1611,6 @@ void CGameContext::OnInit(/*class IKernel *pKernel*/)
 
 	m_Layers.Init(Kernel());
 	m_Collision.Init(&m_Layers);
-
-	if(g_Config.m_SvLoadMapDefaults)
-		LoadMapSettings();
 
 	// reset everything here
 	//world = new GAMEWORLD;
@@ -1453,6 +1662,9 @@ void CGameContext::OnInit(/*class IKernel *pKernel*/)
 		}
 	}
 #endif
+
+	if(g_Config.m_SvLoadMapDefaults)
+		LoadMapSettings();
 }
 
 void CGameContext::OnShutdown()

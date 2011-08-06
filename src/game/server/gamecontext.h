@@ -60,8 +60,22 @@ class CGameContext : public IGameServer
 	static void ConClearVotes(IConsole::IResult *pResult, void *pUserData);
 	static void ConVote(IConsole::IResult *pResult, void *pUserData);
 	static void ConchainSpecialMotdupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
-	static void ConSet(IConsole::IResult *pResult, void *pUserData);
-	static void ConZomb(IConsole::IResult *pResult, void *pUserData);
+	static void ConDoorOpenTime(IConsole::IResult *pResult, void *pUserData);
+	static void ConDoorCloseTime(IConsole::IResult *pResult, void *pUserData);
+	static void ConDoorReopenTime(IConsole::IResult *pResult, void *pUserData);
+	static void ConZDoorCloseTime(IConsole::IResult *pResult, void *pUserData);
+	static void ConZDoorReopenTime(IConsole::IResult *pResult, void *pUserData);
+	static void ConRegisterTimedEvent(IConsole::IResult *pResult, void *pUserData);
+	static void ConListTimedEvents(IConsole::IResult *pResult, void *pUserData);
+	static void ConFlushTimedEvents(IConsole::IResult *pResult, void *pUserData);
+	static void ConRegisterTriggeredEvent(IConsole::IResult *pResult, void *pUserData);
+	static void ConListTriggeredEvents(IConsole::IResult *pResult, void *pUserData);
+	static void ConFlushTriggeredEvents(IConsole::IResult *pResult, void *pUserData);
+	static void ConRegisterOnTeamWinEvent(IConsole::IResult *pResult, void *pUserData);
+	static void ConFlushOnTeamWinEvent(IConsole::IResult *pResult, void *pUserData);
+	static void ConCustomTeleporterRegister(IConsole::IResult *pResult, void *pUserData);
+	static void ConCustomTeleporterFlush(IConsole::IResult *pResult, void *pUserData);
+	static void ConCustomTeleporterList(IConsole::IResult *pResult, void *pUserData);
 	CGameContext(int Resetting);
 	void Construct(int Resetting);
 

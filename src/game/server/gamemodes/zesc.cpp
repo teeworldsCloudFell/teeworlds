@@ -18,12 +18,24 @@ CGameControllerZESC::CGameControllerZESC(class CGameContext *pGameServer) : IGam
 	m_RoundStarted = false;
 	m_NukeTick = 0;
 	m_NukeLaunched = false;
+	m_LevelEarned = false;
 	for(int i = 0; i < 47; i++)
 	{
 		m_DoorState[i] = DOOR_CLOSED;
 		if(i >= 32)
 			m_DoorState[i] = DOOR_OPEN;
 		m_DoorTick[i] = 0;
+	}
+	for(int i = 0; i < 32; i++)
+	{
+		m_DoorTime[i].m_OpenTime = 10;
+		m_DoorTime[i].m_CloseTime = 3;
+		m_DoorTime[i].m_ReopenTime = 10;
+	}
+	for(int i = 0; i < 16; i++)
+	{
+		m_ZDoorTime[i].m_CloseTime = 3;
+		m_ZDoorTime[i].m_ReopenTime = 10;
 	}
 }
 
@@ -117,6 +129,13 @@ void CGameControllerZESC::Tick()
 	if(!ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GameServer()->m_World.m_Paused)
 		return;
 
+	if(m_RoundEndTick)
+	{
+		m_RoundEndTick--;
+		if(!m_RoundEndTick)
+			GameServer()->m_pController->EndRound();
+	}
+
 	GameServer()->m_pController->DoTeamScoreWincheck();
 
 	// Damn fuckin door stuff
@@ -153,7 +172,7 @@ void CGameControllerZESC::Tick()
 				}
 				else if(m_DoorState[i] == DOOR_ZCLOSED && i < 32)
 				{
-					SetDoorState(i, DOOR_REOPEN);
+					SetDoorState(i, DOOR_REOPENED);
 					char aBuf[128];
 					str_format(aBuf, sizeof(aBuf), "(Zombies) Door %d is open. Run!", i+1);
 					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
@@ -168,7 +187,7 @@ void CGameControllerZESC::Tick()
 				}
 				else if(m_DoorState[i] == DOOR_ZCLOSED && i >= 32)
 				{
-					SetDoorState(i, DOOR_REOPEN);
+					SetDoorState(i, DOOR_REOPENED);
 					char aBuf[128];
 					str_format(aBuf, sizeof(aBuf), "(Zombies) ZDoor %d is open. Run!", i-31);
 					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
@@ -211,14 +230,12 @@ void CGameControllerZESC::Tick()
 			if(apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_BLUE) //Humans Win :D
 			{
 				//GameServer()->SendBroadcast("Humans win!", -1);
-				m_aTeamscore[TEAM_BLUE] = 100;
-				apCloseCCharacters[i]->GetPlayer()->m_Score += 100;
+				apCloseCCharacters[i]->GetPlayer()->m_Score += 10;
 				GameServer()->m_pController->EndRound();
 			}
 			else if(apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_RED) //Zombies win :(
 			{
 				//GameServer()->SendBroadcast("Zombies took over the World!", -1);
-				m_aTeamscore[TEAM_RED] = 100;
 				GameServer()->m_pController->EndRound();
 			}
 		}
@@ -266,7 +283,6 @@ void CGameControllerZESC::Tick()
 
 				F->m_AtStand = 0;
 				F->m_pCarryingCharacter = apCloseCCharacters[i];
-				F->m_pCarryingCharacter->GetPlayer()->m_Score += 100;
 				m_NukeTick = Server()->TickSpeed()*g_Config.m_SvNukeTime;
 
 				char aBuf[256];
@@ -330,7 +346,7 @@ void CGameControllerZESC::Snap(int SnappingClient)
 
 void CGameControllerZESC::OnHoldpoint(int Index)
 {
-	if(m_DoorTick[Index] > 0 || (m_DoorState[Index] >= DOOR_OPEN && m_DoorState[Index] <= DOOR_REOPEN && m_DoorState[Index] != 1) || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1)
+	if(m_DoorTick[Index] > 0 || (m_DoorState[Index] >= DOOR_OPEN && m_DoorState[Index] <= DOOR_REOPENED && m_DoorState[Index] != 1) || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
 		return;
 
 	m_DoorTick[Index] = Server()->TickSpeed()*GetDoorTime(Index);
@@ -341,7 +357,7 @@ void CGameControllerZESC::OnHoldpoint(int Index)
 
 void CGameControllerZESC::OnZStop(int Index)
 {
-	if(m_DoorState[Index] || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1)
+	if(m_DoorState[Index] || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
 		return;
 
 	SetDoorState(Index, DOOR_ZCLOSING);
@@ -376,42 +392,48 @@ void CGameControllerZESC::CheckZomb()
 		{
 			GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", "flag_return");
 			GameServer()->CreateSoundGlobal(SOUND_CTF_RETURN);
+			m_NukeTick = 0;
 			m_apFlags[TEAM_RED]->Reset();
 		}
 		return;
 	}
 	GameServer()->m_pController->m_SuddenDeath = 0;
 
-	if(!m_RoundStarted && !GameServer()->m_pController->m_ZombWarmup)
+	if(!m_RoundStarted && !GameServer()->m_pController->m_ZombWarmup && g_Config.m_SvZombieRatio)
 	{
 		StartZomb(true);
 		GameServer()->m_pController->ZombWarmup(g_Config.m_SvZWarmup);
 	}
-	if(!CountHumans() || !CountZombs())
+	if((!CountHumans() || !CountZombs()) && m_RoundStarted && !GameServer()->m_pController->m_ZombWarmup)
+		m_RoundEndTick = Server()->TickSpeed()*0.5;
+}
+
+void CGameControllerZESC::OnEndRound()
+{
+	if(!ZombStarted())
+		return;
+	if(!CountHumans() || !CountZombs() || (CountHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-GameServer()->m_pController->m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !GameServer()->m_pController->m_SuddenDeath))
 	{
-		if(m_NukeLaunched || (!m_apFlags[TEAM_RED] && !m_apFlags[TEAM_BLUE]))
+		m_aTeamscore[TEAM_RED] = 0;
+		m_aTeamscore[TEAM_BLUE] = 0;
+		if(!CountHumans())
 		{
-			m_aTeamscore[TEAM_RED] = 0;
-			m_aTeamscore[TEAM_BLUE] = 0;
-			if(!CountHumans())
+			m_aTeamscore[TEAM_RED] = 100;
+		}
+		if(!CountZombs() || (CountHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-GameServer()->m_pController->m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !GameServer()->m_pController->m_SuddenDeath))
+		{
+			m_aTeamscore[TEAM_BLUE] = 100;
+			for(int i = 0; i < MAX_CLIENTS; i++)
 			{
-				m_aTeamscore[TEAM_RED] = 100;
+				if(GameServer()->m_apPlayers[i] && GameServer()->m_apPlayers[i]->GetTeam() == TEAM_BLUE)
+					GameServer()->m_apPlayers[i]->m_Score += 10;
 			}
-			if(!CountZombs())
+			if(!m_LevelEarned && m_apFlags[TEAM_RED] && m_apFlags[TEAM_RED]->m_pCarryingCharacter && m_apFlags[TEAM_RED]->m_pCarryingCharacter->GetPlayer())
 			{
-				m_aTeamscore[TEAM_BLUE] = 100;
-				for(int i = 0; i < MAX_CLIENTS; i++)
-				{
-					if(GameServer()->m_apPlayers[i] && GameServer()->m_apPlayers[i]->GetTeam() == TEAM_BLUE)
-						GameServer()->m_apPlayers[i]->m_Score += 10;
-				}
-				if(m_apFlags[TEAM_RED] && m_apFlags[TEAM_RED]->m_pCarryingCharacter && m_apFlags[TEAM_RED]->m_pCarryingCharacter->GetPlayer())
-					m_apFlags[TEAM_RED]->m_pCarryingCharacter->GetPlayer()->m_Score += 100;
+				m_apFlags[TEAM_RED]->m_pCarryingCharacter->GetPlayer()->m_Score += 10;
+				m_LevelEarned = true;
 			}
 		}
-		if(m_RoundStarted && !GameServer()->m_pController->m_ZombWarmup)
-			GameServer()->m_pController->EndRound();
-		return;
 	}
 }
 
@@ -464,6 +486,7 @@ void CGameControllerZESC::Reset()
 	}
 	m_NukeLaunched = false;
 	m_NukeTick = 0;
+	m_LevelEarned = false;
 	GameServer()->SendBroadcast("", -1);
 }
 
@@ -486,292 +509,21 @@ bool CGameControllerZESC::NukeLaunched()
 
 int CGameControllerZESC::GetDoorTime(int Index)
 {
-	// Please don't blame me xD
-	if(m_DoorState[Index] == DOOR_CLOSED)
+	if(Index < 32)
 	{
-		switch(Index)
-		{
-		case 0:
-			return g_Config.m_SvDoor1OpenTime;
-		case 1:
-			return g_Config.m_SvDoor2OpenTime;
-		case 2:
-			return g_Config.m_SvDoor3OpenTime;
-		case 3:
-			return g_Config.m_SvDoor4OpenTime;
-		case 4:
-			return g_Config.m_SvDoor5OpenTime;
-		case 5:
-			return g_Config.m_SvDoor6OpenTime;
-		case 6:
-			return g_Config.m_SvDoor7OpenTime;
-		case 7:
-			return g_Config.m_SvDoor8OpenTime;
-		case 8:
-			return g_Config.m_SvDoor9OpenTime;
-		case 9:
-			return g_Config.m_SvDoor10OpenTime;
-		case 10:
-			return g_Config.m_SvDoor11OpenTime;
-		case 11:
-			return g_Config.m_SvDoor12OpenTime;
-		case 12:
-			return g_Config.m_SvDoor13OpenTime;
-		case 13:
-			return g_Config.m_SvDoor14OpenTime;
-		case 14:
-			return g_Config.m_SvDoor15OpenTime;
-		case 15:
-			return g_Config.m_SvDoor16OpenTime;
-		case 16:
-			return g_Config.m_SvDoor17OpenTime;
-		case 17:
-			return g_Config.m_SvDoor18OpenTime;
-		case 18:
-			return g_Config.m_SvDoor19OpenTime;
-		case 19:
-			return g_Config.m_SvDoor20OpenTime;
-		case 20:
-			return g_Config.m_SvDoor21OpenTime;
-		case 21:
-			return g_Config.m_SvDoor22OpenTime;
-		case 22:
-			return g_Config.m_SvDoor23OpenTime;
-		case 23:
-			return g_Config.m_SvDoor24OpenTime;
-		case 24:
-			return g_Config.m_SvDoor25OpenTime;
-		case 25:
-			return g_Config.m_SvDoor26OpenTime;
-		case 26:
-			return g_Config.m_SvDoor27OpenTime;
-		case 27:
-			return g_Config.m_SvDoor28OpenTime;
-		case 28:
-			return g_Config.m_SvDoor29OpenTime;
-		case 29:
-			return g_Config.m_SvDoor30OpenTime;
-		case 30:
-			return g_Config.m_SvDoor31OpenTime;
-		case 31:
-			return g_Config.m_SvDoor32OpenTime;
-		}
+		if(m_DoorState[Index] == DOOR_CLOSED)
+			return m_DoorTime[Index].m_OpenTime;
+		else if(m_DoorState[Index] == DOOR_ZCLOSING || m_DoorState[Index] == DOOR_OPEN)
+			return m_DoorTime[Index].m_CloseTime;
+		else if(m_DoorState[Index] == DOOR_ZCLOSED)
+			return m_DoorTime[Index].m_ReopenTime;
 	}
-	else if((m_DoorState[Index] == DOOR_ZCLOSING || m_DoorState[Index] == DOOR_OPEN) && Index < 32)
+	else if(Index >= 32)
 	{
-		switch(Index)
-		{
-		case 0:
-			return g_Config.m_SvDoor1CloseTime;
-		case 1:
-			return g_Config.m_SvDoor2CloseTime;
-		case 2:
-			return g_Config.m_SvDoor3CloseTime;
-		case 3:
-			return g_Config.m_SvDoor4CloseTime;
-		case 4:
-			return g_Config.m_SvDoor5CloseTime;
-		case 5:
-			return g_Config.m_SvDoor6CloseTime;
-		case 6:
-			return g_Config.m_SvDoor7CloseTime;
-		case 7:
-			return g_Config.m_SvDoor8CloseTime;
-		case 8:
-			return g_Config.m_SvDoor9CloseTime;
-		case 9:
-			return g_Config.m_SvDoor10CloseTime;
-		case 10:
-			return g_Config.m_SvDoor11CloseTime;
-		case 11:
-			return g_Config.m_SvDoor12CloseTime;
-		case 12:
-			return g_Config.m_SvDoor13CloseTime;
-		case 13:
-			return g_Config.m_SvDoor14CloseTime;
-		case 14:
-			return g_Config.m_SvDoor15CloseTime;
-		case 15:
-			return g_Config.m_SvDoor16CloseTime;
-		case 16:
-			return g_Config.m_SvDoor17CloseTime;
-		case 17:
-			return g_Config.m_SvDoor18CloseTime;
-		case 18:
-			return g_Config.m_SvDoor19CloseTime;
-		case 19:
-			return g_Config.m_SvDoor20CloseTime;
-		case 20:
-			return g_Config.m_SvDoor21CloseTime;
-		case 21:
-			return g_Config.m_SvDoor22CloseTime;
-		case 22:
-			return g_Config.m_SvDoor23CloseTime;
-		case 23:
-			return g_Config.m_SvDoor24CloseTime;
-		case 24:
-			return g_Config.m_SvDoor25CloseTime;
-		case 25:
-			return g_Config.m_SvDoor26CloseTime;
-		case 26:
-			return g_Config.m_SvDoor27CloseTime;
-		case 27:
-			return g_Config.m_SvDoor28CloseTime;
-		case 28:
-			return g_Config.m_SvDoor29CloseTime;
-		case 29:
-			return g_Config.m_SvDoor30CloseTime;
-		case 30:
-			return g_Config.m_SvDoor31CloseTime;
-		case 31:
-			return g_Config.m_SvDoor32CloseTime;
-		}
+		if(m_DoorState[Index] == DOOR_ZCLOSING || m_DoorState[Index] == DOOR_OPEN)
+			return m_ZDoorTime[Index-32].m_CloseTime;
+		else if(m_DoorState[Index] == DOOR_ZCLOSED)
+			return m_ZDoorTime[Index-32].m_ReopenTime;
 	}
-	else if(m_DoorState[Index] == DOOR_ZCLOSED && Index < 32)
-	{
-		switch(Index)
-		{
-		case 0:
-			return g_Config.m_SvDoor1ReopenTime;
-		case 1:
-			return g_Config.m_SvDoor2ReopenTime;
-		case 2:
-			return g_Config.m_SvDoor3ReopenTime;
-		case 3:
-			return g_Config.m_SvDoor4ReopenTime;
-		case 4:
-			return g_Config.m_SvDoor5ReopenTime;
-		case 5:
-			return g_Config.m_SvDoor6ReopenTime;
-		case 6:
-			return g_Config.m_SvDoor7ReopenTime;
-		case 7:
-			return g_Config.m_SvDoor8ReopenTime;
-		case 8:
-			return g_Config.m_SvDoor9ReopenTime;
-		case 9:
-			return g_Config.m_SvDoor10ReopenTime;
-		case 10:
-			return g_Config.m_SvDoor11ReopenTime;
-		case 11:
-			return g_Config.m_SvDoor12ReopenTime;
-		case 12:
-			return g_Config.m_SvDoor13ReopenTime;
-		case 13:
-			return g_Config.m_SvDoor14ReopenTime;
-		case 14:
-			return g_Config.m_SvDoor15ReopenTime;
-		case 15:
-			return g_Config.m_SvDoor16ReopenTime;
-		case 16:
-			return g_Config.m_SvDoor17ReopenTime;
-		case 17:
-			return g_Config.m_SvDoor18ReopenTime;
-		case 18:
-			return g_Config.m_SvDoor19ReopenTime;
-		case 19:
-			return g_Config.m_SvDoor20ReopenTime;
-		case 20:
-			return g_Config.m_SvDoor21ReopenTime;
-		case 21:
-			return g_Config.m_SvDoor22ReopenTime;
-		case 22:
-			return g_Config.m_SvDoor23ReopenTime;
-		case 23:
-			return g_Config.m_SvDoor24ReopenTime;
-		case 24:
-			return g_Config.m_SvDoor25ReopenTime;
-		case 25:
-			return g_Config.m_SvDoor26ReopenTime;
-		case 26:
-			return g_Config.m_SvDoor27ReopenTime;
-		case 27:
-			return g_Config.m_SvDoor28ReopenTime;
-		case 28:
-			return g_Config.m_SvDoor29ReopenTime;
-		case 29:
-			return g_Config.m_SvDoor30ReopenTime;
-		case 30:
-			return g_Config.m_SvDoor31ReopenTime;
-		case 31:
-			return g_Config.m_SvDoor32ReopenTime;
-		}
-	}
-	else if((m_DoorState[Index] == DOOR_ZCLOSING || m_DoorState[Index] == DOOR_OPEN) && Index >= 32)
-	{
-		switch(Index)
-		{
-		case 32:
-			return g_Config.m_SvZDoor1CloseTime;
-		case 33:
-			return g_Config.m_SvZDoor2CloseTime;
-		case 34:
-			return g_Config.m_SvZDoor3CloseTime;
-		case 35:
-			return g_Config.m_SvZDoor4CloseTime;
-		case 36:
-			return g_Config.m_SvZDoor5CloseTime;
-		case 37:
-			return g_Config.m_SvZDoor6CloseTime;
-		case 38:
-			return g_Config.m_SvZDoor7CloseTime;
-		case 39:
-			return g_Config.m_SvZDoor8CloseTime;
-		case 40:
-			return g_Config.m_SvZDoor9CloseTime;
-		case 41:
-			return g_Config.m_SvZDoor10CloseTime;
-		case 42:
-			return g_Config.m_SvZDoor11CloseTime;
-		case 43:
-			return g_Config.m_SvZDoor12CloseTime;
-		case 44:
-			return g_Config.m_SvZDoor13CloseTime;
-		case 45:
-			return g_Config.m_SvZDoor14CloseTime;
-		case 46:
-			return g_Config.m_SvZDoor15CloseTime;
-		case 47:
-			return g_Config.m_SvZDoor16CloseTime;
-		}
-	}
-	else if(m_DoorState[Index] == DOOR_ZCLOSED && Index >= 32)
-	{
-		switch(Index)
-		{
-		case 32:
-			return g_Config.m_SvZDoor1ReopenTime;
-		case 33:
-			return g_Config.m_SvZDoor2ReopenTime;
-		case 34:
-			return g_Config.m_SvZDoor3ReopenTime;
-		case 35:
-			return g_Config.m_SvZDoor4ReopenTime;
-		case 36:
-			return g_Config.m_SvZDoor5ReopenTime;
-		case 37:
-			return g_Config.m_SvZDoor6ReopenTime;
-		case 38:
-			return g_Config.m_SvZDoor7ReopenTime;
-		case 39:
-			return g_Config.m_SvZDoor8ReopenTime;
-		case 40:
-			return g_Config.m_SvZDoor9ReopenTime;
-		case 41:
-			return g_Config.m_SvZDoor10ReopenTime;
-		case 42:
-			return g_Config.m_SvZDoor11ReopenTime;
-		case 43:
-			return g_Config.m_SvZDoor12ReopenTime;
-		case 44:
-			return g_Config.m_SvZDoor13ReopenTime;
-		case 45:
-			return g_Config.m_SvZDoor14ReopenTime;
-		case 46:
-			return g_Config.m_SvZDoor15ReopenTime;
-		case 47:
-			return g_Config.m_SvZDoor16ReopenTime;
-		}
-	}
-	return -1;
+	return 0;
 }

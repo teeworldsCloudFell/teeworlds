@@ -45,6 +45,8 @@ public:
 	void GetSpeedup(int Index, vec2 *Dir, int *Force);
 	int IsHoldpoint(vec2 Pos);
 	int IsZStop(vec2 Pos);
+	int IsTrigger(vec2 Pos, int Team);
+	int IsCustomTeleport(vec2 Pos);
 	bool IsBunker(vec2 Pos);
 	bool IsWeaponStrip(vec2 Pos);
 	bool IsKatanaStrip(vec2 Pos);

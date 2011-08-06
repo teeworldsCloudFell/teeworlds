@@ -352,18 +352,18 @@ void CPlayer::SetZomb(int From)
 		vec2 SpawnPos;
 		if(GameServer()->m_pController->ZombieSpawn(&SpawnPos))
 		{
-			m_pCharacter->m_Core.m_Vel = vec2(0,0);
+			m_pCharacter->m_Core.m_HookedPlayer = -1;
+			m_pCharacter->m_Core.m_HookState = HOOK_RETRACTED;
+			m_pCharacter->m_Core.m_TriggeredEvents |= COREEVENT_HOOK_RETRACT;
+			m_pCharacter->m_Core.m_HookState = HOOK_RETRACTED;
 			m_pCharacter->m_Core.m_Pos = SpawnPos;
-			m_pCharacter->m_Pos = SpawnPos;
-			m_pCharacter->m_PrevPos = SpawnPos;
-			m_pCharacter->m_PrevDoorPos = SpawnPos;
-			m_pCharacter->m_Core.m_Pos = SpawnPos;
 			m_pCharacter->m_Core.m_Vel = vec2(0,0);
-			m_pCharacter->m_Pos = SpawnPos;
+			m_pCharacter->m_Core.m_HookPos = m_pCharacter->m_Core.m_Pos;
 			GameServer()->CreatePlayerSpawn(SpawnPos);
 		}
 	}
 
+	str_copy(m_TeeInfos.m_SkinName, "x_zomb", sizeof(m_TeeInfos.m_SkinName));
 	m_pCharacter->SetZomb();
 	GameServer()->m_pController->m_aTeamscore[TEAM_RED]++;
 	GameServer()->m_pController->m_aTeamscore[TEAM_BLUE]--;
@@ -376,6 +376,7 @@ void CPlayer::ResetZomb()
 {
 	if(m_Team == TEAM_SPECTATORS && !m_Nuked)
 		return;
+	str_copy(m_TeeInfos.m_SkinName, m_OriginSkinName, sizeof(m_TeeInfos.m_SkinName));
 	m_Team = TEAM_BLUE;
 	GameServer()->m_pController->OnPlayerInfoChange(GameServer()->m_apPlayers[m_ClientID]);
 	m_Nuked = false;

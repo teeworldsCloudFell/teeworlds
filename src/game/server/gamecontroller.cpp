@@ -34,32 +34,47 @@ IGameController::IGameController(class CGameContext *pGameServer)
 	m_UnbalancedTick = -1;
 	m_ForceBalanced = false;
 
-	m_aNumSpawnPoints[0] = 0;
-	m_aNumSpawnPoints[1] = 0;
-	m_aNumSpawnPoints[2] = 0;
+	m_aNumSpawnPoints = 0;
 	m_aZSpawn = vec2(-42, -42);
+
+	for(int i = 0; i < 32; i++)
+	{
+		m_pTimedEventCmd[i][0] = '\0';
+		m_TimedEventTick[i] = 0;
+		m_TimedEventTime[i] = 0;
+		m_pTriggeredEventCmd[i][0] = '\0';
+		m_TriggeredEventState[i] = false;
+	}
+	for(int i = 0; i < 16; i++)
+	{
+		m_CustomTeleport[i] = -1;
+		m_CustomTeleportTeam[i] = -1;
+	}
+	m_NumTimedEvents = 0;
+	m_pOnTeamWinEventCmd[TEAM_RED][0] = '\0';
+	m_pOnTeamWinEventCmd[TEAM_BLUE][0] = '\0';
 }
 
 IGameController::~IGameController()
 {
 }
 
-void IGameController::EvaluateSpawnType(CSpawnEval *pEval, int Type)
+void IGameController::EvaluateSpawnType(CSpawnEval *pEval)
 {
 	// get spawn point
-	for(int i = 0; i < m_aNumSpawnPoints[Type]; i++)
+	for(int i = 0; i < m_aNumSpawnPoints; i++)
 	{
 		// check if the position is occupado
 		CCharacter *aEnts[MAX_CLIENTS];
-		int Num = GameServer()->m_World.FindEntities(m_aaSpawnPoints[Type][i], 64, (CEntity**)aEnts, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
-		vec2 Positions[5] = { vec2(0.0f, 0.0f), vec2(-2.0f, 0.0f), vec2(0.0f, -2.0f), vec2(2.0f, 0.0f), vec2(0.0f, 2.0f) };	// start, left, up, right, down
+		int Num = GameServer()->m_World.FindEntities(m_aaSpawnPoints[i], 64, (CEntity**)aEnts, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
+		vec2 Positions[5] = { vec2(0.0f, 0.0f), vec2(-2.0f, 0.0f), vec2(0.0f, -2.0f), vec2(2.0f, 0.0f), vec2(0.0f, 2.0f) };	// the original spawns too many players on one spawn and sometime they spawn in earth...
 		int Result = -1;
 		for(int Index = 0; Index < 5 && Result == -1; ++Index)
 		{
 			Result = Index;
 			for(int c = 0; c < Num; ++c)
-				if(GameServer()->Collision()->CheckPoint(m_aaSpawnPoints[Type][i]+Positions[Index]) ||
-					distance(aEnts[c]->m_Pos, m_aaSpawnPoints[Type][i]+Positions[Index]) <= aEnts[c]->m_ProximityRadius)
+				if(GameServer()->Collision()->CheckPoint(m_aaSpawnPoints[i]+Positions[Index]) ||
+					distance(aEnts[c]->m_Pos, m_aaSpawnPoints[i]+Positions[Index]) <= aEnts[c]->m_ProximityRadius)
 				{
 					Result = -1;
 					break;
@@ -68,7 +83,7 @@ void IGameController::EvaluateSpawnType(CSpawnEval *pEval, int Type)
 		if(Result == -1)
 			continue;	// try next spawn point
 
-		vec2 P = m_aaSpawnPoints[Type][i]+Positions[Result];
+		vec2 P = m_aaSpawnPoints[i]+Positions[Result];
 		if(!pEval->m_Got)
 		{
 			pEval->m_Got = true;
@@ -87,13 +102,13 @@ bool IGameController::CanSpawn(int Team, vec2 *pOutPos)
 
 	Eval.m_FriendlyTeam = Team;
 
-	EvaluateSpawnType(&Eval, 0);
+	EvaluateSpawnType(&Eval);
 	if(!Eval.m_Got)
-		EvaluateSpawnType(&Eval, 2);
+		EvaluateSpawnType(&Eval);
 	if(!Eval.m_Got)
-		EvaluateSpawnType(&Eval, 0);
+		EvaluateSpawnType(&Eval);
 	if(!Eval.m_Got)
-		EvaluateSpawnType(&Eval, 2);
+		EvaluateSpawnType(&Eval);
 
 
 	*pOutPos = Eval.m_Pos;
@@ -114,16 +129,13 @@ bool IGameController::OnEntity(int Index, vec2 Pos)
 	int Type = -1;
 	int SubType = 0;
 
+	int Item = -1;
+	int RealWeapon = 0;
+
 	if(Index == ENTITY_SPAWN)
-		m_aaSpawnPoints[0][m_aNumSpawnPoints[0]++] = Pos;
-	else if(Index == ENTITY_SPAWN_RED)
+		m_aaSpawnPoints[m_aNumSpawnPoints++] = Pos;
+	if(Index == ENTITY_SPAWN_RED)
 		m_aZSpawn = Pos;
-	else if(Index == ENTITY_SPAWN_BLUE)
-		m_aaSpawnPoints[2][m_aNumSpawnPoints[2]++] = Pos;
-	/*else if(Index == ENTITY_ARMOR_1)
-		Type = POWERUP_ARMOR;
-	else if(Index == ENTITY_HEALTH_1)
-		Type = POWERUP_HEALTH;*/
 	else if(Index == ENTITY_WEAPON_SHOTGUN)
 	{
 		Type = POWERUP_WEAPON;
@@ -144,9 +156,39 @@ bool IGameController::OnEntity(int Index, vec2 Pos)
 		Type = POWERUP_NINJA;
 		SubType = WEAPON_NINJA;
 	}
-	else if(Index >= 17 && Index <= 64 && g_Config.m_SvDoors)
+	else if(Index == ENTITY_ZHAMMER_UPGRADE)
 	{
-		CDoor *pDoor = new CDoor(&GameServer()->m_World, Index-17);
+		Item = ZITEM_HAMMER;
+		RealWeapon = WEAPON_HAMMER;
+	}
+	else if(Index == ENTITY_HHAMMER_UPGRADE)
+	{
+		Item = HITEM_HAMMER;
+		RealWeapon = WEAPON_HAMMER;
+	}
+	else if(Index == ENTITY_GUN_UPGRADE)
+	{
+		Item = HITEM_GUN;
+		RealWeapon = WEAPON_GUN;
+	}
+	else if(Index == ENTITY_SHOTGUN_UPGRADE)
+	{
+		Item = HITEM_SHOTGUN;
+		RealWeapon = WEAPON_SHOTGUN;
+	}
+	else if(Index == ENTITY_GRENADE_UPGRADE)
+	{
+		Item = HITEM_GRENADE;
+		RealWeapon = WEAPON_GRENADE;
+	}
+	else if(Index == ENTITY_RIFLE_UPGRADE)
+	{
+		Item = HITEM_RIFLE;
+		RealWeapon = WEAPON_RIFLE;
+	}
+	else if(Index >= 17 && Index <= 64)
+	{
+		CDoor *pDoor = new CDoor(&GameServer()->m_World, Index-17, -1);
 		pDoor->m_Pos = Pos;
 		return true;
 	}
@@ -156,14 +198,27 @@ bool IGameController::OnEntity(int Index, vec2 Pos)
 		pPickup->m_Pos = Pos;
 		return true;
 	}
+	if(Item != -1)
+	{
+		CItem *pItem = new CItem(&GameServer()->m_World, Item, RealWeapon);
+		pItem->m_Pos = Pos;
+		return true;
+	}
 
 	return false;
 }
 
 void IGameController::EndRound()
 {
-	if(m_Warmup || m_ZombWarmup) // game can't end when we are running warmup
+	if(m_Warmup || m_ZombWarmup || m_GameOverTick != -1) // game can't end when we are running warmup
 		return;
+
+	GameServer()->zESCController()->OnEndRound();
+
+	if(m_aTeamscore[TEAM_RED] >= 100 && m_aTeamscore[TEAM_BLUE] < 100 && m_pOnTeamWinEventCmd[TEAM_RED][0])
+		GameServer()->Console()->ExecuteLine(m_pOnTeamWinEventCmd[TEAM_RED]);
+	else if(m_aTeamscore[TEAM_BLUE] >= 100 && m_aTeamscore[TEAM_RED] < 100 && m_pOnTeamWinEventCmd[TEAM_BLUE][0])
+		GameServer()->Console()->ExecuteLine(m_pOnTeamWinEventCmd[TEAM_BLUE]);
 
 	GameServer()->m_World.m_Paused = true;
 	m_GameOverTick = Server()->Tick();
@@ -180,9 +235,9 @@ const char *IGameController::GetTeamName(int Team)
 	if(IsTeamplay())
 	{
 		if(Team == TEAM_RED)
-			return "zombies";
+			return "zombie team";
 		else if(Team == TEAM_BLUE)
-			return "humans";
+			return "human team";
 	}
 	else
 	{
@@ -211,6 +266,7 @@ void IGameController::StartRound()
 	m_aTeamscore[TEAM_BLUE] = 0;
 	m_ForceBalanced = false;
 	Server()->DemoRecorder_HandleAutoStart();
+	ResetEvents();
 	char aBuf[256];
 	str_format(aBuf, sizeof(aBuf), "start round type='%s' teamplay='%d'", m_pGameType, m_GameFlags&GAMEFLAG_TEAMS);
 	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
@@ -404,10 +460,18 @@ void IGameController::Tick()
 	if(m_ZombWarmup)
 	{
 		m_ZombWarmup--;
-		if(!m_ZombWarmup) {
-			//Make a player sad :>
-			if(GameServer()->zESCController()->CountPlayers() > 1)
-				RandomZomb();
+		if(!m_ZombWarmup)
+		{
+			// Make a player sad :>
+			if(GameServer()->zESCController()->CountPlayers() > 1 && g_Config.m_SvZombieRatio)
+			{
+				int ZAtStart = 1;
+				ZAtStart = (int)GameServer()->zESCController()->CountPlayers()/(int)g_Config.m_SvZombieRatio;
+				if(!ZAtStart)
+					ZAtStart = 1;
+				for(; ZAtStart; ZAtStart--)
+					RandomZomb();
+			}
 			else
 				GameServer()->zESCController()->StartZomb(0);
 		}
@@ -472,6 +536,85 @@ void IGameController::Tick()
 			}
 		}
 	}
+	if(GameServer()->zESCController()->ZombStarted())
+	{
+		for(int i = 0; i < m_NumTimedEvents; i++)
+		{
+			if(m_TimedEventTick[i] && m_TimedEventTick[i] <= Server()->Tick())
+			{
+				m_TimedEventTick[i] = 0;
+				GameServer()->Console()->ExecuteLine(m_pTimedEventCmd[i]);
+			}
+		}
+	}
+}
+
+bool IGameController::RegisterTimedEvent(int Time, const char *pCommand)
+{
+	if(m_NumTimedEvents >= 32) // Captain, we are full!
+		return false;
+
+	if(!*pCommand || Time < 1) // Why use an event with no command or that gets executed immediately?
+		return false;
+
+	if(m_TimedEventTick[m_NumTimedEvents] || m_TimedEventTime[m_NumTimedEvents] || m_pTimedEventCmd[m_NumTimedEvents][0]) // Should never happen...
+		return false;
+
+	str_copy(m_pTimedEventCmd[m_NumTimedEvents], pCommand, sizeof(m_pTimedEventCmd[m_NumTimedEvents]));
+	m_TimedEventTime[m_NumTimedEvents] = Time;
+	m_TimedEventTick[m_NumTimedEvents] = Server()->Tick() + Time*Server()->TickSpeed();
+	m_NumTimedEvents++;
+	return true;
+}
+
+void IGameController::ResetEvents()
+{
+	for(int i = 0; i < m_NumTimedEvents; i++)
+	{
+		m_TimedEventTick[i] = Server()->Tick() + m_TimedEventTime[i]*Server()->TickSpeed();
+		m_TriggeredEventState[i] = false;
+		for(int i = 0; i < 16; i++)
+		{
+			m_CustomTeleport[i] = -1;
+			m_CustomTeleportTeam[i] = -1;
+		}
+	}
+}
+
+bool IGameController::RegisterTriggeredEvent(int ID, const char *pCommand)
+{
+	if(!*pCommand) // Why use an event with no command?
+		return false;
+
+	if(ID < 0 || ID >= 32) // Notify the user that he's stupid...
+		return false;
+
+	/*if(m_pTriggeredEventCmd[ID][0]) // Change trigger commands is allowed.
+		return false;*/
+
+	str_copy(m_pTriggeredEventCmd[ID], pCommand, sizeof(m_pTriggeredEventCmd[ID]));
+	m_TriggeredEventState[ID] = false;
+	return true;
+}
+
+void IGameController::OnTrigger(int ID)
+{
+	if(!m_pTriggeredEventCmd[ID][0] || m_TriggeredEventState[ID] || !GameServer()->zESCController()->ZombStarted())
+		return;
+
+	GameServer()->Console()->ExecuteLine(m_pTriggeredEventCmd[ID]);
+	m_TriggeredEventState[ID] = true;
+}
+
+int IGameController::OnCustomTeleporter(int ID, int Team)
+{
+	if(m_CustomTeleport[ID] == -1)
+		return -1;
+
+	if(m_CustomTeleportTeam[ID] != -1 && Team != m_CustomTeleportTeam[ID])
+		return -1;
+
+	return m_CustomTeleport[ID];
 }
 
 void IGameController::DoTeamScoreWincheck()
@@ -482,8 +625,6 @@ void IGameController::DoTeamScoreWincheck()
 		if((g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !m_SuddenDeath)
 		{
 			//GameServer()->SendBroadcast("Humans win!", -1);
-			m_aTeamscore[TEAM_BLUE] = 100;
-			m_aTeamscore[TEAM_RED] = 0;
 			EndRound();
 		}
 	}

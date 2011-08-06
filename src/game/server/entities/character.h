@@ -8,6 +8,7 @@
 #include <game/generated/protocol.h>
 
 #include <game/gamecore.h>
+#include <game/server/entities/item.h>
 
 enum
 {
@@ -69,6 +70,10 @@ public:
 
 	bool IsAlive() const { return m_Alive; }
 	class CPlayer *GetPlayer() { return m_pPlayer; }
+
+	// should be the right way?
+	class CItem *m_HookedItem;
+	int m_Item;
 
 private:
 	// player controlling this character

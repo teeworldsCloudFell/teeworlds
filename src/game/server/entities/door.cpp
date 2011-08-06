@@ -6,27 +6,39 @@
 #include <game/server/gamemodes/zesc.h>
 #include "door.h"
 
-CDoor::CDoor(CGameWorld *pGameWorld, int Index)
+CDoor::CDoor(CGameWorld *pGameWorld, int Index, int Time)
 : CEntity(pGameWorld, CGameWorld::ENTTYPE_PICKUP)
 {
 	m_Index = Index;
-	m_State = 1;
+	m_Time = -1;
+	if(Time > 0)
+		m_Time = Time*Server()->TickSpeed();
+	m_State = DOOR_CLOSED;
 	if(Index > 32)
-		m_State = 0;
-
-	Reset();
+		m_State = DOOR_OPEN;
+	if(Index == -1)
+		m_State = DOOR_ZCLOSED;
 
 	GameWorld()->InsertEntity(this);
 }
 
 void CDoor::Reset()
 {
+	if(m_Index == -1)
+		GameServer()->m_World.DestroyEntity(this);
 }
 
 void CDoor::Tick()
 {
-	m_State = GameServer()->zESCController()->DoorState(m_Index);
-	if(m_State == DOOR_OPEN || m_State == DOOR_ZCLOSING || m_State == DOOR_REOPEN)
+	if(m_Time > 0)
+	{
+		m_Time--;
+		if(!m_Time)
+			GameServer()->m_World.DestroyEntity(this);
+	}
+	if(m_Index > -1)
+		m_State = GameServer()->zESCController()->DoorState(m_Index);
+	if(m_State == DOOR_OPEN || m_State == DOOR_ZCLOSING || m_State == DOOR_REOPENED || !m_Time || !g_Config.m_SvDoors)
 		return;
 	CCharacter *apCloseCCharacters[MAX_CLIENTS];
 	int Num = GameServer()->m_World.FindEntities(m_Pos, 16.0f, (CEntity**)apCloseCCharacters, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
@@ -43,7 +55,7 @@ void CDoor::Tick()
 
 void CDoor::Snap(int SnappingClient)
 {
-	if(m_State == DOOR_OPEN || m_State == DOOR_ZCLOSING || m_State == DOOR_REOPEN || NetworkClipped(SnappingClient))
+	if(m_State == DOOR_OPEN || m_State == DOOR_ZCLOSING || m_State == DOOR_REOPENED || !m_Time || !g_Config.m_SvDoors || NetworkClipped(SnappingClient))
 		return;
 
 	CNetObj_Pickup *pP = static_cast<CNetObj_Pickup *>(Server()->SnapNewItem(NETOBJTYPE_PICKUP, m_ID, sizeof(CNetObj_Pickup)));

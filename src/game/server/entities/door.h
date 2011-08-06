@@ -21,19 +21,20 @@ enum
 	DOOR_CLOSED,
 	DOOR_ZCLOSING,
 	DOOR_ZCLOSED,
-	DOOR_REOPEN
+	DOOR_REOPENED
 };
 
 class CDoor : public CEntity
 {
 public:
-	CDoor(CGameWorld *pGameWorld, int Index);
+	CDoor(CGameWorld *pGameWorld, int Index, int Time);
 
 	virtual void Reset();
 	virtual void Tick();
 	virtual void Snap(int SnappingClient);
 
 private:
+	int m_Time;
 	int m_Index;
 	int m_State;
 };
