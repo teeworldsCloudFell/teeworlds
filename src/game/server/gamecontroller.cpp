@@ -470,7 +470,7 @@ void IGameController::Tick()
 				if(!ZAtStart)
 					ZAtStart = 1;
 				for(; ZAtStart; ZAtStart--)
-					RandomZomb();
+					RandomZomb(-1);
 			}
 			else
 				GameServer()->zESCController()->StartZomb(0);
@@ -703,7 +703,7 @@ void IGameController::ZombWarmup(int W)
 	m_ZombWarmup = W*Server()->TickSpeed();
 }
 
-void IGameController::RandomZomb()
+void IGameController::RandomZomb(int Mode)
 {
 	int ZombCID = rand()%MAX_CLIENTS;
 	int WTF = 100; // 100 Trys should be enough
@@ -719,7 +719,7 @@ void IGameController::RandomZomb()
 			return;
 		}
 	}
-	GameServer()->m_apPlayers[ZombCID]->SetZomb(-1);
+	GameServer()->m_apPlayers[ZombCID]->SetZomb(Mode);
 	GameServer()->zESCController()->StartZomb(true);
 	m_LastZomb2 = m_LastZomb;
 	m_LastZomb = ZombCID;

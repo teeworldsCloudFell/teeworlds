@@ -71,7 +71,6 @@ public:
 	bool IsAlive() const { return m_Alive; }
 	class CPlayer *GetPlayer() { return m_pPlayer; }
 
-	// should be the right way?
 	class CItem *m_HookedItem;
 	int m_Item;
 

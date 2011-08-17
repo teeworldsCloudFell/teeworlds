@@ -556,7 +556,7 @@ void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 	m_apPlayers[ClientID] = 0;
 
 	if(!zESCController()->CountZombs() && zESCController()->ZombStarted() && !m_pController->m_ZombWarmup && !zESCController()->NukeLaunched())
-		m_pController->RandomZomb();
+		m_pController->RandomZomb(-2);
 
 	zESCController()->CheckZomb();
 
@@ -609,7 +609,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 			{
 				SendChatTarget(ClientID, "---HELP---");
 				SendChatTarget(ClientID, "\"/info\" information about the mod");
-				SendChatTarget(ClientID, "The human goal is to survive in the given time. Zombies have to infect all humans.");
+				SendChatTarget(ClientID, "The human goal is to survive in the given time, or to reach the end of the map. Zombies have to infect all humans.");
 			}
 			else
 			{
@@ -849,8 +849,11 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 		Server()->SetClientName(ClientID, pMsg->m_pName);
 		Server()->SetClientClan(ClientID, pMsg->m_pClan);
 		Server()->SetClientCountry(ClientID, pMsg->m_Country);
-		str_copy(pPlayer->m_TeeInfos.m_SkinName, pMsg->m_pSkin, sizeof(pPlayer->m_TeeInfos.m_SkinName));
-		str_copy(pPlayer->m_OriginSkinName, pMsg->m_pSkin, sizeof(pPlayer->m_OriginSkinName));
+		if(!str_comp(pMsg->m_pSkin, "zomb"))
+			str_copy(pPlayer->m_TeeInfos.m_SkinName, "default", sizeof(pPlayer->m_TeeInfos.m_SkinName));
+		else
+			str_copy(pPlayer->m_TeeInfos.m_SkinName, pMsg->m_pSkin, sizeof(pPlayer->m_TeeInfos.m_SkinName));
+		str_copy(pPlayer->m_OriginSkinName, pPlayer->m_TeeInfos.m_SkinName, sizeof(pPlayer->m_OriginSkinName));
 		pPlayer->m_TeeInfos.m_UseCustomColor = pMsg->m_UseCustomColor;
 		pPlayer->m_TeeInfos.m_ColorBody = pMsg->m_ColorBody;
 		pPlayer->m_TeeInfos.m_ColorFeet = pMsg->m_ColorFeet;

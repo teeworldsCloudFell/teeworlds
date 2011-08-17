@@ -327,27 +327,31 @@ void CPlayer::TryRespawn()
 
 void CPlayer::SetZomb(int From)
 {
+	// send a nice message
+	CNetMsg_Sv_KillMsg Msg;
 	if(From > -1)
 	{
-		// send a nice message
-		CNetMsg_Sv_KillMsg Msg;
 		Msg.m_Killer = From;
 		Msg.m_Victim = m_ClientID;
 		Msg.m_Weapon = WEAPON_HAMMER;
-		Msg.m_ModeSpecial = 0;
-		Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, -1);
 		GameServer()->m_apPlayers[From]->m_Score++;
 	}
-	m_Team = TEAM_RED;
-	if(From <= -1)
+	else
 	{
-		if(From == -1)
-		{
-			char aBuf[512];
-			GameServer()->CreateSound(m_ViewPos, SOUND_PLAYER_PAIN_LONG);
-			str_format(aBuf, sizeof(aBuf), "'%s' wants your brain! Run away.", Server()->ClientName(m_ClientID));
-			GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
-		}
+		Msg.m_Killer = m_ClientID;
+		Msg.m_Victim = m_ClientID;
+		Msg.m_Weapon = WEAPON_HAMMER;
+	}
+	Msg.m_ModeSpecial = 0;
+	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, -1);
+
+	m_Team = TEAM_RED;
+	if(From == -1)
+	{
+		char aBuf[512];
+		GameServer()->CreateSound(m_ViewPos, SOUND_PLAYER_PAIN_LONG);
+		str_format(aBuf, sizeof(aBuf), "'%s' wants your brain! Run away.", Server()->ClientName(m_ClientID));
+		GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
 
 		vec2 SpawnPos;
 		if(GameServer()->m_pController->ZombieSpawn(&SpawnPos))
@@ -363,7 +367,7 @@ void CPlayer::SetZomb(int From)
 		}
 	}
 
-	str_copy(m_TeeInfos.m_SkinName, "x_zomb", sizeof(m_TeeInfos.m_SkinName));
+	str_copy(m_TeeInfos.m_SkinName, "zomb", sizeof(m_TeeInfos.m_SkinName));
 	m_pCharacter->SetZomb();
 	GameServer()->m_pController->m_aTeamscore[TEAM_RED]++;
 	GameServer()->m_pController->m_aTeamscore[TEAM_BLUE]--;

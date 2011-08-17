@@ -28,17 +28,17 @@ int CItem::GetLevel()
 	switch(m_Item)
 	{
 	case HITEM_HAMMER:
-		return 10;
+		return 3;
 	case HITEM_GUN:
-		return 3;
+		return 1;
 	case HITEM_SHOTGUN:
-		return 5;
+		return 2;
 	case HITEM_GRENADE:
-		return 3;
+		return 1;
 	case HITEM_RIFLE:
-		return 5;
+		return 2;
 	case ZITEM_HAMMER:
-		return 5;
+		return 2;
 	}
 	return 0;
 }
@@ -70,9 +70,33 @@ void CItem::Tick()
 			else if(m_Subtype == WEAPON_RIFLE)
 				GameServer()->CreateSound(m_Pos, SOUND_PICKUP_SHOTGUN);
 
+			char aBuf[128];
+			switch(m_Item)
+			{
+			case HITEM_HAMMER:
+				str_copy(aBuf, "Special item hammer: You can build 5 zdoors with it.", sizeof(aBuf));
+			case HITEM_GUN:
+				str_copy(aBuf, "Gun upgraded.", sizeof(aBuf));
+			case HITEM_SHOTGUN:
+				str_copy(aBuf, "Shotgun upgraded.", sizeof(aBuf));
+			case HITEM_GRENADE:
+				str_copy(aBuf, "Grenade upgraded.", sizeof(aBuf));
+			case HITEM_RIFLE:
+				str_copy(aBuf, "Rifle upgraded.", sizeof(aBuf));
+			case ZITEM_HAMMER:
+				str_copy(aBuf, "Special item hammer: You have less knockback and freeze time.", sizeof(aBuf));
+			}
+			GameServer()->SendBroadcast(aBuf, pChr->GetPlayer()->GetCID());
+
 			GameServer()->SendWeaponPickup(pChr->GetPlayer()->GetCID(), m_Subtype);
 
 			pChr->SetEmote(EMOTE_SURPRISE, Server()->Tick() + 1200 * Server()->TickSpeed() / 1000);
+		}
+		else if(pChr->GetPlayer()->GetTeam() == TEAM_BLUE && m_Item != ZITEM_HAMMER)
+		{
+			char aBuf[128];
+			str_format(aBuf, sizeof(aBuf), "You need to be at least level %d for this item!", GetLevel());
+			GameServer()->SendBroadcast(aBuf, pChr->GetPlayer()->GetCID());
 		}
 		else if(pChr->GetPlayer()->GetTeam() == TEAM_RED && pChr->GetPlayer()->m_Score/100 >= GetLevel() && m_Item == ZITEM_HAMMER)
 		{

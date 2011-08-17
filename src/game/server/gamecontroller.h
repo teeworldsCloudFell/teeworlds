@@ -159,7 +159,7 @@ public:
 	virtual bool CanJoinTeam(int Team, int NotThisID);
 	int ClampTeam(int Team);
 	void ZombWarmup(int W);
-	void RandomZomb();
+	void RandomZomb(int Mode);
 
 	virtual void PostReset();
 };
