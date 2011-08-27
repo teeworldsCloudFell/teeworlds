@@ -44,15 +44,16 @@ IGameController::IGameController(class CGameContext *pGameServer)
 		m_TimedEventTime[i] = 0;
 		m_pTriggeredEventCmd[i][0] = '\0';
 		m_TriggeredEventState[i] = false;
-	}
-	for(int i = 0; i < 16; i++)
-	{
-		m_CustomTeleport[i] = -1;
-		m_CustomTeleportTeam[i] = -1;
+		if(i < 16)
+		{
+			m_CustomTeleport[i] = -1;
+			m_CustomTeleportTeam[i] = -1;
+		}
 	}
 	m_NumTimedEvents = 0;
 	m_pOnTeamWinEventCmd[TEAM_RED][0] = '\0';
 	m_pOnTeamWinEventCmd[TEAM_BLUE][0] = '\0';
+	m_pOnTeamWinEventCmd[2][0] = '\0';
 }
 
 IGameController::~IGameController()
@@ -267,6 +268,8 @@ void IGameController::StartRound()
 	m_ForceBalanced = false;
 	Server()->DemoRecorder_HandleAutoStart();
 	ResetEvents();
+	if(m_pOnTeamWinEventCmd[2][0])
+		GameServer()->Console()->ExecuteLine(m_pOnTeamWinEventCmd[2]);
 	char aBuf[256];
 	str_format(aBuf, sizeof(aBuf), "start round type='%s' teamplay='%d'", m_pGameType, m_GameFlags&GAMEFLAG_TEAMS);
 	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
@@ -573,11 +576,11 @@ void IGameController::ResetEvents()
 	{
 		m_TimedEventTick[i] = Server()->Tick() + m_TimedEventTime[i]*Server()->TickSpeed();
 		m_TriggeredEventState[i] = false;
-		for(int i = 0; i < 16; i++)
+		/*for(int i = 0; i < 16; i++) People have to do it on their own now
 		{
 			m_CustomTeleport[i] = -1;
 			m_CustomTeleportTeam[i] = -1;
-		}
+		}*/
 	}
 }
 

@@ -1395,6 +1395,36 @@ void CGameContext::ConZDoorReopenTime(IConsole::IResult *pResult, void *pUserDat
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
 }
 
+void CGameContext::ConDoorSetState(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	int Door = clamp(pResult->GetInteger(0), 1, 32);
+	int State = clamp(pResult->GetInteger(1), 0, 3);
+	if(State > 1)
+		State++;
+
+	pSelf->zESCController()->m_DoorState[Door-1] = State;
+
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "changed doorstate %d to %d", Door, State > 1 ? State-1 : State);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+}
+
+void CGameContext::ConZDoorSetState(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	int Door = clamp(pResult->GetInteger(0), 1, 32);
+	int State = clamp(pResult->GetInteger(1), 0, 2);
+	if(State)
+		State += 2;
+
+	pSelf->zESCController()->m_DoorState[Door+31] = State;
+
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "changed zdoorstate %d to %d", Door, State ? State-2 : 0);
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+}
+
 void CGameContext::ConRegisterTimedEvent(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
@@ -1487,8 +1517,10 @@ void CGameContext::ConFlushTriggeredEvents(IConsole::IResult *pResult, void *pUs
 void CGameContext::ConRegisterOnTeamWinEvent(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	int Team = clamp(pResult->GetInteger(0), 0, 1);
+	int Team = clamp(pResult->GetInteger(0), -1, 1);
 	const char *pCommand = pResult->GetString(1);
+	if(Team == -1)
+		Team = 2;
 
 	str_copy(pSelf->m_pController->m_pOnTeamWinEventCmd[Team], pCommand, sizeof(pSelf->m_pController->m_pOnTeamWinEventCmd[Team]));
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "On-teamwin event registered");
@@ -1500,6 +1532,7 @@ void CGameContext::ConFlushOnTeamWinEvent(IConsole::IResult *pResult, void *pUse
 
 	pSelf->m_pController->m_pOnTeamWinEventCmd[0][0] = '\0';
 	pSelf->m_pController->m_pOnTeamWinEventCmd[1][0] = '\0';
+	pSelf->m_pController->m_pOnTeamWinEventCmd[2][0] = '\0';
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "On-teamwin events flushed");
 }
 
@@ -1553,6 +1586,31 @@ void CGameContext::ConCustomTeleporterList(IConsole::IResult *pResult, void *pUs
 	}
 }
 
+void CGameContext::ConReloadMapDefaults(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	for(int i = 0; i < 32; i++) // First we have to delete all events.
+	{
+		pSelf->m_pController->m_pTimedEventCmd[i][0] = '\0';
+		pSelf->m_pController->m_TimedEventTick[i] = 0;
+		pSelf->m_pController->m_TimedEventTime[i] = 0;
+		pSelf->m_pController->m_pTriggeredEventCmd[i][0] = '\0';
+		pSelf->m_pController->m_TriggeredEventState[i] = false;
+		if(i < 16)
+		{
+			pSelf->m_pController->m_CustomTeleport[i] = -1;
+			pSelf->m_pController->m_CustomTeleportTeam[i] = -1;
+		}
+	}
+	pSelf->m_pController->m_pOnTeamWinEventCmd[0][0] = '\0';
+	pSelf->m_pController->m_pOnTeamWinEventCmd[1][0] = '\0';
+	pSelf->m_pController->m_pOnTeamWinEventCmd[2][0] = '\0';
+
+	// Now we can load them again.
+	pSelf->LoadMapSettings();
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Reloaded map settings.");
+}
+
 void CGameContext::OnConsoleInit()
 {
 	m_pServer = Kernel()->RequestInterface<IServer>();
@@ -1583,6 +1641,9 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("zdoor_closetime", "ii", CFGFLAG_SERVER, ConZDoorCloseTime, this, "Adjust the zdoor closetime: zdoor_closetime <id> <seconds>");
 	Console()->Register("zdoor_reopentime", "ii", CFGFLAG_SERVER, ConZDoorReopenTime, this, "Adjust the zdoor reopentime: zdoor_reopentime <id> <seconds>");
 
+	Console()->Register("door_state", "ii", CFGFLAG_SERVER, ConDoorSetState, this, "Set the doorstate: door_state <id> <state (0=open, 1=closed, 2=zclosed, 3=reopened)>");
+	Console()->Register("zdoor_state", "ii", CFGFLAG_SERVER, ConZDoorSetState, this, "Set the zdoorstate: zdoor_state <id> <state (0=open, 1=zclosed, 2=reopened)>");
+
 	Console()->Register("event_timed_register", "is", CFGFLAG_SERVER, ConRegisterTimedEvent, this, "Register a timed event: event_timed_register <seconds> <command>");
 	Console()->Register("event_timed_list", "", CFGFLAG_SERVER, ConListTimedEvents, this, "List all timed events");
 	Console()->Register("event_timed_flush", "", CFGFLAG_SERVER, ConFlushTimedEvents, this, "Delete all timed events");
@@ -1591,12 +1652,14 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("event_triggered_list", "", CFGFLAG_SERVER, ConListTriggeredEvents, this, "List all triggered events");
 	Console()->Register("event_triggered_flush", "", CFGFLAG_SERVER, ConFlushTriggeredEvents, this, "Delete all triggered events");
 
-	Console()->Register("event_onteamwin_register", "is", CFGFLAG_SERVER, ConRegisterOnTeamWinEvent, this, "Register a on-teamwin event: event_onteamwin_register <team> <command>");
+	Console()->Register("event_onteamwin_register", "is", CFGFLAG_SERVER, ConRegisterOnTeamWinEvent, this, "Register a on-teamwin event: event_onteamwin_register <team (-1=Both, 0=Red, 1=Blue)> <command>");
 	Console()->Register("event_onteamwin_flush", "", CFGFLAG_SERVER, ConFlushOnTeamWinEvent, this, "Flush on-teamwin events");
 
-	Console()->Register("cteleporter_register", "ii?i", CFGFLAG_SERVER, ConCustomTeleporterRegister, this, "Assign teleport to a custom teleporter: cteleport_register <id> <to X> (<team>)");
+	Console()->Register("cteleporter_register", "ii?i", CFGFLAG_SERVER, ConCustomTeleporterRegister, this, "Assign teleport to a custom teleporter: cteleport_register <id> <to X> [team]");
 	Console()->Register("cteleporter_list", "", CFGFLAG_SERVER, ConCustomTeleporterList, this, "List custom teleports");
 	Console()->Register("cteleporter_flush", "", CFGFLAG_SERVER, ConCustomTeleporterFlush, this, "Flush custom teleports");
+
+	Console()->Register("reload_map_defaults", "", CFGFLAG_SERVER, ConReloadMapDefaults, this, "Reload the map internal settings. ");
 }
 
 void CGameContext::OnInit(/*class IKernel *pKernel*/)
@@ -1619,7 +1682,7 @@ void CGameContext::OnInit(/*class IKernel *pKernel*/)
 	//world = new GAMEWORLD;
 	//players = new CPlayer[MAX_CLIENTS];
 
-	// zESC only gametype
+	// zESC is the only gametype
 	m_pController = new CGameControllerZESC(this);
 	zESCController()->InitTeleporter();
 

@@ -76,6 +76,9 @@ class CGameContext : public IGameServer
 	static void ConCustomTeleporterRegister(IConsole::IResult *pResult, void *pUserData);
 	static void ConCustomTeleporterFlush(IConsole::IResult *pResult, void *pUserData);
 	static void ConCustomTeleporterList(IConsole::IResult *pResult, void *pUserData);
+	static void ConReloadMapDefaults(IConsole::IResult *pResult, void *pUserData);
+	static void ConDoorSetState(IConsole::IResult *pResult, void *pUserData);
+	static void ConZDoorSetState(IConsole::IResult *pResult, void *pUserData);
 	CGameContext(int Resetting);
 	void Construct(int Resetting);
 

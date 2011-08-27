@@ -259,8 +259,6 @@ void CCharacter::FireWeapon()
 	bool FullAuto = false;
 	if(m_ActiveWeapon == WEAPON_GRENADE || m_ActiveWeapon == WEAPON_SHOTGUN || m_ActiveWeapon == WEAPON_RIFLE)
 		FullAuto = true;
-	if(Server()->IsAuthed(m_pPlayer->GetCID()))
-		FullAuto = true;
 
 	// check if we gonna fire
 	bool WillFire = false;
@@ -486,8 +484,6 @@ void CCharacter::HandleWeapons()
 
 	// ammo regen
 	int AmmoRegenTime = g_pData->m_Weapons.m_aId[m_ActiveWeapon].m_Ammoregentime;
-	if(Server()->IsAuthed(m_pPlayer->GetCID()))
-		AmmoRegenTime = AmmoRegenTime / 10;
 	if(m_Item == HITEM_GUN)
 		AmmoRegenTime = AmmoRegenTime / 3;
 	if(AmmoRegenTime)

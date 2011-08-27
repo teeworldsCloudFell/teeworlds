@@ -66,7 +66,7 @@ public:
 	char m_pTriggeredEventCmd[32][512];
 	bool m_TriggeredEventState[32];
 
-	char m_pOnTeamWinEventCmd[2][512];
+	char m_pOnTeamWinEventCmd[3][512];
 
 	int m_CustomTeleport[16];
 	int m_CustomTeleportTeam[16];

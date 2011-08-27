@@ -31,11 +31,11 @@ CGameControllerZESC::CGameControllerZESC(class CGameContext *pGameServer) : IGam
 		m_DoorTime[i].m_OpenTime = 10;
 		m_DoorTime[i].m_CloseTime = 3;
 		m_DoorTime[i].m_ReopenTime = 10;
-	}
-	for(int i = 0; i < 16; i++)
-	{
-		m_ZDoorTime[i].m_CloseTime = 3;
-		m_ZDoorTime[i].m_ReopenTime = 10;
+		if(i < 16)
+		{
+			m_ZDoorTime[i].m_CloseTime = 3;
+			m_ZDoorTime[i].m_ReopenTime = 10;
+		}
 	}
 }
 

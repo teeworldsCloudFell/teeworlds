@@ -59,7 +59,7 @@ void CCollision::Init(class CLayers *pLayers)
 			m_pTiles[i].m_Index = 0;
 		}
 
-		// race tiles
+		// custom tiles
 		if(Index >= 14 && Index <= 175)
 			m_pTiles[i].m_Index = Index;
 	}
