@@ -230,6 +230,7 @@ void CGameControllerZESC::Tick()
 			if(apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_BLUE) //Humans Win :D
 			{
 				//GameServer()->SendBroadcast("Humans win!", -1);
+				m_aTeamscore[TEAM_BLUE] = 100;
 				apCloseCCharacters[i]->GetPlayer()->m_Score += 10;
 				GameServer()->m_pController->EndRound();
 			}
