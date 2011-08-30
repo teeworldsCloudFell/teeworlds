@@ -361,6 +361,7 @@ void CPlayer::SetZomb(int From)
 			m_pCharacter->m_Core.m_TriggeredEvents |= COREEVENT_HOOK_RETRACT;
 			m_pCharacter->m_Core.m_HookState = HOOK_RETRACTED;
 			m_pCharacter->m_Core.m_Pos = SpawnPos;
+			m_pCharacter->m_PrevDoorPos = SpawnPos;
 			m_pCharacter->m_Core.m_Vel = vec2(0,0);
 			m_pCharacter->m_Core.m_HookPos = m_pCharacter->m_Core.m_Pos;
 			GameServer()->CreatePlayerSpawn(SpawnPos);
