@@ -272,7 +272,7 @@ void CPlayer::SetTeam(int Team)
 			m_RespawnTick = Server()->Tick()+Server()->TickSpeed()/2;
 		}
 		else
-			SetZomb(-2);
+			SetZomb(-3);
 		return;
 	}
 
@@ -346,12 +346,15 @@ void CPlayer::SetZomb(int From)
 	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, -1);
 
 	m_Team = TEAM_RED;
-	if(From == -1)
+	if(From == -1 || From == -3)
 	{
-		char aBuf[512];
-		GameServer()->CreateSound(m_ViewPos, SOUND_PLAYER_PAIN_LONG);
-		str_format(aBuf, sizeof(aBuf), "'%s' wants your brain! Run away.", Server()->ClientName(m_ClientID));
-		GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+		if(From == -1)
+		{
+			char aBuf[512];
+			GameServer()->CreateSound(m_ViewPos, SOUND_PLAYER_PAIN_LONG);
+			str_format(aBuf, sizeof(aBuf), "'%s' wants your brain! Run away.", Server()->ClientName(m_ClientID));
+			GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+		}
 
 		vec2 SpawnPos;
 		if(GameServer()->m_pController->ZombieSpawn(&SpawnPos))

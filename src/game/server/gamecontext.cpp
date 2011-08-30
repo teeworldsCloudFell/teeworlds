@@ -1602,6 +1602,7 @@ void CGameContext::ConReloadMapDefaults(IConsole::IResult *pResult, void *pUserD
 			pSelf->m_pController->m_CustomTeleportTeam[i] = -1;
 		}
 	}
+	pSelf->m_pController->m_NumTimedEvents = 0;
 	pSelf->m_pController->m_pOnTeamWinEventCmd[0][0] = '\0';
 	pSelf->m_pController->m_pOnTeamWinEventCmd[1][0] = '\0';
 	pSelf->m_pController->m_pOnTeamWinEventCmd[2][0] = '\0';
