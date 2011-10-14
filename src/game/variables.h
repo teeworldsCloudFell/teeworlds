@@ -95,11 +95,11 @@ MACRO_CONFIG_INT(SvSpeedupAdd, sv_speedup_add, 0, -100, 100, CFGFLAG_SERVER, "Bo
 MACRO_CONFIG_INT(SvJumperAdd, sv_jumper_add, 0, -100, 100, CFGFLAG_SERVER, "Jumper power")
 MACRO_CONFIG_INT(SvDoors, sv_doors, 1, 0, 1, CFGFLAG_SERVER, "Enable/Disable Doors")
 MACRO_CONFIG_INT(SvLoadMapDefaults, sv_load_map_defaults, 1, 0, 1, CFGFLAG_SERVER, "Load map default settings")
-
 MACRO_CONFIG_INT(SvHdoorReopenTime, sv_hdoor_reopen_time, 10, 1, 60, CFGFLAG_SERVER, "Reopen time for the human created doors (hammer item)")
 MACRO_CONFIG_INT(SvZWarmup, sv_zwarmup, 15, 3, 60, CFGFLAG_SERVER, "Warmup time for choosing random zombie")
 MACRO_CONFIG_INT(SvNukeTime, sv_nuke_time, 15, 1, 60, CFGFLAG_SERVER, "Time till nuke arrives")
 MACRO_CONFIG_INT(SvZombieRatio, sv_zombie_ratio, 16, 0, 16, CFGFLAG_SERVER, "Infection rate on start")
+MACRO_CONFIG_INT(SvFlushCustomTeleporter, sv_flush_cteleporter, 0, 0, 1, CFGFLAG_SERVER, "Flush custom teleporter on roundend")
 
 // debug
 #ifdef CONF_DEBUG // this one can crash the server if not used correctly

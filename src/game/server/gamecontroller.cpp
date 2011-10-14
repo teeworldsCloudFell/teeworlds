@@ -39,21 +39,24 @@ IGameController::IGameController(class CGameContext *pGameServer)
 
 	for(int i = 0; i < 32; i++)
 	{
-		m_pTimedEventCmd[i][0] = '\0';
-		m_TimedEventTick[i] = 0;
-		m_TimedEventTime[i] = 0;
-		m_pTriggeredEventCmd[i][0] = '\0';
-		m_TriggeredEventState[i] = false;
+		m_TriggeredEvent[i].m_pAction[0] = '\0';
+		m_TriggeredEvent[i].m_State = false;
 		if(i < 16)
 		{
-			m_CustomTeleport[i] = -1;
-			m_CustomTeleportTeam[i] = -1;
+			m_CustomTeleport[i].m_Teleport = -1;
+			m_CustomTeleport[i].m_Team = -1;
 		}
 	}
+	for(int i = 0; i < MAX_TIMED_EVENTS; i++)
+	{
+		m_TimedEvent[i].m_pAction[0] = '\0';
+		m_TimedEvent[i].m_Time = 0;
+		m_TimedEvent[i].m_Tick = 0;
+	}
 	m_NumTimedEvents = 0;
-	m_pOnTeamWinEventCmd[TEAM_RED][0] = '\0';
-	m_pOnTeamWinEventCmd[TEAM_BLUE][0] = '\0';
-	m_pOnTeamWinEventCmd[2][0] = '\0';
+	m_pOnTeamWinEvent[TEAM_RED][0] = '\0';
+	m_pOnTeamWinEvent[TEAM_BLUE][0] = '\0';
+	m_pOnTeamWinEvent[2][0] = '\0'; // Roundend, both teams
 }
 
 IGameController::~IGameController()
@@ -216,10 +219,10 @@ void IGameController::EndRound()
 
 	GameServer()->zESCController()->OnEndRound();
 
-	if(m_aTeamscore[TEAM_RED] >= 100 && m_aTeamscore[TEAM_BLUE] < 100 && m_pOnTeamWinEventCmd[TEAM_RED][0])
-		GameServer()->Console()->ExecuteLine(m_pOnTeamWinEventCmd[TEAM_RED]);
-	else if(m_aTeamscore[TEAM_BLUE] >= 100 && m_aTeamscore[TEAM_RED] < 100 && m_pOnTeamWinEventCmd[TEAM_BLUE][0])
-		GameServer()->Console()->ExecuteLine(m_pOnTeamWinEventCmd[TEAM_BLUE]);
+	if(m_aTeamscore[TEAM_RED] >= 100 && m_aTeamscore[TEAM_BLUE] < 100 && m_pOnTeamWinEvent[TEAM_RED][0])
+		GameServer()->Console()->ExecuteLine(m_pOnTeamWinEvent[TEAM_RED]);
+	else if(m_aTeamscore[TEAM_BLUE] >= 100 && m_aTeamscore[TEAM_RED] < 100 && m_pOnTeamWinEvent[TEAM_BLUE][0])
+		GameServer()->Console()->ExecuteLine(m_pOnTeamWinEvent[TEAM_BLUE]);
 
 	GameServer()->m_World.m_Paused = true;
 	m_GameOverTick = Server()->Tick();
@@ -268,8 +271,8 @@ void IGameController::StartRound()
 	m_ForceBalanced = false;
 	Server()->DemoRecorder_HandleAutoStart();
 	ResetEvents();
-	if(m_pOnTeamWinEventCmd[2][0])
-		GameServer()->Console()->ExecuteLine(m_pOnTeamWinEventCmd[2]);
+	if(m_pOnTeamWinEvent[2][0])
+		GameServer()->Console()->ExecuteLine(m_pOnTeamWinEvent[2]);
 	char aBuf[256];
 	str_format(aBuf, sizeof(aBuf), "start round type='%s' teamplay='%d'", m_pGameType, m_GameFlags&GAMEFLAG_TEAMS);
 	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
@@ -539,14 +542,14 @@ void IGameController::Tick()
 			}
 		}
 	}
-	if(GameServer()->zESCController()->ZombStarted())
+	if(GameServer()->zESCController()->CountPlayers())
 	{
 		for(int i = 0; i < m_NumTimedEvents; i++)
 		{
-			if(m_TimedEventTick[i] && m_TimedEventTick[i] <= Server()->Tick())
+			if(m_TimedEvent[i].m_Tick && m_TimedEvent[i].m_Tick <= Server()->Tick())
 			{
-				m_TimedEventTick[i] = 0;
-				GameServer()->Console()->ExecuteLine(m_pTimedEventCmd[i]);
+				m_TimedEvent[i].m_Tick = 0;
+				GameServer()->Console()->ExecuteLine(m_TimedEvent[i].m_pAction);
 			}
 		}
 	}
@@ -554,18 +557,18 @@ void IGameController::Tick()
 
 bool IGameController::RegisterTimedEvent(int Time, const char *pCommand)
 {
-	if(m_NumTimedEvents >= 32) // Captain, we are full!
+	if(m_NumTimedEvents >= MAX_TIMED_EVENTS) // Captain, we are full!
 		return false;
 
 	if(!*pCommand || Time < 1) // Why use an event with no command or that gets executed immediately?
 		return false;
 
-	if(m_TimedEventTick[m_NumTimedEvents] || m_TimedEventTime[m_NumTimedEvents] || m_pTimedEventCmd[m_NumTimedEvents][0]) // Should never happen...
+	if(m_TimedEvent[m_NumTimedEvents].m_Tick || m_TimedEvent[m_NumTimedEvents].m_Time || m_TimedEvent[m_NumTimedEvents].m_pAction[0]) // Should never happen...
 		return false;
 
-	str_copy(m_pTimedEventCmd[m_NumTimedEvents], pCommand, sizeof(m_pTimedEventCmd[m_NumTimedEvents]));
-	m_TimedEventTime[m_NumTimedEvents] = Time;
-	m_TimedEventTick[m_NumTimedEvents] = Server()->Tick() + Time*Server()->TickSpeed();
+	str_copy(m_TimedEvent[m_NumTimedEvents].m_pAction, pCommand, sizeof(m_TimedEvent[m_NumTimedEvents].m_pAction));
+	m_TimedEvent[m_NumTimedEvents].m_Time = Time;
+	m_TimedEvent[m_NumTimedEvents].m_Tick = Server()->Tick() + Time*Server()->TickSpeed();
 	m_NumTimedEvents++;
 	return true;
 }
@@ -573,14 +576,15 @@ bool IGameController::RegisterTimedEvent(int Time, const char *pCommand)
 void IGameController::ResetEvents()
 {
 	for(int i = 0; i < m_NumTimedEvents; i++)
+		m_TimedEvent[i].m_Tick = Server()->Tick() + m_TimedEvent[i].m_Time*Server()->TickSpeed();
+	for(int i = 0; i < 32; i++)
 	{
-		m_TimedEventTick[i] = Server()->Tick() + m_TimedEventTime[i]*Server()->TickSpeed();
-		m_TriggeredEventState[i] = false;
-		/*for(int i = 0; i < 16; i++) People have to do it on their own now
+		m_TriggeredEvent[i].m_State = false;
+		if(i < 16 && g_Config.m_SvFlushCustomTeleporter)
 		{
-			m_CustomTeleport[i] = -1;
-			m_CustomTeleportTeam[i] = -1;
-		}*/
+			m_CustomTeleport[i].m_Teleport = -1;
+			m_CustomTeleport[i].m_Team = -1;
+		}
 	}
 }
 
@@ -592,32 +596,32 @@ bool IGameController::RegisterTriggeredEvent(int ID, const char *pCommand)
 	if(ID < 0 || ID >= 32) // Notify the user that he's stupid...
 		return false;
 
-	/*if(m_pTriggeredEventCmd[ID][0]) // Change trigger commands is allowed.
+	/*if(m_TriggeredEvent[ID].m_pAction[0]) // Change trigger commands is allowed.
 		return false;*/
 
-	str_copy(m_pTriggeredEventCmd[ID], pCommand, sizeof(m_pTriggeredEventCmd[ID]));
-	m_TriggeredEventState[ID] = false;
+	str_copy(m_TriggeredEvent[ID].m_pAction, pCommand, sizeof(m_TriggeredEvent[ID].m_pAction));
+	m_TriggeredEvent[ID].m_State = false;
 	return true;
 }
 
 void IGameController::OnTrigger(int ID)
 {
-	if(!m_pTriggeredEventCmd[ID][0] || m_TriggeredEventState[ID] || !GameServer()->zESCController()->ZombStarted())
+	if(!m_TriggeredEvent[ID].m_pAction[0] || m_TriggeredEvent[ID].m_State)
 		return;
 
-	GameServer()->Console()->ExecuteLine(m_pTriggeredEventCmd[ID]);
-	m_TriggeredEventState[ID] = true;
+	GameServer()->Console()->ExecuteLine(m_TriggeredEvent[ID].m_pAction);
+	m_TriggeredEvent[ID].m_State = true;
 }
 
 int IGameController::OnCustomTeleporter(int ID, int Team)
 {
-	if(m_CustomTeleport[ID] == -1)
+	if(m_CustomTeleport[ID].m_Teleport == -1) // Check if there's any teleport assigned
 		return -1;
 
-	if(m_CustomTeleportTeam[ID] != -1 && Team != m_CustomTeleportTeam[ID])
+	if(m_CustomTeleport[ID].m_Team != -1 && Team != m_CustomTeleport[ID].m_Team) // Check if there's any team assigned to this teleporter, if yes check if it matches with the players team
 		return -1;
 
-	return m_CustomTeleport[ID];
+	return m_CustomTeleport[ID].m_Teleport;
 }
 
 void IGameController::DoTeamScoreWincheck()

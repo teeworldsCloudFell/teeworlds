@@ -373,8 +373,6 @@ void CPlayer::SetZomb(int From)
 
 	str_copy(m_TeeInfos.m_SkinName, "zomb", sizeof(m_TeeInfos.m_SkinName));
 	m_pCharacter->SetZomb();
-	GameServer()->m_pController->m_aTeamscore[TEAM_RED]++;
-	GameServer()->m_pController->m_aTeamscore[TEAM_BLUE]--;
 	GameServer()->m_pController->OnPlayerInfoChange(GameServer()->m_apPlayers[m_ClientID]);
 	GameServer()->zESCController()->CheckZomb();
 	GameServer()->SendChatTarget(m_ClientID, "You are now a zombie! Eat some brains.");

@@ -21,21 +21,14 @@ public:
 	bool m_LevelEarned;
 	int m_RoundEndTick;
 
-	int m_DoorState[48];
-	int m_DoorTick[48];
-
-	struct DoorTime
+	struct CDoor
 	{
+		int m_State;
+		int m_Tick;
 		int m_OpenTime;
 		int m_CloseTime;
 		int m_ReopenTime;
-	} m_DoorTime[32];
-
-	struct ZDoorTime
-	{
-		int m_CloseTime;
-		int m_ReopenTime;
-	} m_ZDoorTime[16];
+	} m_Door[48];
 
 	int m_NukeTick;
 	bool m_NukeLaunched;

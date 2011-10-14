@@ -79,6 +79,7 @@ class CGameContext : public IGameServer
 	static void ConReloadMapDefaults(IConsole::IResult *pResult, void *pUserData);
 	static void ConDoorSetState(IConsole::IResult *pResult, void *pUserData);
 	static void ConZDoorSetState(IConsole::IResult *pResult, void *pUserData);
+	static void ConTeleportTeam(IConsole::IResult *pResult, void *pUserData);
 	CGameContext(int Resetting);
 	void Construct(int Resetting);
 

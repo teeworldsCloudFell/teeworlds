@@ -19,23 +19,17 @@ CGameControllerZESC::CGameControllerZESC(class CGameContext *pGameServer) : IGam
 	m_NukeTick = 0;
 	m_NukeLaunched = false;
 	m_LevelEarned = false;
-	for(int i = 0; i < 47; i++)
+
+	for(int i = 0; i < 48; i++)
 	{
-		m_DoorState[i] = DOOR_CLOSED;
-		if(i >= 32)
-			m_DoorState[i] = DOOR_OPEN;
-		m_DoorTick[i] = 0;
-	}
-	for(int i = 0; i < 32; i++)
-	{
-		m_DoorTime[i].m_OpenTime = 10;
-		m_DoorTime[i].m_CloseTime = 3;
-		m_DoorTime[i].m_ReopenTime = 10;
-		if(i < 16)
-		{
-			m_ZDoorTime[i].m_CloseTime = 3;
-			m_ZDoorTime[i].m_ReopenTime = 10;
-		}
+		if(i < 32)
+			m_Door[i].m_State = DOOR_CLOSED;
+		else
+			m_Door[i].m_State = DOOR_OPEN;
+		m_Door[i].m_Tick = 0;
+		m_Door[i].m_OpenTime = 10;
+		m_Door[i].m_CloseTime = 3;
+		m_Door[i].m_ReopenTime = 10;
 	}
 }
 
@@ -139,20 +133,20 @@ void CGameControllerZESC::Tick()
 	GameServer()->m_pController->DoTeamScoreWincheck();
 
 	// Damn fuckin door stuff
-	for(int i = 0; i < 47; i++)
+	for(int i = 0; i < 48; i++)
 	{
-		if(m_DoorTick[i] > 0)
+		if(m_Door[i].m_Tick > 0)
 		{
-			m_DoorTick[i]--;
-			if(m_DoorState[i] == DOOR_CLOSED)
+			m_Door[i].m_Tick--;
+			if(m_Door[i].m_State == DOOR_CLOSED)
 			{
-				if(m_DoorTick[i] == 5*Server()->TickSpeed())
+				if(m_Door[i].m_Tick == 5*Server()->TickSpeed())
 				{
 					char aBuf[128];
 					str_format(aBuf, sizeof(aBuf), "(All) Door %d opening in 5 seconds.", i+1);
 					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
 				}
-				else if(!m_DoorTick[i])
+				else if(!m_Door[i].m_Tick)
 				{
 					SetDoorState(i, DOOR_OPEN);
 					char aBuf[128];
@@ -160,32 +154,32 @@ void CGameControllerZESC::Tick()
 					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf); 
 				}
 			}
-			else if(!m_DoorTick[i])
+			else if(!m_Door[i].m_Tick)
 			{
-				if(m_DoorState[i] == DOOR_ZCLOSING && i < 32)
+				if(m_Door[i].m_State == DOOR_ZCLOSING && i < 32)
 				{
 					SetDoorState(i, DOOR_ZCLOSED);
 					char aBuf[128];
 					str_format(aBuf, sizeof(aBuf), "(Zombies) Door %d closed. Reopening in %d seconds.", i+1, GetDoorTime(i));
 					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
-					m_DoorTick[i] = Server()->TickSpeed()*GetDoorTime(i);
+					m_Door[i].m_Tick = Server()->TickSpeed()*GetDoorTime(i);
 				}
-				else if(m_DoorState[i] == DOOR_ZCLOSED && i < 32)
+				else if(m_Door[i].m_State == DOOR_ZCLOSED && i < 32)
 				{
 					SetDoorState(i, DOOR_REOPENED);
 					char aBuf[128];
 					str_format(aBuf, sizeof(aBuf), "(Zombies) Door %d is open. Run!", i+1);
 					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
 				}
-				else if(m_DoorState[i] == DOOR_ZCLOSING && i >= 32)
+				else if(m_Door[i].m_State == DOOR_ZCLOSING && i >= 32)
 				{
 					SetDoorState(i, DOOR_ZCLOSED);
 					char aBuf[128];
 					str_format(aBuf, sizeof(aBuf), "(Zombies) ZDoor %d closed. Reopening in %d seconds.", i-31, GetDoorTime(i));
 					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
-					m_DoorTick[i] = Server()->TickSpeed()*GetDoorTime(i);
+					m_Door[i].m_Tick = Server()->TickSpeed()*GetDoorTime(i);
 				}
-				else if(m_DoorState[i] == DOOR_ZCLOSED && i >= 32)
+				else if(m_Door[i].m_State == DOOR_ZCLOSED && i >= 32)
 				{
 					SetDoorState(i, DOOR_REOPENED);
 					char aBuf[128];
@@ -347,10 +341,10 @@ void CGameControllerZESC::Snap(int SnappingClient)
 
 void CGameControllerZESC::OnHoldpoint(int Index)
 {
-	if(m_DoorTick[Index] > 0 || (m_DoorState[Index] >= DOOR_OPEN && m_DoorState[Index] <= DOOR_REOPENED && m_DoorState[Index] != 1) || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
+	if(m_Door[Index].m_Tick || (m_Door[Index].m_State >= DOOR_OPEN && m_Door[Index].m_State <= DOOR_REOPENED && m_Door[Index].m_State != 1) || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
 		return;
 
-	m_DoorTick[Index] = Server()->TickSpeed()*GetDoorTime(Index);
+	m_Door[Index].m_Tick = Server()->TickSpeed()*GetDoorTime(Index);
 	char aBuf[128];
 	str_format(aBuf, sizeof(aBuf), "(All) Door %d opening in %d seconds.", Index+1, GetDoorTime(Index));
 	GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
@@ -358,11 +352,11 @@ void CGameControllerZESC::OnHoldpoint(int Index)
 
 void CGameControllerZESC::OnZStop(int Index)
 {
-	if(m_DoorState[Index] || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
+	if(m_Door[Index].m_State || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
 		return;
 
 	SetDoorState(Index, DOOR_ZCLOSING);
-	m_DoorTick[Index] = Server()->TickSpeed()*GetDoorTime(Index);
+	m_Door[Index].m_Tick = Server()->TickSpeed()*GetDoorTime(Index);
 	char aBuf[128];
 	str_format(aBuf, sizeof(aBuf), "(Zombies) Door %d closing in %d seconds.", Index+1, GetDoorTime(Index));
 	if(Index >= 32)
@@ -478,12 +472,16 @@ void CGameControllerZESC::Reset()
 		if(GameServer()->m_apPlayers[i])
 			GameServer()->m_apPlayers[i]->ResetZomb();
 	}
-	for(int i = 0; i < 47; i++)
+	for(int i = 0; i < 48; i++)
 	{
-		m_DoorState[i] = DOOR_CLOSED;
-		if(i >= 32)
-			m_DoorState[i] = DOOR_OPEN;
-		m_DoorTick[i] = 0;
+		if(i < 32)
+			m_Door[i].m_State = DOOR_CLOSED;
+		else
+			m_Door[i].m_State = DOOR_OPEN;
+		m_Door[i].m_Tick = 0;
+		m_Door[i].m_OpenTime = 10;
+		m_Door[i].m_CloseTime = 3;
+		m_Door[i].m_ReopenTime = 10;
 	}
 	m_NukeLaunched = false;
 	m_NukeTick = 0;
@@ -493,12 +491,12 @@ void CGameControllerZESC::Reset()
 
 int CGameControllerZESC::DoorState(int Index)
 {
-	return m_DoorState[Index];
+	return m_Door[Index].m_State;
 }
 
 void CGameControllerZESC::SetDoorState(int Index, int State)
 {
-	m_DoorState[Index] = State;
+	m_Door[Index].m_State = State;
 }
 
 bool CGameControllerZESC::NukeLaunched()
@@ -510,21 +508,11 @@ bool CGameControllerZESC::NukeLaunched()
 
 int CGameControllerZESC::GetDoorTime(int Index)
 {
-	if(Index < 32)
-	{
-		if(m_DoorState[Index] == DOOR_CLOSED)
-			return m_DoorTime[Index].m_OpenTime;
-		else if(m_DoorState[Index] == DOOR_ZCLOSING || m_DoorState[Index] == DOOR_OPEN)
-			return m_DoorTime[Index].m_CloseTime;
-		else if(m_DoorState[Index] == DOOR_ZCLOSED)
-			return m_DoorTime[Index].m_ReopenTime;
-	}
-	else if(Index >= 32)
-	{
-		if(m_DoorState[Index] == DOOR_ZCLOSING || m_DoorState[Index] == DOOR_OPEN)
-			return m_ZDoorTime[Index-32].m_CloseTime;
-		else if(m_DoorState[Index] == DOOR_ZCLOSED)
-			return m_ZDoorTime[Index-32].m_ReopenTime;
-	}
+	if(m_Door[Index].m_State == DOOR_CLOSED)
+		return m_Door[Index].m_OpenTime;
+	else if(m_Door[Index].m_State == DOOR_ZCLOSING || m_Door[Index].m_State == DOOR_OPEN)
+		return m_Door[Index].m_CloseTime;
+	else if(m_Door[Index].m_State == DOOR_ZCLOSED)
+		return m_Door[Index].m_ReopenTime;
 	return 0;
 }

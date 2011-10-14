@@ -74,22 +74,19 @@ void CItem::Tick()
 			switch(m_Item)
 			{
 			case HITEM_HAMMER:
-				str_copy(aBuf, "Special item hammer: You can build 5 zdoors with it.", sizeof(aBuf));
+				str_copy(aBuf, "Special item hammer: You can build 5 zdoors with it.", sizeof(aBuf)); break;
 			case HITEM_GUN:
-				str_copy(aBuf, "Gun upgraded.", sizeof(aBuf));
+				str_copy(aBuf, "Gun upgraded.", sizeof(aBuf)); break;
 			case HITEM_SHOTGUN:
-				str_copy(aBuf, "Shotgun upgraded.", sizeof(aBuf));
+				str_copy(aBuf, "Shotgun upgraded.", sizeof(aBuf)); break;
 			case HITEM_GRENADE:
-				str_copy(aBuf, "Grenade upgraded.", sizeof(aBuf));
+				str_copy(aBuf, "Grenade upgraded.", sizeof(aBuf)); break;
 			case HITEM_RIFLE:
-				str_copy(aBuf, "Rifle upgraded.", sizeof(aBuf));
-			case ZITEM_HAMMER:
-				str_copy(aBuf, "Special item hammer: You have less knockback and freeze time.", sizeof(aBuf));
+				str_copy(aBuf, "Rifle upgraded.", sizeof(aBuf)); break;
 			}
+
 			GameServer()->SendBroadcast(aBuf, pChr->GetPlayer()->GetCID());
-
 			GameServer()->SendWeaponPickup(pChr->GetPlayer()->GetCID(), m_Subtype);
-
 			pChr->SetEmote(EMOTE_SURPRISE, Server()->Tick() + 1200 * Server()->TickSpeed() / 1000);
 		}
 		else if(pChr->GetPlayer()->GetTeam() == TEAM_BLUE && m_Item != ZITEM_HAMMER)
@@ -98,11 +95,14 @@ void CItem::Tick()
 			str_format(aBuf, sizeof(aBuf), "You need to be at least level %d for this item!", GetLevel());
 			GameServer()->SendBroadcast(aBuf, pChr->GetPlayer()->GetCID());
 		}
-		else if(pChr->GetPlayer()->GetTeam() == TEAM_RED && pChr->GetPlayer()->m_Score/100 >= GetLevel() && m_Item == ZITEM_HAMMER)
+		else if(pChr->GetPlayer()->GetTeam() == TEAM_BLUE && m_Item == ZITEM_HAMMER)
+			GameServer()->SendBroadcast("This is a zombie item, you can't pick it up.", pChr->GetPlayer()->GetCID());
+		else if(pChr->GetPlayer()->GetTeam() == TEAM_RED && pChr->GetPlayer()->m_Score/10 >= GetLevel() && m_Item == ZITEM_HAMMER)
 		{
 			pChr->m_Item = m_Item;
 			GameServer()->CreateSound(m_Pos, SOUND_WEAPON_SWITCH);
 			pChr->SetEmote(EMOTE_ANGRY, Server()->Tick() + 1200 * Server()->TickSpeed() / 1000);
+			GameServer()->SendBroadcast("Special item hammer: You have less knockback and freeze time.", pChr->GetPlayer()->GetCID());
 		}
 	}
 }

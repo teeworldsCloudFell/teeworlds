@@ -5,6 +5,8 @@
 
 #include <base/vmath.h>
 
+const int MAX_TIMED_EVENTS = 32;
+
 /*
 	Class: Game Controller
 		Controls the main game logic. Keeping track of team and player score,
@@ -58,18 +60,27 @@ protected:
 	int m_LastZomb2;
 
 public:
-	char m_pTimedEventCmd[32][512];
-	int m_TimedEventTick[32];
-	int m_TimedEventTime[32];
+	struct CTimedEvent
+	{
+		int m_Time;
+		int64 m_Tick;
+		char m_pAction[512];
+	} m_TimedEvent[MAX_TIMED_EVENTS];
 	int m_NumTimedEvents;
 
-	char m_pTriggeredEventCmd[32][512];
-	bool m_TriggeredEventState[32];
+	struct CTriggeredEvent
+	{
+		bool m_State;
+		char m_pAction[512];
+	} m_TriggeredEvent[32];
 
-	char m_pOnTeamWinEventCmd[3][512];
+	struct CCustomTeleport
+	{
+		int m_Teleport;
+		int m_Team;
+	} m_CustomTeleport[32];
 
-	int m_CustomTeleport[16];
-	int m_CustomTeleportTeam[16];
+	char m_pOnTeamWinEvent[3][512];
 
 	const char *m_pGameType;
 

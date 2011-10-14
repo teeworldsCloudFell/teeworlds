@@ -956,7 +956,7 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 		{
 			if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item != HITEM_RIFLE)
 				m_Item ? m_FreezeTick = Server()->Tick() + Server()->TickSpeed() : m_FreezeTick = Server()->Tick() + Server()->TickSpeed()*1.5f;
-			else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item != HITEM_RIFLE)
+			else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item == HITEM_RIFLE)
 				m_Item ? m_FreezeTick = Server()->Tick() + Server()->TickSpeed()*1.5f : m_FreezeTick = Server()->Tick() + Server()->TickSpeed()*2.f;
 		}
 
