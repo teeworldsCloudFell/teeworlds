@@ -325,7 +325,7 @@ void CCharacter::FireWeapon()
 			}
 			else
 			{
-				int Num = GameServer()->m_World.FindEntities(ProjStartPos, m_ProximityRadius*0.5f, (CEntity**)apEnts, 
+				int Num = GameServer()->m_World.FindEntities(ProjStartPos, m_ProximityRadius*0.65f, (CEntity**)apEnts, 
 					MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
 
 				for (int i = 0; i < Num; ++i)
@@ -337,7 +337,7 @@ void CCharacter::FireWeapon()
 
 					// set his velocity to fast upward (for now)
 					if(length(pTarget->m_Pos-ProjStartPos) > 0.0f)
-						GameServer()->CreateHammerHit(pTarget->m_Pos-normalize(pTarget->m_Pos-ProjStartPos)*m_ProximityRadius*0.5f);
+						GameServer()->CreateHammerHit(pTarget->m_Pos-normalize(pTarget->m_Pos-ProjStartPos)*m_ProximityRadius*0.65f);
 					else
 						GameServer()->CreateHammerHit(ProjStartPos);
 
@@ -347,8 +347,11 @@ void CCharacter::FireWeapon()
 					else
 						Dir = vec2(0.f, -1.f);
 
-					pTarget->TakeDamage(vec2(0.f, -1.f) + normalize(Dir + vec2(0.f, -1.1f)) * 10.0f, g_pData->m_Weapons.m_Hammer.m_pBase->m_Damage,
-						m_pPlayer->GetCID(), m_ActiveWeapon);
+					if(pTarget->m_pPlayer->GetTeam() == TEAM_RED)
+						pTarget->TakeDamage(vec2(0.f, -1.f) + normalize(Dir + vec2(0.f, -0.5f)) * 35.0f, g_pData->m_Weapons.m_Hammer.m_pBase->m_Damage, m_pPlayer->GetCID(), m_ActiveWeapon);
+					else
+						pTarget->TakeDamage(vec2(0.f, -1.f) + normalize(Dir + vec2(0.f, -1.1f)) * 10.0f, g_pData->m_Weapons.m_Hammer.m_pBase->m_Damage, m_pPlayer->GetCID(), m_ActiveWeapon);
+
 					Hits++;
 				}
 			}
@@ -755,9 +758,19 @@ void CCharacter::Tick()
 		}
 	}
 
-	if(m_FreezeTick > Server()->Tick()) {
+	if(m_FreezeTick)
+	{
+		m_FreezeTick--;
 		m_Core.m_Vel = vec2(0.f, 0.f);
-		m_Core.m_Pos = m_PrevPos; }
+		m_Core.m_Pos = m_PrevPos;
+	}
+	if(m_BurnTick)
+	{
+		m_BurnTick--;
+		m_Core.m_Vel *= 0.9;
+		if(!(m_BurnTick%20))
+			GameServer()->CreateExplosion(m_Core.m_Pos, GetPlayer()->GetCID(), WEAPON_GRENADE, true);
+	}
 
 	// set Position just in case it was changed
 	m_Pos = m_Core.m_Pos;
@@ -931,40 +944,42 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 
 	if(m_pPlayer->GetTeam() == TEAM_RED)
 	{
-		if(Weapon == WEAPON_GRENADE)
-		{
-			if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item != HITEM_GRENADE)
-				m_Item ? m_Core.m_Vel += Force : m_Core.m_Vel += Force*2.f;
-			else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item == HITEM_GUN)
-				m_Item ? m_Core.m_Vel += Force*2 : m_Core.m_Vel += Force*3.f;
-		}
+		vec2 AddVel = vec2(0, 0);
+		if(Weapon == WEAPON_HAMMER)
+			m_Item ? AddVel = Force*0.7 : AddVel = Force;
 		else if(Weapon == WEAPON_GUN)
 		{
 			if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item != HITEM_GUN)
-				m_Item ? m_Core.m_Vel += Force*0.7f : m_Core.m_Vel += Force;
+				m_Item ? AddVel = Force*0.7f : AddVel = Force;
 			else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item == HITEM_GUN)
-				m_Item ? m_Core.m_Vel += Force : m_Core.m_Vel += Force*1.35;
+				m_Item ? AddVel = Force : AddVel = Force*1.35;
 		}
 		else if(Weapon == WEAPON_SHOTGUN)
 		{
 			if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item != HITEM_SHOTGUN)
-				m_Item ? m_Core.m_Vel += Force*0.7f : m_Core.m_Vel += Force;
+				m_Item ? AddVel = Force*0.7f : AddVel = Force;
 			else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item == HITEM_SHOTGUN)
-				m_Item ? m_Core.m_Vel += Force : m_Core.m_Vel += Force*1.3f;
+				m_Item ? AddVel = Force : AddVel = Force*1.3f;
+		}
+		else if(Weapon == WEAPON_GRENADE)
+		{
+			if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item != HITEM_GRENADE)
+				m_Item ? AddVel = Force : AddVel = Force*2.f;
+			else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item == HITEM_GUN)
+				m_Item ? AddVel = Force*2 : AddVel = Force*3.f;
+			m_BurnTick = Server()->TickSpeed()*1.5;
 		}
 		else if(Weapon == WEAPON_RIFLE)
 		{
 			if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item != HITEM_RIFLE)
-				m_Item ? m_FreezeTick = Server()->Tick() + Server()->TickSpeed() : m_FreezeTick = Server()->Tick() + Server()->TickSpeed()*1.5f;
+				m_Item ? m_FreezeTick = Server()->TickSpeed()*1 : m_FreezeTick = Server()->TickSpeed()*1.5f;
 			else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item == HITEM_RIFLE)
-				m_Item ? m_FreezeTick = Server()->Tick() + Server()->TickSpeed()*1.5f : m_FreezeTick = Server()->Tick() + Server()->TickSpeed()*2.f;
+				m_Item ? m_FreezeTick = Server()->TickSpeed()*1.5f : m_FreezeTick = Server()->TickSpeed()*2.f;
 		}
-
-		return false;
+		if(m_BurnTick)
+			AddVel *= 2;
+		m_Core.m_Vel += AddVel;
 	}
-
-	if(GameServer()->m_pController->IsFriendlyFire(m_pPlayer->GetCID(), From) && !g_Config.m_SvTeamdamage)
-		return false;
 
 	return false;
 }

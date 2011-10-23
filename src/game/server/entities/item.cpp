@@ -59,7 +59,7 @@ void CItem::Tick()
 			{
 				pChr->m_HookedItem = this;
 				m_Enabled = false;
-				pChr->IncreaseArmor(5);
+				pChr->IncreaseArmor(10);
 			}
 			else
 				pChr->GiveWeapon(m_Subtype, 10);
@@ -74,15 +74,20 @@ void CItem::Tick()
 			switch(m_Item)
 			{
 			case HITEM_HAMMER:
-				str_copy(aBuf, "Special item hammer: You can build 5 zdoors with it.", sizeof(aBuf)); break;
+				str_copy(aBuf, "Special item hammer: You can build 5 zdoors with it.", sizeof(aBuf));
+				break;
 			case HITEM_GUN:
-				str_copy(aBuf, "Gun upgraded.", sizeof(aBuf)); break;
+				str_copy(aBuf, "Gun upgraded.", sizeof(aBuf));
+				break;
 			case HITEM_SHOTGUN:
-				str_copy(aBuf, "Shotgun upgraded.", sizeof(aBuf)); break;
+				str_copy(aBuf, "Shotgun upgraded.", sizeof(aBuf));
+				break;
 			case HITEM_GRENADE:
-				str_copy(aBuf, "Grenade upgraded.", sizeof(aBuf)); break;
+				str_copy(aBuf, "Grenade upgraded.", sizeof(aBuf));
+				break;
 			case HITEM_RIFLE:
-				str_copy(aBuf, "Rifle upgraded.", sizeof(aBuf)); break;
+				str_copy(aBuf, "Rifle upgraded.", sizeof(aBuf));
+				break;
 			}
 
 			GameServer()->SendBroadcast(aBuf, pChr->GetPlayer()->GetCID());

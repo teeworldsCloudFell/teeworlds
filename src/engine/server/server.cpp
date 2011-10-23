@@ -1157,6 +1157,7 @@ void CServer::InitRegister(CNetServer *pNetServer, IEngineMasterServer *pMasterS
 
 int CServer::Run()
 {
+	srand((unsigned)(time_get()/time_freq()));
 	m_pGameServer = Kernel()->RequestInterface<IGameServer>();
 	m_pMap = Kernel()->RequestInterface<IEngineMap>();
 	m_pStorage = Kernel()->RequestInterface<IStorage>();

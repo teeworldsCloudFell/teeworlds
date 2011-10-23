@@ -88,7 +88,7 @@ void CProjectile::Tick()
 	{
 		m_Pos = GameServer()->zESCController()->m_pTeleporter[z-1];
 		m_StartTick = Server()->Tick();
-		}
+	}
 }
 
 void CProjectile::FillInfo(CNetObj_Projectile *pProj)

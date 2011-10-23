@@ -56,7 +56,7 @@ IGameController::IGameController(class CGameContext *pGameServer)
 	m_NumTimedEvents = 0;
 	m_pOnTeamWinEvent[TEAM_RED][0] = '\0';
 	m_pOnTeamWinEvent[TEAM_BLUE][0] = '\0';
-	m_pOnTeamWinEvent[2][0] = '\0'; // Roundend, both teams
+	m_pOnTeamWinEvent[2][0] = '\0'; // on restart
 }
 
 IGameController::~IGameController()
@@ -270,9 +270,9 @@ void IGameController::StartRound()
 	m_aTeamscore[TEAM_BLUE] = 0;
 	m_ForceBalanced = false;
 	Server()->DemoRecorder_HandleAutoStart();
-	ResetEvents();
 	if(m_pOnTeamWinEvent[2][0])
 		GameServer()->Console()->ExecuteLine(m_pOnTeamWinEvent[2]);
+	ResetEvents();
 	char aBuf[256];
 	str_format(aBuf, sizeof(aBuf), "start round type='%s' teamplay='%d'", m_pGameType, m_GameFlags&GAMEFLAG_TEAMS);
 	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);

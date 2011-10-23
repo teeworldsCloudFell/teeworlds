@@ -269,9 +269,8 @@ void CPlayer::SetTeam(int Team)
 		if(m_Team == TEAM_SPECTATORS)
 		{
 			m_Team = TEAM_RED;
-			m_RespawnTick = Server()->Tick()+Server()->TickSpeed()/2;
+			TryRespawn();
 		}
-		else
 			SetZomb(-3);
 		return;
 	}

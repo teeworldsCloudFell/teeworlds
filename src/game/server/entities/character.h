@@ -54,6 +54,7 @@ public:
 	vec2 m_PrevPos;
 	vec2 m_PrevDoorPos;
 	int m_FreezeTick;
+	int m_BurnTick;
 	// the player core for the physics
 	CCharacterCore m_Core;
 

@@ -430,6 +430,7 @@ void CGameControllerZESC::OnEndRound()
 			}
 		}
 	}
+	ResetDoors();
 }
 
 int CGameControllerZESC::CountPlayers()
@@ -472,6 +473,14 @@ void CGameControllerZESC::Reset()
 		if(GameServer()->m_apPlayers[i])
 			GameServer()->m_apPlayers[i]->ResetZomb();
 	}
+	m_NukeLaunched = false;
+	m_NukeTick = 0;
+	m_LevelEarned = false;
+	GameServer()->SendBroadcast("", -1);
+}
+
+void CGameControllerZESC::ResetDoors()
+{
 	for(int i = 0; i < 48; i++)
 	{
 		if(i < 32)
@@ -479,14 +488,7 @@ void CGameControllerZESC::Reset()
 		else
 			m_Door[i].m_State = DOOR_OPEN;
 		m_Door[i].m_Tick = 0;
-		m_Door[i].m_OpenTime = 10;
-		m_Door[i].m_CloseTime = 3;
-		m_Door[i].m_ReopenTime = 10;
 	}
-	m_NukeLaunched = false;
-	m_NukeTick = 0;
-	m_LevelEarned = false;
-	GameServer()->SendBroadcast("", -1);
 }
 
 int CGameControllerZESC::DoorState(int Index)

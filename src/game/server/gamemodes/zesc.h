@@ -47,6 +47,7 @@ public:
 	virtual int CountZombs();
 	virtual int CountHumans();
 	virtual void Reset();
+	virtual void ResetDoors();
 	virtual int DoorState(int Index);
 	virtual void SetDoorState(int Index, int State);
 	virtual bool NukeLaunched();
