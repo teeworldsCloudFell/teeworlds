@@ -551,6 +551,92 @@ void CCharacter::Tick()
 
 	m_Core.m_Input = m_Input;
 	m_Core.Tick(true);
+	
+	// tile index
+	int TileIndex = GameServer()->Collision()->GetIndex(m_PrevPos, m_Pos);
+	
+	if(TileIndex != -1 && GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_STOPL)
+	{
+		if(m_Core.m_Vel.x > 0)
+		{
+			if((int)GameServer()->Collision()->GetPos(TileIndex).x < (int)m_Core.m_Pos.x)
+				m_Core.m_Pos.x = m_PrevPos.x;
+			m_Core.m_Vel.x = 0;
+		}
+	}
+	else if(TileIndex != -1 && GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_STOPR)
+	{
+		if(m_Core.m_Vel.x < 0)
+		{
+			if((int)GameServer()->Collision()->GetPos(TileIndex).x > (int)m_Core.m_Pos.x)
+				m_Core.m_Pos.x = m_PrevPos.x;
+			m_Core.m_Vel.x = 0;
+		}
+	}
+	else if(TileIndex != -1 && GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_STOPB)
+	{
+		if(m_Core.m_Vel.y < 0)
+		{
+			if((int)GameServer()->Collision()->GetPos(TileIndex).y > (int)m_Core.m_Pos.y)
+				m_Core.m_Pos.y = m_PrevPos.y;
+			m_Core.m_Vel.y = 0;
+		}
+	}
+	else if(TileIndex != -1 && GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_STOPT)
+	{
+		if(m_Core.m_Vel.y > 0)
+		{
+			if((int)GameServer()->Collision()->GetPos(TileIndex).y < (int)m_Core.m_Pos.y)
+				m_Core.m_Pos.y = m_PrevPos.y;
+			if(Jumped&3 && m_Core.m_Jumped != Jumped) // check double jump
+				m_Core.m_Jumped = Jumped;
+			m_Core.m_Vel.y = 0;
+		}
+	}
+	
+	// handle speedup tiles
+	int CurrentSpeedup = GameServer()->Collision()->IsSpeedup(TileIndex);
+	bool SpeedupTouch = false;
+	if(m_LastSpeedup != CurrentSpeedup && CurrentSpeedup > -1)
+	{
+		vec2 Direction;
+		int Force;
+		GameServer()->Collision()->GetSpeedup(TileIndex, &Direction, &Force);
+		
+		m_Core.m_Vel += Direction*Force;
+		
+		SpeedupTouch = true;
+	}
+	
+	m_LastSpeedup = CurrentSpeedup;
+	
+	// handle teleporter
+	int z = GameServer()->Collision()->IsTeleport(TileIndex);
+	if(g_Config.m_SvTeleport && z)
+	{
+		// check double jump
+		if(Jumped&3 && m_Core.m_Jumped != Jumped)
+			m_Core.m_Jumped = Jumped;
+				
+		m_Core.m_HookedPlayer = -1;
+		m_Core.m_HookState = HOOK_RETRACTED;
+		m_Core.m_Pos = pRace->m_pTeleporter[z-1];
+		m_Core.m_HookPos = m_Core.m_Pos;
+		//Resetting velocity to prevent exploit
+		if(g_Config.m_SvTeleportVelReset)
+			m_Core.m_Vel = vec2(0,0);
+		if(g_Config.m_SvStrip)
+		{
+			m_ActiveWeapon = WEAPON_HAMMER;
+			m_LastWeapon = WEAPON_HAMMER;
+			m_aWeapons[0].m_Got = true;
+			for(int i = 1; i < NUM_WEAPONS; i++)
+				m_aWeapons[i].m_Got = false;
+		}
+	}
+	
+	// set Position just in case it was changed
+	m_Pos = m_Core.m_Pos;
 
 	// handle death-tiles and leaving gamelayer
 	if(GameServer()->Collision()->GetCollisionAt(m_Pos.x+m_ProximityRadius/3.f, m_Pos.y-m_ProximityRadius/3.f)&CCollision::COLFLAG_DEATH ||
