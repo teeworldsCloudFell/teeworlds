@@ -74,7 +74,7 @@ void CItem::Tick()
 			switch(m_Item)
 			{
 			case HITEM_HAMMER:
-				str_copy(aBuf, "Special item hammer: You can build 5 zdoors with it.", sizeof(aBuf));
+				str_copy(aBuf, "Special item hammer: You can build 10 zdoors with it.", sizeof(aBuf));
 				break;
 			case HITEM_GUN:
 				str_copy(aBuf, "Gun upgraded.", sizeof(aBuf));

@@ -242,7 +242,7 @@ void CPlayer::SetTeam(int Team)
 		GameServer()->SendBroadcast("You were nuked, you can't rejoin.", m_ClientID);
 		return; }
 	if(GameServer()->zESCController()->m_NukeLaunched) {
-		GameServer()->SendBroadcast("Nuke allready launched, wait for gameend.", m_ClientID);
+		GameServer()->SendBroadcast("Nuke already launched, wait for gameend.", m_ClientID);
 		Nuke();
 		return; }
 	if(m_Team == TEAM_RED && Team != TEAM_SPECTATORS) {
@@ -254,8 +254,8 @@ void CPlayer::SetTeam(int Team)
 	if(Team == TEAM_RED && ((GameServer()->zESCController()->ZombStarted() && GameServer()->m_pController->m_ZombWarmup) || !GameServer()->zESCController()->ZombStarted())) {
 		GameServer()->SendBroadcast("Zombie will be choosen randomly.", m_ClientID);
 		return; }
-	if(m_Team == TEAM_BLUE && GameServer()->zESCController()->CountHumans() < 2 && GameServer()->zESCController()->ZombStarted()) {
-		GameServer()->SendBroadcast("You are the last human.", m_ClientID);
+	if(m_Team == TEAM_BLUE && GameServer()->zESCController()->ZombStarted()) {
+		GameServer()->SendBroadcast("You can't join the zombie team.", m_ClientID);
 		return; }
 	if(m_Team == TEAM_RED && GameServer()->zESCController()->CountZombs() < 2 && GameServer()->zESCController()->ZombStarted()) {
 		GameServer()->SendBroadcast("You are the last zombie.", m_ClientID);

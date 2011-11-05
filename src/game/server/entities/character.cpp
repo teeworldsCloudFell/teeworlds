@@ -946,13 +946,13 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 	{
 		vec2 AddVel = vec2(0, 0);
 		if(Weapon == WEAPON_HAMMER)
-			m_Item ? AddVel = Force*0.7 : AddVel = Force;
+			m_Item ? AddVel = Force*0.7f : AddVel = Force;
 		else if(Weapon == WEAPON_GUN)
 		{
 			if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item != HITEM_GUN)
 				m_Item ? AddVel = Force*0.7f : AddVel = Force;
 			else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item == HITEM_GUN)
-				m_Item ? AddVel = Force : AddVel = Force*1.35;
+				m_Item ? AddVel = Force : AddVel = Force*1.35f;
 		}
 		else if(Weapon == WEAPON_SHOTGUN)
 		{
@@ -964,20 +964,25 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 		else if(Weapon == WEAPON_GRENADE)
 		{
 			if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item != HITEM_GRENADE)
-				m_Item ? AddVel = Force : AddVel = Force*2.f;
-			else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item == HITEM_GUN)
-				m_Item ? AddVel = Force*2 : AddVel = Force*3.f;
-			m_BurnTick = Server()->TickSpeed()*1.5;
+			{
+				m_Item ? AddVel = Force : AddVel = Force*2.0f;
+				m_Item ? m_BurnTick = Server()->TickSpeed()*1.5f : m_BurnTick = Server()->TickSpeed()*2.0f;
+			}
+			else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item == HITEM_GRENADE)
+			{
+				m_Item ? AddVel = Force*2 : AddVel = Force*3.0f;
+				m_Item ? m_BurnTick = Server()->TickSpeed()*2.0f : m_BurnTick = Server()->TickSpeed()*3.0f;
+			}
 		}
 		else if(Weapon == WEAPON_RIFLE)
 		{
 			if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item != HITEM_RIFLE)
-				m_Item ? m_FreezeTick = Server()->TickSpeed()*1 : m_FreezeTick = Server()->TickSpeed()*1.5f;
+				m_Item ? m_FreezeTick = Server()->TickSpeed()*1.0f : m_FreezeTick = Server()->TickSpeed()*1.5f;
 			else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item == HITEM_RIFLE)
-				m_Item ? m_FreezeTick = Server()->TickSpeed()*1.5f : m_FreezeTick = Server()->TickSpeed()*2.f;
+				m_Item ? m_FreezeTick = Server()->TickSpeed()*1.5f : m_FreezeTick = Server()->TickSpeed()*2.0f;
 		}
 		if(m_BurnTick)
-			AddVel *= 2;
+			AddVel *= 2.5f;
 		m_Core.m_Vel += AddVel;
 	}
 
@@ -989,9 +994,19 @@ void CCharacter::SetZomb()
 	m_ActiveWeapon = WEAPON_HAMMER;
 	m_LastWeapon = WEAPON_HAMMER;
 	m_QueuedWeapon = -1;
+
+	if(m_Item && (m_Item != HITEM_GUN || m_Item != HITEM_GRENADE))
+	{
+		GameServer()->SendBroadcast("Your human item transfered into a zombie item!", m_pPlayer->GetCID());
+		GameServer()->CreateSound(m_Pos, SOUND_WEAPON_SWITCH);
+		SetEmote(EMOTE_ANGRY, Server()->Tick() + 1200 * Server()->TickSpeed() / 1000);
+		m_Item = ZITEM_HAMMER;
+	}
+	else
+		m_Item = 0;
+	
 	if(m_HookedItem)
 		m_HookedItem->Reset();
-	m_Item = 0;
 	m_HookedItem = 0;
 	m_Armor = 0;
 }
