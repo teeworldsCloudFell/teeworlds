@@ -1,16 +1,13 @@
 /* (c) Magnus Auvinen. See licence.txt in the root of the distribution for more information. */
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
-
-#include <base/tl/array.h>
-
 #include <engine/console.h>
 #include <engine/graphics.h>
 #include <engine/input.h>
 #include <engine/keys.h>
 #include <engine/storage.h>
-
 #include "editor.h"
 
+#include <base/tl/array.h>
 
 // popup menu handling
 static struct
@@ -141,6 +138,57 @@ int CEditor::PopupGroup(CEditor *pEditor, CUIRect View)
 		}
 	}
 
+	if(pEditor->GetSelectedGroup()->m_GameGroup && !pEditor->m_Map.m_pTeleLayer)
+	{
+		// new tele layer
+		View.HSplitBottom(10.0f, &View, &Button);
+		View.HSplitBottom(12.0f, &View, &Button);
+		static int s_NewSwitchLayerButton = 0;
+		if(pEditor->DoButton_Editor(&s_NewSwitchLayerButton, "Add Tele Layer", 0, &Button, 0, "Creates a new tele layer"))
+		{
+			CLayer *l = new CLayerTele(pEditor->m_Map.m_pGameLayer->m_Width, pEditor->m_Map.m_pGameLayer->m_Height);
+			pEditor->m_Map.MakeTeleLayer(l);
+			pEditor->m_Map.m_lGroups[pEditor->m_SelectedGroup]->AddLayer(l);
+			pEditor->m_SelectedLayer = pEditor->m_Map.m_lGroups[pEditor->m_SelectedGroup]->m_lLayers.size()-1;
+			pEditor->m_Brush.Clear();
+			return 1;
+		}
+ 	}
+	
+	if(pEditor->GetSelectedGroup()->m_GameGroup && !pEditor->m_Map.m_pSpeedupLayer)
+	{
+		// new speedup layer
+		View.HSplitBottom(10.0f, &View, &Button);
+		View.HSplitBottom(12.0f, &View, &Button);
+		static int s_NewSwitchLayerButton = 0;
+		if(pEditor->DoButton_Editor(&s_NewSwitchLayerButton, "Add Speedup Layer", 0, &Button, 0, "Creates a new speedup layer"))
+		{
+			CLayer *l = new CLayerSpeedup(pEditor->m_Map.m_pGameLayer->m_Width, pEditor->m_Map.m_pGameLayer->m_Height);
+			pEditor->m_Map.MakeSpeedupLayer(l);
+			pEditor->m_Map.m_lGroups[pEditor->m_SelectedGroup]->AddLayer(l);
+			pEditor->m_SelectedLayer = pEditor->m_Map.m_lGroups[pEditor->m_SelectedGroup]->m_lLayers.size()-1;
+			pEditor->m_Brush.Clear();
+			return 1;
+		}
+	}
+
+	if(pEditor->GetSelectedGroup()->m_GameGroup && !pEditor->m_Map.m_pSwitchLayer)
+	{
+		// new switch layer
+		View.HSplitBottom(10.0f, &View, &Button);
+		View.HSplitBottom(12.0f, &View, &Button);
+		static int s_NewSwitchLayerButton = 0;
+		if(pEditor->DoButton_Editor(&s_NewSwitchLayerButton, "Add Switch Layer", 0, &Button, 0, "Creates a new switch layer"))
+		{
+			CLayer *l = new CLayerSwitch(pEditor->m_Map.m_pGameLayer->m_Width, pEditor->m_Map.m_pGameLayer->m_Height);
+			pEditor->m_Map.MakeSwitchLayer(l);
+			pEditor->m_Map.m_lGroups[pEditor->m_SelectedGroup]->AddLayer(l);
+			pEditor->m_SelectedLayer = pEditor->m_Map.m_lGroups[pEditor->m_SelectedGroup]->m_lLayers.size()-1;
+			pEditor->m_Brush.Clear();
+			return 1;
+		}
+	}
+	
 	// new tile layer
 	View.HSplitBottom(10.0f, &View, &Button);
 	View.HSplitBottom(12.0f, &View, &Button);
@@ -253,12 +301,18 @@ int CEditor::PopupLayer(CEditor *pEditor, CUIRect View)
 	if(pEditor->m_Map.m_pGameLayer != pEditor->GetSelectedLayer(0) &&
 		pEditor->DoButton_Editor(&s_DeleteButton, "Delete layer", 0, &Button, 0, "Deletes the layer"))
 	{
+		if(pEditor->GetSelectedLayer(0) == pEditor->m_Map.m_pTeleLayer)
+			pEditor->m_Map.m_pTeleLayer = 0x0;
+		if(pEditor->GetSelectedLayer(0) == pEditor->m_Map.m_pSpeedupLayer)
+			pEditor->m_Map.m_pSpeedupLayer = 0x0;
+		if(pEditor->GetSelectedLayer(0) == pEditor->m_Map.m_pSwitchLayer)
+			pEditor->m_Map.m_pSwitchLayer = 0x0;
 		pEditor->m_Map.m_lGroups[pEditor->m_SelectedGroup]->DeleteLayer(pEditor->m_SelectedLayer);
 		return 1;
 	}
 
 	// layer name
-	if(pEditor->m_Map.m_pGameLayer != pEditor->GetSelectedLayer(0))
+	if(pEditor->m_Map.m_pGameLayer != pEditor->GetSelectedLayer(0) && pEditor->m_Map.m_pTeleLayer != pEditor->GetSelectedLayer(0) && pEditor->m_Map.m_pSpeedupLayer != pEditor->GetSelectedLayer(0) && pEditor->m_Map.m_pSwitchLayer != pEditor->GetSelectedLayer(0))
 	{
 		View.HSplitBottom(5.0f, &View, &Button);
 		View.HSplitBottom(12.0f, &View, &Button);
@@ -289,11 +343,11 @@ int CEditor::PopupLayer(CEditor *pEditor, CUIRect View)
 		{0},
 	};
 
-	if(pEditor->m_Map.m_pGameLayer == pEditor->GetSelectedLayer(0)) // dont use Group and Detail from the selection if this is the game layer
+	if(pEditor->m_Map.m_pGameLayer == pEditor->GetSelectedLayer(0) || pEditor->m_Map.m_pTeleLayer == pEditor->GetSelectedLayer(0) || pEditor->m_Map.m_pSpeedupLayer == pEditor->GetSelectedLayer(0)) // dont use Group and Detail from the selection if this is the game layer
 	{
 		aProps[0].m_Type = PROPTYPE_NULL;
-		aProps[2].m_Type = PROPTYPE_NULL;
-	}
+ 		aProps[2].m_Type = PROPTYPE_NULL;
+ 	}
 
 	static int s_aIds[NUM_PROPS] = {0};
 	int NewVal = 0;
@@ -635,6 +689,74 @@ int CEditor::PopupNewFolder(CEditor *pEditor, CUIRect View)
 	return 0;
 }
 
+int CEditor::PopupMapInfo(CEditor *pEditor, CUIRect View)
+{
+	CUIRect Label, ButtonBar, Button;
+
+	// title
+	View.HSplitTop(10.0f, 0, &View);
+	View.HSplitTop(30.0f, &Label, &View);
+	pEditor->UI()->DoLabel(&Label, "Map details", 20.0f, 0);
+
+	View.HSplitBottom(10.0f, &View, 0);
+	View.HSplitBottom(20.0f, &View, &ButtonBar);
+
+	View.VMargin(40.0f, &View);
+
+	// author box
+	View.HSplitTop(20.0f, &Label, &View);
+	pEditor->UI()->DoLabel(&Label, "Author:", 10.0f, -1);
+	Label.VSplitLeft(40.0f, 0, &Button);
+	Button.HSplitTop(12.0f, &Button, 0);
+	static float s_AuthorBox = 0;
+	pEditor->DoEditBox(&s_AuthorBox, &Button, pEditor->m_Map.m_MapInfo.m_aAuthorTmp, sizeof(pEditor->m_Map.m_MapInfo.m_aAuthorTmp), 10.0f, &s_AuthorBox);
+
+	// version box
+	View.HSplitTop(20.0f, &Label, &View);
+	pEditor->UI()->DoLabel(&Label, "Version:", 10.0f, -1);
+	Label.VSplitLeft(40.0f, 0, &Button);
+	Button.HSplitTop(12.0f, &Button, 0);
+	static float s_VersionBox = 0;
+	pEditor->DoEditBox(&s_VersionBox, &Button, pEditor->m_Map.m_MapInfo.m_aVersionTmp, sizeof(pEditor->m_Map.m_MapInfo.m_aVersionTmp), 10.0f, &s_VersionBox);
+
+	// credits box
+	View.HSplitTop(20.0f, &Label, &View);
+	pEditor->UI()->DoLabel(&Label, "Credits:", 10.0f, -1);
+	Label.VSplitLeft(40.0f, 0, &Button);
+	Button.HSplitTop(12.0f, &Button, 0);
+	static float s_CreditsBox = 0;
+	pEditor->DoEditBox(&s_CreditsBox, &Button, pEditor->m_Map.m_MapInfo.m_aCreditsTmp, sizeof(pEditor->m_Map.m_MapInfo.m_aCreditsTmp), 10.0f, &s_CreditsBox);
+
+	// license box
+	View.HSplitTop(20.0f, &Label, &View);
+	pEditor->UI()->DoLabel(&Label, "License:", 10.0f, -1);
+	Label.VSplitLeft(40.0f, 0, &Button);
+	Button.HSplitTop(12.0f, &Button, 0);
+	static float s_LicenseBox = 0;
+	pEditor->DoEditBox(&s_LicenseBox, &Button, pEditor->m_Map.m_MapInfo.m_aLicenseTmp, sizeof(pEditor->m_Map.m_MapInfo.m_aLicenseTmp), 10.0f, &s_LicenseBox);
+
+	// button bar
+	ButtonBar.VSplitLeft(30.0f, 0, &ButtonBar);
+	ButtonBar.VSplitLeft(110.0f, &Label, &ButtonBar);
+	static int s_CreateButton = 0;
+	if(pEditor->DoButton_Editor(&s_CreateButton, "Save", 0, &Label, 0, 0))
+	{
+		str_copy(pEditor->m_Map.m_MapInfo.m_aAuthor, pEditor->m_Map.m_MapInfo.m_aAuthorTmp, sizeof(pEditor->m_Map.m_MapInfo.m_aAuthor));
+		str_copy(pEditor->m_Map.m_MapInfo.m_aVersion, pEditor->m_Map.m_MapInfo.m_aVersionTmp, sizeof(pEditor->m_Map.m_MapInfo.m_aVersion));
+		str_copy(pEditor->m_Map.m_MapInfo.m_aCredits, pEditor->m_Map.m_MapInfo.m_aCreditsTmp, sizeof(pEditor->m_Map.m_MapInfo.m_aCredits));
+		str_copy(pEditor->m_Map.m_MapInfo.m_aLicense, pEditor->m_Map.m_MapInfo.m_aLicenseTmp, sizeof(pEditor->m_Map.m_MapInfo.m_aLicense));
+		return 1;
+	}
+
+	ButtonBar.VSplitRight(30.0f, &ButtonBar, 0);
+	ButtonBar.VSplitRight(110.0f, &ButtonBar, &Label);
+	static int s_AbortButton = 0;
+	if(pEditor->DoButton_Editor(&s_AbortButton, "Abort", 0, &Label, 0, 0))
+		return 1;
+
+	return 0;
+}
+
 int CEditor::PopupEvent(CEditor *pEditor, CUIRect View)
 {
 	CUIRect Label, ButtonBar;
@@ -769,6 +891,88 @@ int CEditor::PopupSelectImageResult()
 	g_SelectImageCurrent = g_SelectImageSelected;
 	g_SelectImageSelected = -100;
 	return g_SelectImageCurrent;
+}
+
+int CEditor::PopupTele(CEditor *pEditor, CUIRect View)
+{
+	CUIRect Button;
+	View.HSplitBottom(12.0f, &View, &Button);
+	
+	enum
+	{
+		PROP_TELE=0,
+		NUM_PROPS,
+	};
+	
+	CProperty aProps[] = {
+		{"Number", pEditor->m_TeleNum, PROPTYPE_INT_STEP, 0, 255},
+		{0},
+	};
+
+	static int s_aIds[NUM_PROPS] = {0};
+	int NewVal = 0;
+	int Prop = pEditor->DoProperties(&View, aProps, s_aIds, &NewVal);
+	
+	if(Prop == PROP_TELE)
+		 pEditor->m_TeleNum = clamp(NewVal, 0, 255);
+	
+	return 0;
+}
+
+int CEditor::PopupSpeedup(CEditor *pEditor, CUIRect View)
+{
+	CUIRect Button;
+	View.HSplitBottom(12.0f, &View, &Button);
+	
+	enum
+	{
+		PROP_FORCE=0,
+		PROP_ANGLE,
+		NUM_PROPS,
+	};
+	
+	CProperty aProps[] = {
+		{"Force", pEditor->m_SpeedupForce, PROPTYPE_INT_SCROLL, 0, 255},
+		{"Angle", pEditor->m_SpeedupAngle, PROPTYPE_INT_SCROLL, 0, 359},
+		{0},
+	};
+
+	static int s_aIds[NUM_PROPS] = {0};
+	int NewVal = 0;
+	int Prop = pEditor->DoProperties(&View, aProps, s_aIds, &NewVal);
+	
+	if(Prop == PROP_FORCE)
+		pEditor->m_SpeedupForce = clamp(NewVal, 0, 255);
+	if(Prop == PROP_ANGLE)
+		pEditor->m_SpeedupAngle = clamp(NewVal, 0, 359);
+	
+	return 0;
+}
+
+int CEditor::PopupSwitch(CEditor *pEditor, CUIRect View)
+{
+	CUIRect Button;
+	View.HSplitBottom(12.0f, &View, &Button);
+	
+	enum
+	{
+		PROP_SWITCH=0,
+		NUM_PROPS,
+	};
+	
+	CProperty aProps[] = {
+		{"Number", pEditor->m_SwitchNum, PROPTYPE_INT_STEP, 0, 255},
+		{0},
+	};
+
+	static int s_aIds[NUM_PROPS] = {0};
+	int NewVal = 0;
+	int Prop = pEditor->DoProperties(&View, aProps, s_aIds, &NewVal);
+	
+	if(Prop == PROP_SWITCH)
+		 pEditor->m_SwitchNum = clamp(NewVal, 0, 255);
+	
+	return 0;
 }
 
 static int s_GametileOpSelected = -1;

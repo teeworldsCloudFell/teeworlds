@@ -5,6 +5,8 @@
 #include <game/server/gamecontext.h>
 #include <game/mapitems.h>
 
+#include "../gamemodes/crap.h"
+
 #include "character.h"
 #include "laser.h"
 #include "projectile.h"
@@ -62,6 +64,8 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 
 	m_pPlayer = pPlayer;
 	m_Pos = Pos;
+	m_HittingDoor = false;
+	m_PushDirection = vec2(0,0);
 
 	m_Core.Reset();
 	m_Core.Init(&GameServer()->m_World.m_Core, GameServer()->Collision());
@@ -259,14 +263,14 @@ void CCharacter::FireWeapon()
 	if(CountInput(m_LatestPrevInput.m_Fire, m_LatestInput.m_Fire).m_Presses)
 		WillFire = true;
 
-	if(FullAuto && (m_LatestInput.m_Fire&1) && m_aWeapons[m_ActiveWeapon].m_Ammo)
+	if(FullAuto && (m_LatestInput.m_Fire&1) && (m_aWeapons[m_ActiveWeapon].m_Ammo || g_Config.m_SvInfiniteAmmo))
 		WillFire = true;
 
 	if(!WillFire)
 		return;
 
 	// check for ammo
-	if(!m_aWeapons[m_ActiveWeapon].m_Ammo)
+	if(!m_aWeapons[m_ActiveWeapon].m_Ammo && !g_Config.m_SvInfiniteAmmo)
 	{
 		// 125ms is a magical limit of how fast a human can click
 		m_ReloadTimer = 125 * Server()->TickSpeed() / 1000;
@@ -420,7 +424,7 @@ void CCharacter::FireWeapon()
 
 	m_AttackTick = Server()->Tick();
 
-	if(m_aWeapons[m_ActiveWeapon].m_Ammo > 0) // -1 == unlimited
+	if(m_aWeapons[m_ActiveWeapon].m_Ammo > 0 && !g_Config.m_SvInfiniteAmmo) // -1 == unlimited
 		m_aWeapons[m_ActiveWeapon].m_Ammo--;
 
 	if(!m_ReloadTimer)
@@ -548,9 +552,19 @@ void CCharacter::Tick()
 
 		m_pPlayer->m_ForceBalanced = false;
 	}
+	// save jumping state
+	int Jumped = m_Core.m_Jumped;
 
 	m_Core.m_Input = m_Input;
 	m_Core.Tick(true);
+
+	if(g_Config.m_SvRegen > 0 && (Server()->Tick()%g_Config.m_SvRegen) == 0)
+	{
+		if(m_Health < 10)
+			m_Health++;
+		else if(m_Armor < 10)
+			m_Armor++;
+	}
 	
 	// tile index
 	int TileIndex = GameServer()->Collision()->GetIndex(m_PrevPos, m_Pos);
@@ -620,11 +634,8 @@ void CCharacter::Tick()
 				
 		m_Core.m_HookedPlayer = -1;
 		m_Core.m_HookState = HOOK_RETRACTED;
-		m_Core.m_Pos = pRace->m_pTeleporter[z-1];
+		m_Core.m_Pos = GameServer()->CrapController()->m_pTeleporter[z-1];
 		m_Core.m_HookPos = m_Core.m_Pos;
-		//Resetting velocity to prevent exploit
-		if(g_Config.m_SvTeleportVelReset)
-			m_Core.m_Vel = vec2(0,0);
 		if(g_Config.m_SvStrip)
 		{
 			m_ActiveWeapon = WEAPON_HAMMER;
@@ -650,9 +661,30 @@ void CCharacter::Tick()
 
 	// handle Weapons
 	HandleWeapons();
+	
+	// door crap
+	// check if character is hitting a door
+	if(m_HittingDoor)
+	{
+		if(length(m_Core.m_Vel) < 5)
+			m_Core.m_Vel = m_PushDirection*5;
+		else
+			m_Core.m_Vel = m_PushDirection*clamp(length(m_Core.m_Vel), 0.f, 10.f)*1.05f;
+		if(m_Core.m_Jumped&3)
+			m_Core.m_Jumped &= ~2;
+	}
+	
+	if(!m_HittingDoor)
+		m_OldPos = m_Core.m_Pos;
+		
+	// reset hitting door state
+	m_HittingDoor = false;
 
 	// Previnput
 	m_PrevInput = m_Input;
+
+	// Prevposition
+	m_PrevPos = m_Core.m_Pos;
 	return;
 }
 

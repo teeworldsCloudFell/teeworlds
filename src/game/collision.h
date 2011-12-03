@@ -43,10 +43,14 @@ public:
 	int IsTeleport(int Index);
 	int IsSpeedup(int Index);
 	void GetSpeedup(int Index, vec2 *Dir, int *Force);
+	int IsDoor(int x, int y);
+	int GetSwitchNum(vec2 Pos);
 	
 	class CTeleTile *m_pTele;
 	class CSpeedupTile *m_pSpeedup;
-	
+	class CSwitchTile *m_pSwitch;
+
+	class CSwitchTile *Switches() { return m_pSwitch; }
 	class CLayers *Layers() { return m_pLayers; }
 };
 

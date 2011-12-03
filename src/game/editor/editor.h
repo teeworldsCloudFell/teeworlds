@@ -3,24 +3,23 @@
 #ifndef GAME_EDITOR_EDITOR_H
 #define GAME_EDITOR_EDITOR_H
 
-#include <math.h>
-
-#include <base/math.h>
 #include <base/system.h>
-
-#include <base/tl/algorithm.h>
+#include <base/math.h>
 #include <base/tl/array.h>
+#include <base/tl/algorithm.h>
 #include <base/tl/sorted_array.h>
 #include <base/tl/string.h>
 
-#include <game/client/ui.h>
+#include <math.h>
 #include <game/mapitems.h>
 #include <game/client/render.h>
 
-#include <engine/shared/config.h>
 #include <engine/shared/datafile.h>
+#include <engine/shared/config.h>
 #include <engine/editor.h>
 #include <engine/graphics.h>
+
+#include <game/client/ui.h>
 
 #include "auto_map.h"
 
@@ -122,6 +121,7 @@ public:
 	class CEditor *m_pEditor;
 	class IGraphics *Graphics();
 	class ITextRender *TextRender();
+	class IStorage *Storage();
 
 	CLayer()
 	{
@@ -137,8 +137,6 @@ public:
 	virtual ~CLayer()
 	{
 	}
-
-
 	virtual void BrushSelecting(CUIRect Rect) {}
 	virtual int BrushGrab(CLayerGroup *pBrush, CUIRect Rect) { return 0; }
 	virtual void FillSelection(bool Empty, CLayer *pBrush, CUIRect Rect) {}
@@ -274,7 +272,46 @@ public:
 	array<CEditorImage*> m_lImages;
 	array<CEnvelope*> m_lEnvelopes;
 
+	class CMapInfo
+	{
+	public:
+		char m_aAuthorTmp[32];
+		char m_aVersionTmp[16];
+		char m_aCreditsTmp[128];
+		char m_aLicenseTmp[32];
+
+		char m_aAuthor[32];
+		char m_aVersion[16];
+		char m_aCredits[128];
+		char m_aLicense[32];
+
+		void Reset()
+		{
+			m_aAuthorTmp[0] = 0;
+			m_aVersionTmp[0] = 0;
+			m_aCreditsTmp[0] = 0;
+			m_aLicenseTmp[0] = 0;
+
+			m_aAuthor[0] = 0;
+			m_aVersion[0] = 0;
+			m_aCredits[0] = 0;
+			m_aLicense[0] = 0;
+		}
+	};
+	CMapInfo m_MapInfo;
+
+	struct CSetting
+	{
+		char m_aCommand[64];
+
+		bool operator==(const CSetting &Other) { return !str_comp(m_aCommand, Other.m_aCommand); }
+	};
+	array<CSetting> m_lSettings;
+
 	class CLayerGame *m_pGameLayer;
+	class CLayerTele *m_pTeleLayer;
+	class CLayerSpeedup *m_pSpeedupLayer;
+	class CLayerSwitch *m_pSwitchLayer;
 	CLayerGroup *m_pGameGroup;
 
 	CEnvelope *NewEnvelope(int Channels)
@@ -286,6 +323,7 @@ public:
 	}
 
 	void DeleteEnvelope(int Index);
+	void CopyEnvelope(CEnvelope *pEnvelope);
 
 	CLayerGroup *NewGroup()
 	{
@@ -334,6 +372,10 @@ public:
 	// io
 	int Save(class IStorage *pStorage, const char *pFilename);
 	int Load(class IStorage *pStorage, const char *pFilename, int StorageType);
+	
+	void MakeTeleLayer(CLayer *pLayer);
+	void MakeSpeedupLayer(CLayer *pLayer);
+	void MakeSwitchLayer(CLayer *pLayer);
 };
 
 
@@ -370,8 +412,8 @@ public:
 	CLayerTiles(int w, int h);
 	~CLayerTiles();
 
-	void Resize(int NewW, int NewH);
-	void Shift(int Direction);
+	virtual void Resize(int NewW, int NewH);
+	virtual void Shift(int Direction);
 
 	void MakePalette();
 	virtual void Render();
@@ -402,6 +444,9 @@ public:
 
 	int m_TexID;
 	int m_Game;
+	int m_Tele;
+	int m_Speedup;
+	int m_Switch;
 	int m_Image;
 	int m_Width;
 	int m_Height;
@@ -419,7 +464,7 @@ public:
 
 	virtual void Render();
 	CQuad *NewQuad();
-
+	
 	virtual void BrushSelecting(CUIRect Rect);
 	virtual int BrushGrab(CLayerGroup *pBrush, CUIRect Rect);
 	virtual void BrushPlace(CLayer *pBrush, float wx, float wy);
@@ -445,6 +490,53 @@ public:
 	~CLayerGame();
 
 	virtual int RenderProperties(CUIRect *pToolbox);
+};
+
+class CLayerTele : public CLayerTiles
+{
+public:
+	CLayerTele(int w, int h);
+	~CLayerTele();
+	
+	CTeleTile *m_pTeleTile;
+	
+	virtual void Resize(int NewW, int NewH);
+	virtual void Shift(int Direction);
+	virtual void BrushDraw(CLayer *pBrush, float wx, float wy);
+	virtual void BrushFlipX();
+	virtual void BrushFlipY();
+	virtual void BrushRotate(float Amount);
+	virtual void FillSelection(bool Empty, CLayer *pBrush, CUIRect Rect);
+};
+
+class CLayerSpeedup : public CLayerTiles
+{
+public:
+	CLayerSpeedup(int w, int h);
+	~CLayerSpeedup();
+	
+	CSpeedupTile *m_pSpeedupTile;
+	
+	virtual void Resize(int NewW, int NewH);
+	virtual void Shift(int Direction);
+	virtual void BrushDraw(CLayer *pBrush, float wx, float wy);
+	virtual void BrushFlipX();
+	virtual void BrushFlipY();
+	virtual void BrushRotate(float Amount);
+	virtual void FillSelection(bool Empty, CLayer *pBrush, CUIRect Rect);
+};
+
+class CLayerSwitch : public CLayerTiles
+{
+public:
+	CLayerSwitch(int w, int h);
+	~CLayerSwitch();
+	
+	CSwitchTile *m_pSwitchTile;
+	
+	virtual void Resize(int NewW, int NewH);
+	virtual void BrushDraw(CLayer *pBrush, float wx, float wy);
+	virtual void FillSelection(bool Empty, CLayer *pBrush, CUIRect Rect);
 };
 
 class CEditor : public IEditor
@@ -528,10 +620,14 @@ public:
 		m_AnimateSpeed = 1;
 
 		m_ShowEnvelopeEditor = 0;
+		m_ShowServerSettingsEditor = false;
 
 		m_ShowEnvelopePreview = 0;
 		m_SelectedQuadEnvelope = -1;
 		m_SelectedEnvelopePoint = -1;
+
+		m_CommandBox = 0.0f;
+		m_aSettingsCommand[0] = 0;
 
 		ms_CheckerTexture = 0;
 		ms_BackgroundTexture = 0;
@@ -539,6 +635,13 @@ public:
 		ms_EntitiesTexture = 0;
 
 		ms_pUiGotContext = 0;
+		
+		m_TeleNum = 1;
+		
+		m_SpeedupForce = 50;
+		m_SpeedupAngle = 0;
+
+		m_SwitchNum = 1;
 	}
 
 	virtual void Init();
@@ -651,6 +754,7 @@ public:
 
 	int m_ShowEnvelopeEditor;
 	int m_ShowEnvelopePreview; //Values: 0-Off|1-Selected Envelope|2-All
+	bool m_ShowServerSettingsEditor;
 	bool m_ShowPicker;
 
 	int m_SelectedLayer;
@@ -675,6 +779,8 @@ public:
 	CEditorMap m_Map;
 
 	static void EnvelopeEval(float TimeOffset, int Env, float *pChannels, void *pUser);
+	float m_CommandBox;
+	char m_aSettingsCommand[64];
 
 	void DoMapBorder();
 	int DoButton_Editor_Common(const void *pID, const char *pText, int Checked, const CUIRect *pRect, int Flags, const char *pToolTip);
@@ -706,12 +812,16 @@ public:
 	static int PopupQuad(CEditor *pEditor, CUIRect View);
 	static int PopupPoint(CEditor *pEditor, CUIRect View);
 	static int PopupNewFolder(CEditor *pEditor, CUIRect View);
+	static int PopupMapInfo(CEditor *pEditor, CUIRect View);
 	static int PopupEvent(CEditor *pEditor, CUIRect View);
 	static int PopupSelectImage(CEditor *pEditor, CUIRect View);
 	static int PopupSelectGametileOp(CEditor *pEditor, CUIRect View);
 	static int PopupImage(CEditor *pEditor, CUIRect View);
 	static int PopupMenuFile(CEditor *pEditor, CUIRect View);
 	static int PopupSelectConfigAutoMap(CEditor *pEditor, CUIRect View);
+	static int PopupTele(CEditor *pEditor, CUIRect View);
+	static int PopupSpeedup(CEditor *pEditor, CUIRect View);
+	static int PopupSwitch(CEditor *pEditor, CUIRect View);
 
 	static void CallbackOpenMap(const char *pFileName, int StorageType, void *pUser);
 	static void CallbackAppendMap(const char *pFileName, int StorageType, void *pUser);
@@ -746,6 +856,7 @@ public:
 	void RenderModebar(CUIRect View);
 	void RenderStatusbar(CUIRect View);
 	void RenderEnvelopeEditor(CUIRect View);
+	void RenderServerSettingsEditor(CUIRect View);
 
 	void RenderMenubar(CUIRect Menubar);
 	void RenderFileDialog();
@@ -769,6 +880,13 @@ public:
 	}
 
 	int GetLineDistance();
+
+	unsigned char m_TeleNum;
+
+	unsigned char m_SpeedupForce;
+	short m_SpeedupAngle;
+
+	unsigned char m_SwitchNum;
 };
 
 // make sure to inline this function

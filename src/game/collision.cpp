@@ -20,6 +20,7 @@ CCollision::CCollision()
 	m_pLayers = 0;
 	m_pTele = 0;
 	m_pSpeedup = 0;
+	m_pSwitch = 0;
 }
 
 void CCollision::Init(class CLayers *pLayers)
@@ -27,6 +28,7 @@ void CCollision::Init(class CLayers *pLayers)
 	// reset race specific pointers
 	m_pTele = 0;
 	m_pSpeedup = 0;
+	m_pSwitch = 0;
 
 	m_pLayers = pLayers;
 	m_Width = m_pLayers->GameLayer()->m_Width;
@@ -36,6 +38,8 @@ void CCollision::Init(class CLayers *pLayers)
 		m_pTele = static_cast<CTeleTile *>(m_pLayers->Map()->GetData(m_pLayers->TeleLayer()->m_Tele));
 	if(m_pLayers->SpeedupLayer())
 		m_pSpeedup = static_cast<CSpeedupTile *>(m_pLayers->Map()->GetData(m_pLayers->SpeedupLayer()->m_Speedup));
+	if(m_pLayers->SwitchLayer())
+		m_pSwitch = static_cast<CSwitchTile *>(m_pLayers->Map()->GetData(m_pLayers->SwitchLayer()->m_Switch));
 
 	for(int i = 0; i < m_Width*m_Height; i++)
 	{
@@ -173,6 +177,31 @@ void CCollision::GetSpeedup(int Index, vec2 *Dir, int *Force)
 	float Angle = m_pSpeedup[Index].m_Angle * (3.14159265f/180.0f);
 	*Force = m_pSpeedup[Index].m_Force;
 	*Dir = vec2(cos(Angle), sin(Angle));
+}
+
+int CCollision::IsDoor(int x, int y)
+{
+	if(!m_pSwitch)
+		return 0;
+		
+	int nx = clamp(x/32, 0, m_Width-1);
+	int ny = clamp(y/32, 0, m_Height-1);
+	
+	if(m_pSwitch[ny*m_Width+nx].m_Type >= TILE_DOOR_START && m_pSwitch[ny*m_Width+nx].m_Type <= TILE_DOOR_SWITCH)
+		return m_pSwitch[ny*m_Width+nx].m_Type;
+	else
+		return 0;
+}
+
+int CCollision::GetSwitchNum(vec2 Pos)
+{
+	if(!m_pSwitch)
+		return 0;
+		
+	int nx = clamp((int)Pos.x/32, 0, m_Width-1);
+	int ny = clamp((int)Pos.y/32, 0, m_Height-1);
+	
+	return m_pSwitch[ny*m_Width+nx].m_Number;
 }
 	
 // TODO: rewrite this smarter!

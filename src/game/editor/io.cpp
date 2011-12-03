@@ -220,6 +220,59 @@ int CEditorMap::Save(class IStorage *pStorage, const char *pFileName)
 		df.AddItem(MAPITEMTYPE_VERSION, 0, sizeof(Item), &Item);
 	}
 
+	// save map info
+	{
+		CMapItemInfo Item;
+		Item.m_Version = 1;
+
+		if(m_MapInfo.m_aAuthor[0])
+			Item.m_Author = df.AddData(str_length(m_MapInfo.m_aAuthor)+1, m_MapInfo.m_aAuthor);
+		else
+			Item.m_Author = -1;
+		if(m_MapInfo.m_aVersion[0])
+			Item.m_MapVersion = df.AddData(str_length(m_MapInfo.m_aVersion)+1, m_MapInfo.m_aVersion);
+		else
+			Item.m_MapVersion = -1;
+		if(m_MapInfo.m_aCredits[0])
+			Item.m_Credits = df.AddData(str_length(m_MapInfo.m_aCredits)+1, m_MapInfo.m_aCredits);
+		else
+			Item.m_Credits = -1;
+		if(m_MapInfo.m_aLicense[0])
+			Item.m_License = df.AddData(str_length(m_MapInfo.m_aLicense)+1, m_MapInfo.m_aLicense);
+		else
+			Item.m_License = -1;
+
+		Item.m_Settings = -1;
+		if(m_lSettings.size())
+		{
+			int Size = 0;
+			for(int i = 0; i < m_lSettings.size(); i++)
+				Size += str_length(m_lSettings[i].m_aCommand);
+			Size += m_lSettings.size();
+
+			char *pBuf = new char[Size];
+			mem_zero(pBuf, Size);
+			int Index = 0;
+			for(int i = 0; i < m_lSettings.size(); i++)
+			{
+				int j = 0;
+				while(Index < Size)
+				{
+					pBuf[Index] = m_lSettings[i].m_aCommand[j];
+					if(!m_lSettings[i].m_aCommand[j]) // check for null termination
+						break;
+					Index++;
+					j++;
+				}
+				Index++;
+			}
+			Item.m_Settings = df.AddData(Size, pBuf);
+			delete[] pBuf;
+		}
+
+		df.AddItem(MAPITEMTYPE_INFO, 0, sizeof(Item), &Item);
+	}
+
 	// save images
 	for(int i = 0; i < m_lImages.size(); i++)
 	{
@@ -292,9 +345,41 @@ int CEditorMap::Save(class IStorage *pStorage, const char *pFileName)
 
 				Item.m_Width = pLayer->m_Width;
 				Item.m_Height = pLayer->m_Height;
-				Item.m_Flags = pLayer->m_Game ? TILESLAYERFLAG_GAME : 0;
+				if(pLayer->m_Tele)
+					Item.m_Flags = 2;
+				else if(pLayer->m_Speedup)
+					Item.m_Flags = 4;
+				else if(pLayer->m_Switch)
+					Item.m_Flags = 8;
+				else
+					Item.m_Flags = pLayer->m_Game ? TILESLAYERFLAG_GAME : 0;
 				Item.m_Image = pLayer->m_Image;
-				Item.m_Data = df.AddData(pLayer->m_Width*pLayer->m_Height*sizeof(CTile), pLayer->m_pTiles);
+				if(pLayer->m_Tele)
+				{
+					CTile *Tiles = new CTile[pLayer->m_Width*pLayer->m_Height];
+					mem_zero(Tiles, pLayer->m_Width*pLayer->m_Height*sizeof(CTile));
+					Item.m_Data = df.AddData(pLayer->m_Width*pLayer->m_Height*sizeof(CTile), Tiles);
+					Item.m_Tele = df.AddData(pLayer->m_Width*pLayer->m_Height*sizeof(CTeleTile), ((CLayerTele *)pLayer)->m_pTeleTile);
+					delete[] Tiles;
+				}
+				else if(pLayer->m_Speedup)
+				{
+					CTile *Tiles = new CTile[pLayer->m_Width*pLayer->m_Height];
+					mem_zero(Tiles, pLayer->m_Width*pLayer->m_Height*sizeof(CTile));
+					Item.m_Data = df.AddData(pLayer->m_Width*pLayer->m_Height*sizeof(CTile), Tiles);
+					Item.m_Speedup = df.AddData(pLayer->m_Width*pLayer->m_Height*sizeof(CSpeedupTile), ((CLayerSpeedup *)pLayer)->m_pSpeedupTile);
+					delete[] Tiles;
+				}
+				else if(pLayer->m_Switch)
+				{
+					CTile *Tiles = new CTile[pLayer->m_Width*pLayer->m_Height];
+					mem_zero(Tiles, pLayer->m_Width*pLayer->m_Height*sizeof(CTile));
+					Item.m_Data = df.AddData(pLayer->m_Width*pLayer->m_Height*sizeof(CTile), Tiles);
+					Item.m_Switch = df.AddData(pLayer->m_Width*pLayer->m_Height*sizeof(CSwitchTile), ((CLayerSwitch *)pLayer)->m_pSwitchTile);
+					delete[] Tiles;
+				}
+				else
+					Item.m_Data = df.AddData(pLayer->m_Width*pLayer->m_Height*sizeof(CTile), pLayer->m_pTiles);
 
 				// save layer name
 				StrToInts(Item.m_aName, sizeof(Item.m_aName)/sizeof(int), pLayer->m_aName);
@@ -411,8 +496,7 @@ int CEditorMap::Load(class IStorage *pStorage, const char *pFileName, int Storag
 	}
 	else if(pItem->m_Version == 1)
 	{
-		//editor.reset(false);
-
+		//editor.reset(false);s
 		// load images
 		{
 			int Start, Num;
@@ -519,6 +603,33 @@ int CEditorMap::Load(class IStorage *pStorage, const char *pFileName, int Storag
 							MakeGameLayer(pTiles);
 							MakeGameGroup(pGroup);
 						}
+						else if(pTilemapItem->m_Flags&2)
+						{
+							if(pTilemapItem->m_Version < 3) // get the right values for tele layer
+							{
+								int *pTele = (int*)(pTilemapItem)+15;
+								pTilemapItem->m_Tele = *pTele;
+							}
+
+							pTiles = new CLayerTele(pTilemapItem->m_Width, pTilemapItem->m_Height);
+							MakeTeleLayer(pTiles);
+						}
+						else if(pTilemapItem->m_Flags&4)
+						{
+							if(pTilemapItem->m_Version < 3) // get the right values for speedup layer
+							{
+								int *pSpeedup = (int*)(pTilemapItem)+16;
+								pTilemapItem->m_Speedup = *pSpeedup;
+							}
+
+							pTiles = new CLayerSpeedup(pTilemapItem->m_Width, pTilemapItem->m_Height);
+							MakeSpeedupLayer(pTiles);
+						}
+						else if(pTilemapItem->m_Flags&8)
+						{
+							pTiles = new CLayerSwitch(pTilemapItem->m_Width, pTilemapItem->m_Height);
+							MakeSwitchLayer(pTiles);
+						}
 						else
 						{
 							pTiles = new CLayerTiles(pTilemapItem->m_Width, pTilemapItem->m_Height);
@@ -551,6 +662,52 @@ int CEditorMap::Load(class IStorage *pStorage, const char *pFileName, int Storag
 						}
 
 						DataFile.UnloadData(pTilemapItem->m_Data);
+						
+						if(pTiles->m_Tele)
+						{
+							void *pTeleData = DataFile.GetData(pTilemapItem->m_Tele);
+							mem_copy(((CLayerTele*)pTiles)->m_pTeleTile, pTeleData, pTiles->m_Width*pTiles->m_Height*sizeof(CTeleTile));
+							
+							for(int i = 0; i < pTiles->m_Width*pTiles->m_Height; i++)
+							{
+								if(((CLayerTele*)pTiles)->m_pTeleTile[i].m_Type == TILE_TELEIN)
+									((CLayerTiles*)pTiles)->m_pTiles[i].m_Index = TILE_TELEIN;
+								else if(((CLayerTele*)pTiles)->m_pTeleTile[i].m_Type == TILE_TELEOUT)
+									((CLayerTiles*)pTiles)->m_pTiles[i].m_Index = TILE_TELEOUT;
+								else
+									((CLayerTiles*)pTiles)->m_pTiles[i].m_Index = 0;
+							}
+							DataFile.UnloadData(pTilemapItem->m_Tele);
+						}
+						else if(pTiles->m_Speedup)
+						{
+							void *pSpeedupData = DataFile.GetData(pTilemapItem->m_Speedup);
+							mem_copy(((CLayerSpeedup*)pTiles)->m_pSpeedupTile, pSpeedupData, pTiles->m_Width*pTiles->m_Height*sizeof(CSpeedupTile));
+							
+							for(int i = 0; i < pTiles->m_Width*pTiles->m_Height; i++)
+							{
+								if(((CLayerSpeedup*)pTiles)->m_pSpeedupTile[i].m_Force > 0)
+									((CLayerTiles*)pTiles)->m_pTiles[i].m_Index = TILE_BOOST;
+								else
+									((CLayerTiles*)pTiles)->m_pTiles[i].m_Index = 0;
+							}
+							
+							DataFile.UnloadData(pTilemapItem->m_Speedup);
+						}
+						else if(pTiles->m_Switch)
+						{
+							void *pSwitchData = DataFile.GetData(pTilemapItem->m_Switch);
+							mem_copy(((CLayerSwitch*)pTiles)->m_pSwitchTile, pSwitchData, pTiles->m_Width*pTiles->m_Height*sizeof(CSwitchTile));
+							
+							for(int i = 0; i < pTiles->m_Width*pTiles->m_Height; i++)
+							{
+								if(((CLayerSwitch*)pTiles)->m_pSwitchTile[i].m_Type >= TILE_DOOR_START && ((CLayerSwitch*)pTiles)->m_pSwitchTile[i].m_Type <= TILE_DOOR_SWITCH)
+									((CLayerTiles*)pTiles)->m_pTiles[i].m_Index = ((CLayerSwitch*)pTiles)->m_pSwitchTile[i].m_Type;
+								else
+									((CLayerTiles*)pTiles)->m_pTiles[i].m_Index = 0;
+							}
+							DataFile.UnloadData(pTilemapItem->m_Switch);
+						}
 					}
 					else if(pLayerItem->m_Type == LAYERTYPE_QUADS)
 					{
@@ -655,6 +812,25 @@ int CEditor::Append(const char *pFileName, int StorageType)
 		}
 	}
 	NewMap.m_lGroups.clear();
+
+	// transfer map info
+	if(!m_Map.m_MapInfo.m_aAuthor[0] && NewMap.m_MapInfo.m_aAuthor[0])
+		str_copy(m_Map.m_MapInfo.m_aAuthor, NewMap.m_MapInfo.m_aAuthor, sizeof(m_Map.m_MapInfo.m_aAuthor));
+	if(!m_Map.m_MapInfo.m_aVersion[0] && NewMap.m_MapInfo.m_aVersion[0])
+		str_copy(m_Map.m_MapInfo.m_aVersion, NewMap.m_MapInfo.m_aVersion, sizeof(m_Map.m_MapInfo.m_aVersion));
+	if(!m_Map.m_MapInfo.m_aCredits[0] && NewMap.m_MapInfo.m_aCredits[0])
+		str_copy(m_Map.m_MapInfo.m_aCredits, NewMap.m_MapInfo.m_aCredits, sizeof(m_Map.m_MapInfo.m_aCredits));
+	if(!m_Map.m_MapInfo.m_aLicense[0] && NewMap.m_MapInfo.m_aLicense[0])
+		str_copy(m_Map.m_MapInfo.m_aLicense, NewMap.m_MapInfo.m_aLicense, sizeof(m_Map.m_MapInfo.m_aLicense));
+
+	// transfer map settings
+	for(int i = 0; i < NewMap.m_lSettings.size(); i++)
+	{
+		CEditorMap::CSetting Setting;
+		str_copy(Setting.m_aCommand, NewMap.m_lSettings[i].m_aCommand, sizeof(Setting.m_aCommand));
+		if(find_linear(m_Map.m_lSettings.all(), Setting).empty())
+			m_Map.m_lSettings.add(Setting);
+	}
 
 	// all done \o/
 	return 0;

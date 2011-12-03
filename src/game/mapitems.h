@@ -46,6 +46,16 @@ enum
 	TILE_SOLID,
 	TILE_DEATH,
 	TILE_NOHOOK,
+	TILE_DOOR_START=23,
+	TILE_DOOR_END,
+	TILE_DOOR_SWITCH,
+	TILE_TELEIN,
+	TILE_TELEOUT,
+	TILE_BOOST,
+	TILE_STOPL,
+	TILE_STOPR,
+	TILE_STOPB,
+	TILE_STOPT,
 
 	TILEFLAG_VFLIP=1,
 	TILEFLAG_HFLIP=2,
@@ -89,6 +99,36 @@ public:
 	unsigned char m_Skip;
 	unsigned char m_Reserved;
 };
+
+class CTeleTile
+{
+public:
+	unsigned char m_Number;
+	unsigned char m_Type;
+};
+
+class CSpeedupTile
+{
+public:
+	unsigned char m_Force;
+	short m_Angle;
+};
+
+struct CSwitchTile
+{
+	unsigned char m_Number;
+	unsigned char m_Type;
+};
+
+struct CMapItemInfo
+{
+	int m_Version;
+	int m_Author;
+	int m_MapVersion;
+	int m_Credits;
+	int m_License;
+	int m_Settings;
+} ;
 
 struct CMapItemImage
 {
@@ -150,6 +190,12 @@ struct CMapItemLayerTilemap
 	int m_Data;
 
 	int m_aName[3];
+
+	int m_Tele;
+	
+	int m_Speedup;
+
+	int m_Switch;
 } ;
 
 struct CMapItemLayerQuads

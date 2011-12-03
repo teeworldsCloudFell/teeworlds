@@ -62,6 +62,9 @@ public:
 
 	bool IsAlive() const { return m_Alive; }
 	class CPlayer *GetPlayer() { return m_pPlayer; }
+	vec2 m_OldPos;
+	bool m_HittingDoor;
+	vec2 m_PushDirection;
 
 private:
 	// player controlling this character
@@ -129,6 +132,8 @@ private:
 	CCharacterCore m_SendCore; // core that we should send
 	CCharacterCore m_ReckoningCore; // the dead reckoning core
 
+	int m_LastSpeedup;
+	vec2 m_PrevPos;
 };
 
 #endif
