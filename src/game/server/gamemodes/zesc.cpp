@@ -19,6 +19,7 @@ CGameControllerZESC::CGameControllerZESC(class CGameContext *pGameServer) : IGam
 	m_NukeTick = 0;
 	m_NukeLaunched = false;
 	m_LevelEarned = false;
+	LoadStandardSettings();
 
 	for(int i = 0; i < 48; i++)
 	{
@@ -36,6 +37,26 @@ CGameControllerZESC::CGameControllerZESC(class CGameContext *pGameServer) : IGam
 CGameControllerZESC::~CGameControllerZESC()
 {
 	delete[] m_pTeleporter;
+}
+
+void CGameControllerZESC::LoadStandardSettings()
+{
+	for(int i = 0; i < 48; i++)
+	{
+		if(i < 32)
+			m_Door[i].m_State = DOOR_CLOSED;
+		else
+			m_Door[i].m_State = DOOR_OPEN;
+		m_Door[i].m_Tick = 0;
+		m_Door[i].m_OpenTime = 10;
+		m_Door[i].m_CloseTime = 3;
+		m_Door[i].m_ReopenTime = 10;
+	}
+	g_Config.m_SvZombieRatio = 16;
+	g_Config.m_SvZWarmup = 15;
+	g_Config.m_SvDoors = 1;
+	g_Config.m_SvNukeTime = 15;
+	g_Config.m_SvFlushCustomTeleporter = 0;
 }
 
 void CGameControllerZESC::InitTeleporter()

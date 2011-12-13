@@ -2,6 +2,7 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include <new>
 #include <base/math.h>
+#include <base/tl/array.h>
 #include <engine/shared/config.h>
 #include <engine/map.h>
 #include <engine/console.h>
@@ -1444,11 +1445,11 @@ void CGameContext::ConListTimedEvents(IConsole::IResult *pResult, void *pUserDat
 	CGameContext *pSelf = (CGameContext *)pUserData;
 
 	char aBuf[512];
-	str_format(aBuf, sizeof(aBuf), "Registered timed events: %d", pSelf->m_pController->m_NumTimedEvents);
+	str_format(aBuf, sizeof(aBuf), "Registered timed events: %d", pSelf->m_pController->m_lTimedEvents.size());
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
-	for(int i = 0; i < pSelf->m_pController->m_NumTimedEvents; i++)
+	for(int i = 0; i < pSelf->m_pController->m_lTimedEvents.size(); i++)
 	{
-		str_format(aBuf, sizeof(aBuf), "%d. \"%s\"", i+1, pSelf->m_pController->m_TimedEvent[i].m_pAction);
+		str_format(aBuf, sizeof(aBuf), "%d. \"%s\"", i+1, pSelf->m_pController->m_lTimedEvents[i].m_pAction);
 		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
 	}
 }
@@ -1457,13 +1458,7 @@ void CGameContext::ConFlushTimedEvents(IConsole::IResult *pResult, void *pUserDa
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
 
-	for(int i = 0; i < pSelf->m_pController->m_NumTimedEvents; i++)
-	{
-		pSelf->m_pController->m_TimedEvent[i].m_pAction[0] = '\0';
-		pSelf->m_pController->m_TimedEvent[i].m_Time = 0;
-		pSelf->m_pController->m_TimedEvent[i].m_Tick = 0;
-	}
-	pSelf->m_pController->m_NumTimedEvents = 0;
+	pSelf->m_pController->m_lTimedEvents.clear();
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Timed events flushed");
 }
 
@@ -1487,7 +1482,7 @@ void CGameContext::ConListTriggeredEvents(IConsole::IResult *pResult, void *pUse
 
 	for(int i = 0; i < 32; i++)
 	{
-		if(pSelf->m_pController->m_TriggeredEvent[i].m_pAction[0])
+		if(pSelf->m_pController->m_aTriggeredEvents[i].m_aAction[0])
 			NumTriggeredEvents++;
 	}
 	str_format(aBuf, sizeof(aBuf), "Registered triggered events: %d", NumTriggeredEvents);
@@ -1495,9 +1490,9 @@ void CGameContext::ConListTriggeredEvents(IConsole::IResult *pResult, void *pUse
 
 	for(int i = 0; i < 32; i++)
 	{
-		if(pSelf->m_pController->m_TriggeredEvent[i].m_pAction[0])
+		if(pSelf->m_pController->m_aTriggeredEvents[i].m_aAction[0])
 		{
-			str_format(aBuf, sizeof(aBuf), "%d. \"%s\"", i+1, pSelf->m_pController->m_TriggeredEvent[i].m_pAction);
+			str_format(aBuf, sizeof(aBuf), "%d. \"%s\"", i+1, pSelf->m_pController->m_aTriggeredEvents[i].m_aAction);
 			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
 		}
 	}
@@ -1509,8 +1504,8 @@ void CGameContext::ConFlushTriggeredEvents(IConsole::IResult *pResult, void *pUs
 
 	for(int i = 0; i < 32; i++)
 	{
-		pSelf->m_pController->m_TriggeredEvent[i].m_pAction[0] = '\0';
-		pSelf->m_pController->m_TriggeredEvent[i].m_State = false;
+		pSelf->m_pController->m_aTriggeredEvents[i].m_aAction[0] = '\0';
+		pSelf->m_pController->m_aTriggeredEvents[i].m_State = false;
 	}
 
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Triggered events flushed");
@@ -1524,7 +1519,7 @@ void CGameContext::ConRegisterOnTeamWinEvent(IConsole::IResult *pResult, void *p
 	if(Team == -1)
 		Team = 2;
 
-	str_copy(pSelf->m_pController->m_pOnTeamWinEvent[Team], pCommand, sizeof(pSelf->m_pController->m_pOnTeamWinEvent[Team]));
+	str_copy(pSelf->m_pController->m_aaOnTeamWinEvent[Team], pCommand, sizeof(pSelf->m_pController->m_aaOnTeamWinEvent[Team]));
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "On-teamwin event registered");
 }
 
@@ -1532,9 +1527,9 @@ void CGameContext::ConFlushOnTeamWinEvent(IConsole::IResult *pResult, void *pUse
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
 
-	pSelf->m_pController->m_pOnTeamWinEvent[0][0] = '\0';
-	pSelf->m_pController->m_pOnTeamWinEvent[1][0] = '\0';
-	pSelf->m_pController->m_pOnTeamWinEvent[2][0] = '\0';
+	pSelf->m_pController->m_aaOnTeamWinEvent[0][0] = '\0';
+	pSelf->m_pController->m_aaOnTeamWinEvent[1][0] = '\0';
+	pSelf->m_pController->m_aaOnTeamWinEvent[2][0] = '\0';
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "On-teamwin events flushed");
 }
 
@@ -1544,9 +1539,9 @@ void CGameContext::ConCustomTeleporterRegister(IConsole::IResult *pResult, void 
 	int ID = clamp(pResult->GetInteger(0), 1, 16)-1;
 	int ToX = clamp(pResult->GetInteger(1), 1, 255)-1;
 
-	pSelf->m_pController->m_CustomTeleport[ID].m_Teleport = ToX;
+	pSelf->m_pController->m_aCustomTeleport[ID].m_Teleport = ToX;
 	if(pResult->NumArguments() > 2)
-		pSelf->m_pController->m_CustomTeleport[ID].m_Team = clamp(pResult->GetInteger(2), 0, 1);
+		pSelf->m_pController->m_aCustomTeleport[ID].m_Team = clamp(pResult->GetInteger(2), 0, 1);
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Custom teleporter registered");
 }
 
@@ -1556,8 +1551,8 @@ void CGameContext::ConCustomTeleporterFlush(IConsole::IResult *pResult, void *pU
 
 	for(int i = 0; i < 16; i++)
 	{
-		pSelf->m_pController->m_CustomTeleport[i].m_Teleport = -1;
-		pSelf->m_pController->m_CustomTeleport[i].m_Team = -1;
+		pSelf->m_pController->m_aCustomTeleport[i].m_Teleport = -1;
+		pSelf->m_pController->m_aCustomTeleport[i].m_Team = -1;
 	}	
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Custom teleports flushed");
 }
@@ -1570,19 +1565,19 @@ void CGameContext::ConCustomTeleporterList(IConsole::IResult *pResult, void *pUs
 
 	for(int i = 0; i < 16; i++)
 	{
-		if(pSelf->m_pController->m_CustomTeleport[i].m_Teleport != -1)
+		if(pSelf->m_pController->m_aCustomTeleport[i].m_Teleport != -1)
 			NumCTeleports++;
 	}
 	str_format(aBuf, sizeof(aBuf), "Custom teleports: %d", NumCTeleports);
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
 	for(int i = 0; i < 16; i++)
 	{
-		if(pSelf->m_pController->m_CustomTeleport[i].m_Teleport != -1)
+		if(pSelf->m_pController->m_aCustomTeleport[i].m_Teleport != -1)
 		{
-			if(pSelf->m_pController->m_CustomTeleport[i].m_Team != -1)
-				str_format(aBuf, sizeof(aBuf), "%d: %d, Team: %d", i+1, pSelf->m_pController->m_CustomTeleport[i].m_Teleport+1, pSelf->m_pController->m_CustomTeleport[i].m_Team);
+			if(pSelf->m_pController->m_aCustomTeleport[i].m_Team != -1)
+				str_format(aBuf, sizeof(aBuf), "%d: %d, Team: %d", i+1, pSelf->m_pController->m_aCustomTeleport[i].m_Teleport+1, pSelf->m_pController->m_aCustomTeleport[i].m_Team);
 			else
-				str_format(aBuf, sizeof(aBuf), "%d: %d", i+1, pSelf->m_pController->m_CustomTeleport[i].m_Teleport+1);
+				str_format(aBuf, sizeof(aBuf), "%d: %d", i+1, pSelf->m_pController->m_aCustomTeleport[i].m_Teleport+1);
 			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
 		}
 	}
@@ -1593,24 +1588,18 @@ void CGameContext::ConReloadMapDefaults(IConsole::IResult *pResult, void *pUserD
 	CGameContext *pSelf = (CGameContext *)pUserData;
 	for(int i = 0; i < 32; i++) // First we have to delete all events...
 	{
-		pSelf->m_pController->m_TriggeredEvent[i].m_pAction[0] = '\0';
-		pSelf->m_pController->m_TriggeredEvent[i].m_State = false;
+		pSelf->m_pController->m_aTriggeredEvents[i].m_aAction[0] = '\0';
+		pSelf->m_pController->m_aTriggeredEvents[i].m_State = false;
 		if(i < 16)
 		{
-			pSelf->m_pController->m_CustomTeleport[i].m_Teleport = -1;
-			pSelf->m_pController->m_CustomTeleport[i].m_Team = -1;
+			pSelf->m_pController->m_aCustomTeleport[i].m_Teleport = -1;
+			pSelf->m_pController->m_aCustomTeleport[i].m_Team = -1;
 		}
 	}
-	for(int i = 0; i < pSelf->m_pController->m_NumTimedEvents; i++)
-	{
-		pSelf->m_pController->m_TimedEvent[i].m_pAction[0] = '\0';
-		pSelf->m_pController->m_TimedEvent[i].m_Time = 0;
-		pSelf->m_pController->m_TimedEvent[i].m_Tick = 0;
-	}
-	pSelf->m_pController->m_NumTimedEvents = 0;
-	pSelf->m_pController->m_pOnTeamWinEvent[0][0] = '\0';
-	pSelf->m_pController->m_pOnTeamWinEvent[1][0] = '\0';
-	pSelf->m_pController->m_pOnTeamWinEvent[2][0] = '\0';
+	pSelf->m_pController->m_lTimedEvents.clear();
+	pSelf->m_pController->m_aaOnTeamWinEvent[0][0] = '\0';
+	pSelf->m_pController->m_aaOnTeamWinEvent[1][0] = '\0';
+	pSelf->m_pController->m_aaOnTeamWinEvent[2][0] = '\0';
 
 	// Now we can load them again.
 	pSelf->LoadMapSettings();
@@ -1671,11 +1660,11 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("door_state", "ii", CFGFLAG_SERVER, ConDoorSetState, this, "Set the doorstate: door_state <id> <state (0=open, 1=closed, 2=zclosed, 3=reopened)>");
 	Console()->Register("zdoor_state", "ii", CFGFLAG_SERVER, ConZDoorSetState, this, "Set the zdoorstate: zdoor_state <id> <state (0=open, 1=zclosed, 2=reopened)>");
 
-	Console()->Register("event_timed_register", "is", CFGFLAG_SERVER, ConRegisterTimedEvent, this, "Register a timed event: event_timed_register <seconds> <command>");
+	Console()->Register("event_timed_register", "ir", CFGFLAG_SERVER, ConRegisterTimedEvent, this, "Register a timed event: event_timed_register <seconds> <command>");
 	Console()->Register("event_timed_list", "", CFGFLAG_SERVER, ConListTimedEvents, this, "List all timed events");
 	Console()->Register("event_timed_flush", "", CFGFLAG_SERVER, ConFlushTimedEvents, this, "Delete all timed events");
 
-	Console()->Register("event_triggered_register", "is", CFGFLAG_SERVER, ConRegisterTriggeredEvent, this, "Register a triggered event: event_triggered_register <id> <command>");
+	Console()->Register("event_triggered_register", "ir", CFGFLAG_SERVER, ConRegisterTriggeredEvent, this, "Register a triggered event: event_triggered_register <id> <command>");
 	Console()->Register("event_triggered_list", "", CFGFLAG_SERVER, ConListTriggeredEvents, this, "List all triggered events");
 	Console()->Register("event_triggered_flush", "", CFGFLAG_SERVER, ConFlushTriggeredEvents, this, "Delete all triggered events");
 

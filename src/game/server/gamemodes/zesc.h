@@ -33,6 +33,7 @@ public:
 	int m_NukeTick;
 	bool m_NukeLaunched;
 
+	virtual void LoadStandardSettings();
 	virtual void Tick();
 	virtual void Snap(int SnappingClient);
 	virtual int OnCharacterDeath(class CCharacter *pVictim, class CPlayer *pKiller, int Weapon);

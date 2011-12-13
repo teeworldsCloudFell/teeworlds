@@ -4,8 +4,7 @@
 #define GAME_SERVER_GAMECONTROLLER_H
 
 #include <base/vmath.h>
-
-const int MAX_TIMED_EVENTS = 32;
+#include <base/tl/array.h>
 
 /*
 	Class: Game Controller
@@ -64,23 +63,34 @@ public:
 	{
 		int m_Time;
 		int64 m_Tick;
-		char m_pAction[512];
-	} m_TimedEvent[MAX_TIMED_EVENTS];
-	int m_NumTimedEvents;
+		char *m_pAction;
+
+		CTimedEvent() {}
+		CTimedEvent(int Time, int64 Tick, const char *pAction)
+		{
+			m_Time = Time;
+			m_Tick = Tick;
+			// Saving memory ftw! xD
+			m_pAction = new char[str_length(pAction)+1];
+			mem_zero(m_pAction, str_length(pAction)+1);
+			str_copy(m_pAction, pAction, str_length(pAction)+1);
+		}
+	};
+	array<CTimedEvent> m_lTimedEvents;
 
 	struct CTriggeredEvent
 	{
 		bool m_State;
-		char m_pAction[512];
-	} m_TriggeredEvent[32];
+		char m_aAction[512];
+	} m_aTriggeredEvents[32];
 
 	struct CCustomTeleport
 	{
 		int m_Teleport;
 		int m_Team;
-	} m_CustomTeleport[32];
+	} m_aCustomTeleport[32];
 
-	char m_pOnTeamWinEvent[3][512];
+	char m_aaOnTeamWinEvent[3][512];
 
 	const char *m_pGameType;
 
