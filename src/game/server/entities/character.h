@@ -75,6 +75,15 @@ public:
 	class CItem *m_HookedItem;
 	int m_Item;
 
+	// ninja
+	struct
+	{
+		vec2 m_ActivationDir;
+		int m_ActivationTick;
+		int m_CurrentMoveTime;
+		int m_OldVelAmount;
+	} m_Ninja;
+
 private:
 	// player controlling this character
 	class CPlayer *m_pPlayer;
@@ -123,15 +132,6 @@ private:
 
 	int m_Health;
 	int m_Armor;
-
-	// ninja
-	struct
-	{
-		vec2 m_ActivationDir;
-		int m_ActivationTick;
-		int m_CurrentMoveTime;
-		int m_OldVelAmount;
-	} m_Ninja;
 
 	// info for dead reckoning
 	int m_ReckoningTick; // tick that we are performing dead reckoning From

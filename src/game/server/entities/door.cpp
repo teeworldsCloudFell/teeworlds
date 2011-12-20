@@ -50,6 +50,7 @@ void CDoor::Tick()
 			apCloseCCharacters[i]->m_PrevDoorPos = apCloseCCharacters[i]->m_PrevPos;
 		apCloseCCharacters[i]->m_Core.m_Pos = apCloseCCharacters[i]->m_PrevDoorPos;
 		apCloseCCharacters[i]->m_Core.m_Vel = vec2(0.0f, 0.0f);
+		//apCloseCCharacters[i]->m_Ninja.m_CurrentMoveTime = 0; Player gets stuck in door xD
 	}
 }
 

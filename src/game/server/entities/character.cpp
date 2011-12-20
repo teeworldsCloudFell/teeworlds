@@ -663,6 +663,7 @@ void CCharacter::Tick()
 		}
 		for(int i = 2; i < NUM_WEAPONS; i++)
 			m_aWeapons[i].m_Got = false;
+		m_Ninja.m_CurrentMoveTime = 0;
 	}
 
 	if(m_ActiveWeapon == WEAPON_NINJA && GameServer()->Collision()->IsKatanaStrip(m_Pos))
@@ -673,6 +674,7 @@ void CCharacter::Tick()
 			m_ActiveWeapon = WEAPON_GUN;
 
 		SetWeapon(m_ActiveWeapon);
+		m_Ninja.m_CurrentMoveTime = 0;
 	}
 
 	else if(TileIndex != -1 && GameServer()->Collision()->GetCollision(TileIndex) == TILE_STOPL)

@@ -60,7 +60,7 @@ void CCollision::Init(class CLayers *pLayers)
 		}
 
 		// custom tiles
-		if(Index >= 14 && Index <= 175)
+		if(Index >= 13 && Index <= 175)
 			m_pTiles[i].m_Index = Index;
 	}
 }
