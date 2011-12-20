@@ -4,7 +4,7 @@
 #include "door_laser.h"
 
 CDoorLaser::CDoorLaser(CGameWorld *pGameWorld, vec2 From, vec2 To, CDoor *pDoor)
-	: CEntity(pGameWorld, NETOBJTYPE_LASER)
+: CEntity(pGameWorld, NETOBJTYPE_LASER)
 {
 	m_pDoor = pDoor;
 	m_From = From;
@@ -36,7 +36,7 @@ void CDoorLaser::Tick()
 
 void CDoorLaser::Snap(int SnappingClient)
 {
-	if(NetworkClipped(SnappingClient))
+	if(NetworkClipped(SnappingClient) && distance(m_From, m_Pos) < 1600.0f && (!GameServer()->m_apPlayers[SnappingClient] || distance(m_From, GameServer()->m_apPlayers[SnappingClient]->m_ViewPos) > 800.0f))
 		return;
 
 	if(!m_pDoor->m_TurnedOn)
@@ -47,5 +47,8 @@ void CDoorLaser::Snap(int SnappingClient)
 	pObj->m_Y = (int)m_Pos.y;
 	pObj->m_FromX = (int)m_From.x;
 	pObj->m_FromY = (int)m_From.y;
-	pObj->m_StartTick = Server()->Tick()-3;
+	if(GameServer()->m_apPlayers[SnappingClient]->GetTeam() == m_pDoor->m_Team || m_pDoor->m_Team == -1)
+		pObj->m_StartTick = Server()->Tick()-3;
+	else
+		pObj->m_StartTick = Server()->Tick();
 }

@@ -997,7 +997,7 @@ void CEditor::DoToolbar(CUIRect ToolBar)
 		if(DoButton_Ex(&s_SwitchButton, "Switch", (pS && pS->m_Switch)?0:-1, &Button, 0, "Switch", CUI::CORNER_ALL))
 		{
 			static int s_SwitchPopupId = 0;
-			UiInvokePopupMenu(&s_SwitchPopupId, 0, UI()->MouseX(), UI()->MouseY(), 120, 23, PopupSwitch);
+			UiInvokePopupMenu(&s_SwitchPopupId, 0, UI()->MouseX(), UI()->MouseY(), 120, 43, PopupSwitch);
 		}
 	}
 

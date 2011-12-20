@@ -208,7 +208,7 @@ CCharacter *CGameWorld::IntersectCharacter(vec2 Pos0, vec2 Pos1, float Radius, v
 	return pClosest;
 }
 
-CCharacter *CGameWorld::LaserIntersectCharacter(vec2 Pos0, vec2 Pos1, float Radius, vec2& NewPos, CCharacter *pNotThis[16])
+CCharacter *CGameWorld::LaserIntersectCharacter(vec2 Pos0, vec2 Pos1, float Radius, vec2& NewPos, CCharacter *pNotThis[MAX_CLIENTS])
 {
 	// Find other players
 	float ClosestLen = distance(Pos0, Pos1) * 100.0f;

@@ -957,11 +957,13 @@ int CEditor::PopupSwitch(CEditor *pEditor, CUIRect View)
 	enum
 	{
 		PROP_SWITCH=0,
+		PROP_TEAM,
 		NUM_PROPS,
 	};
 	
 	CProperty aProps[] = {
 		{"Number", pEditor->m_SwitchNum, PROPTYPE_INT_STEP, 0, 255},
+		{"Team", pEditor->m_SwitchTeam-2, PROPTYPE_INT_STEP, -1, 1},
 		{0},
 	};
 
@@ -971,6 +973,8 @@ int CEditor::PopupSwitch(CEditor *pEditor, CUIRect View)
 	
 	if(Prop == PROP_SWITCH)
 		 pEditor->m_SwitchNum = clamp(NewVal, 0, 255);
+	if(Prop == PROP_TEAM)
+		pEditor->m_SwitchTeam = clamp(NewVal, -1, 1)+2;
 	
 	return 0;
 }

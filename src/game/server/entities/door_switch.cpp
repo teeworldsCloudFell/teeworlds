@@ -5,29 +5,32 @@
 #include "character.h"
 #include "door_switch.h"
 
-CDoorSwitch::CDoorSwitch(CGameWorld *pGameWorld, vec2 Pos, CDoor *pDoor)
+CDoorSwitch::CDoorSwitch(CGameWorld *pGameWorld, vec2 Pos, CDoor *pDoor, bool Lights)
 : CEntity(pGameWorld, NETOBJTYPE_LASER)
 {
 	m_Pos = Pos;
 	m_pDoor = pDoor;
 	m_ID1 = Server()->SnapNewID();
 	m_ID2 = Server()->SnapNewID();
+	m_Lights = Lights;
 	GameWorld()->InsertEntity(this);
+	/*if(m_Lights)
+		dbg_msg("Doorswitch created", "Switch: %d, Pos: %d, %d", pDoor->m_SwitchNum, (int)Pos.x, (int)Pos.y);*/
 }
 
 void CDoorSwitch::Tick()
 {
 	CCharacter *pChar = GameWorld()->ClosestCharacter(m_Pos, 20, 0x0);
 	
-	if(!pChar)
+	if(!pChar || !pChar->GetPlayer())
 		return;
 
-	((CGameControllerCRAP*)GameServer()->m_pController)->SwitchDoor(m_pDoor, m_Pos);
+	GameServer()->CrapController()->SwitchDoor(m_pDoor, pChar->GetPlayer(), m_Pos, !m_Lights);
 }
 
 void CDoorSwitch::Snap(int SnappingClient)
 {
-	if(NetworkClipped(SnappingClient))
+	if(NetworkClipped(SnappingClient) || !m_Lights)
 		return;
 		
 	// if the door is active make a star

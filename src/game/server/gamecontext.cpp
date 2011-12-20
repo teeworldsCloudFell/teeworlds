@@ -1360,6 +1360,9 @@ void CGameContext::OnInit(/*class IKernel *pKernel*/)
 	// init teleporter
 	CrapController()->InitTeleporter();
 
+	// create doors
+	CrapController()->InitDoors();
+
 	// setup core world
 	//for(int i = 0; i < MAX_CLIENTS; i++)
 	//	game.players[i].core.world = &game.world.core;

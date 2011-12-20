@@ -17,9 +17,10 @@ public:
 	vec2 *m_pTeleporter;
 	void InitTeleporter();
 	
+	bool m_Switches[255];
 	array<CDoor> m_lDoors;
-	void GetDoors();
-	void SwitchDoor(CDoor *pDoor, vec2 Pos);
+	void InitDoors();
+	void SwitchDoor(CDoor *pDoor, CPlayer *pPlayer, vec2 Pos, bool Silent);
 
 	virtual void Tick();
 

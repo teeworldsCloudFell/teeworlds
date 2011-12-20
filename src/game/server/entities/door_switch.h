@@ -8,7 +8,7 @@
 class CDoorSwitch : public CEntity
 {
 public:
-	CDoorSwitch(CGameWorld *pGameWorld, vec2 Pos, CDoor *pDoor);
+	CDoorSwitch(CGameWorld *pGameWorld, vec2 Pos, CDoor *pDoor, bool Lights);
 	
 	virtual void Tick();
 	virtual void Snap(int SnappingClient);
@@ -17,6 +17,7 @@ private:
 	CDoor *m_pDoor;
 	int m_ID1;
 	int m_ID2;
+	bool m_Lights; // Dummyswitch, only checks if player hits it. It isn't sending any data
 };
 
 #endif

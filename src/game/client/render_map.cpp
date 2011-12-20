@@ -476,6 +476,18 @@ void CRenderTools::RenderSwitchmap(CSwitchTile *pSwitch, int w, int h, float Sca
 				str_format(aBuf, sizeof(aBuf), "%d", Index);
 				UI()->TextRender()->Text(0, mx*Scale-2, my*Scale-4, Scale-5, aBuf, -1);
 			}
+			int Team = pSwitch[c].m_Team;
+			if(Team > 1 && Index)
+			{
+				Graphics()->TextureSet(-1);
+				Graphics()->QuadsBegin();
+				if(Team-2 == TEAM_RED)
+					Graphics()->SetColor(255.0f, 0.0f, 0.0f, 255.0f);
+				else
+					Graphics()->SetColor(0.0f, 0.0f, 255.0f, 255.0f);
+				DrawSprite(mx*Scale+23, my*Scale+23, Scale-6);
+				Graphics()->QuadsEnd();
+			}
 		}
 		
 	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);

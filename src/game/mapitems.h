@@ -46,9 +46,10 @@ enum
 	TILE_SOLID,
 	TILE_DEATH,
 	TILE_NOHOOK,
-	TILE_DOOR_START=23,
+	TILE_DOOR_START=22,
 	TILE_DOOR_END,
 	TILE_DOOR_SWITCH,
+	TILE_DOOR_BLOCK,
 	TILE_TELEIN,
 	TILE_TELEOUT,
 	TILE_BOOST,
@@ -118,6 +119,7 @@ struct CSwitchTile
 {
 	unsigned char m_Number;
 	unsigned char m_Type;
+	int m_Team;
 };
 
 struct CMapItemInfo

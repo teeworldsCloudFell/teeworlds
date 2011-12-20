@@ -64,7 +64,7 @@ void CCollision::Init(class CLayers *pLayers)
 		}
 		
 		// race tiles
-		if(Index >= 29 && Index <= 59)
+		if(Index >= 22 && Index <= 59)
 			m_pTiles[i].m_Index = Index;
 	}
 }
@@ -187,7 +187,7 @@ int CCollision::IsDoor(int x, int y)
 	int nx = clamp(x/32, 0, m_Width-1);
 	int ny = clamp(y/32, 0, m_Height-1);
 	
-	if(m_pSwitch[ny*m_Width+nx].m_Type >= TILE_DOOR_START && m_pSwitch[ny*m_Width+nx].m_Type <= TILE_DOOR_SWITCH)
+	if(m_pSwitch[ny*m_Width+nx].m_Type >= TILE_DOOR_START && m_pSwitch[ny*m_Width+nx].m_Type <= TILE_DOOR_BLOCK)
 		return m_pSwitch[ny*m_Width+nx].m_Type;
 	else
 		return 0;
@@ -202,6 +202,17 @@ int CCollision::GetSwitchNum(vec2 Pos)
 	int ny = clamp((int)Pos.y/32, 0, m_Height-1);
 	
 	return m_pSwitch[ny*m_Width+nx].m_Number;
+}
+
+int CCollision::GetSwitchTeam(int x, int y)
+{
+	if(!m_pSwitch)
+		return 0;
+
+	int nx = clamp(x/32, 0, m_Width-1);
+	int ny = clamp(y/32, 0, m_Height-1);
+
+	return m_pSwitch[ny*m_Width+nx].m_Team-2;
 }
 	
 // TODO: rewrite this smarter!
@@ -230,6 +241,23 @@ int CCollision::IntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *p
 	if(pOutBeforeCollision)
 		*pOutBeforeCollision = Pos1;
 	return 0;
+}
+
+bool CCollision::DoorBlock(vec2 Pos0, vec2 Pos1)
+{
+	float Distance = distance(Pos0, Pos1);
+	int End(Distance+1);
+	vec2 Last = Pos0;
+
+	for(int i = 0; i < End; i++)
+	{
+		float PointOnLine = i/Distance;
+		vec2 Pos = mix(Pos0, Pos1, PointOnLine);
+		if(IsDoor(Pos.x, Pos.y) == TILE_DOOR_BLOCK)
+			return true;
+		Last = Pos;
+	}
+	return false;
 }
 
 // TODO: OPT: rewrite this smarter!

@@ -14,23 +14,26 @@ public:
 	{
 		vec2 m_Pos;
 		int m_Type;
+		int m_Team;
 	};
 	
 	array<CDoorNode> m_lNodes;
-	int m_Type;
-	array<vec2> m_lSwitch;
+	array<CDoorNode> m_lSwitch;
+	int m_Team;
+	int m_SwitchNum;
+
 	bool m_TurnedOn;
 	int m_SwitchTick;
 	
 	CDoor() {}
-	CDoor(CGameContext *pGameServer, array<CDoorNode> lNodes, array<vec2> lSwitch);
+	CDoor(CGameContext *pGameServer, int Team, int SwitchNum, array<CDoorNode> lNodes, array<CDoor::CDoorNode> lSwitch);
 	
 	class CGameContext *GameServer() { return m_pGameServer; }
 	class IServer *Server() { return m_pGameServer->Server(); }
 	
 	void Reset();
 	void Init();
-	bool Switch(vec2 Pos);
+	bool Switch(vec2 Pos, bool Silent);
 };
 
 #endif

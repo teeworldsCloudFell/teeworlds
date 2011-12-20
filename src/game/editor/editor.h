@@ -642,6 +642,7 @@ public:
 		m_SpeedupAngle = 0;
 
 		m_SwitchNum = 1;
+		m_SwitchTeam = 1;
 	}
 
 	virtual void Init();
@@ -887,6 +888,7 @@ public:
 	short m_SpeedupAngle;
 
 	unsigned char m_SwitchNum;
+	int m_SwitchTeam;
 };
 
 // make sure to inline this function
