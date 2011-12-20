@@ -32,39 +32,14 @@ public:
 
 	int Init(const char *pApplicationName, int NumArgs, const char **ppArguments)
 	{
-		// get userdir
-		fs_storage_path(pApplicationName, m_aUserdir, sizeof(m_aUserdir));
-
-		// get datadir
-		FindDatadir(ppArguments[0]);
-
 		// get currentdir
 		if(!fs_getcwd(m_aCurrentdir, sizeof(m_aCurrentdir)))
 			m_aCurrentdir[0] = 0;
 
-		// load paths from storage.cfg
-		LoadPaths(ppArguments[0]);
+		dbg_msg("storage", "using standard paths");
+		AddDefaultPaths();
 
-		if(!m_NumPaths)
-		{
-			dbg_msg("storage", "using standard paths");
-			AddDefaultPaths();
-		}
-
-		// add save directories
-		if(m_NumPaths && (!m_aaStoragePaths[TYPE_SAVE][0] || !fs_makedir(m_aaStoragePaths[TYPE_SAVE])))
-		{
-			char aPath[MAX_PATH_LENGTH];
-			fs_makedir(GetPath(TYPE_SAVE, "screenshots", aPath, sizeof(aPath)));
-			fs_makedir(GetPath(TYPE_SAVE, "screenshots/auto", aPath, sizeof(aPath)));
-			fs_makedir(GetPath(TYPE_SAVE, "maps", aPath, sizeof(aPath)));
-			fs_makedir(GetPath(TYPE_SAVE, "dumps", aPath, sizeof(aPath)));
-			fs_makedir(GetPath(TYPE_SAVE, "downloadedmaps", aPath, sizeof(aPath)));
-			fs_makedir(GetPath(TYPE_SAVE, "demos", aPath, sizeof(aPath)));
-			fs_makedir(GetPath(TYPE_SAVE, "demos/auto", aPath, sizeof(aPath)));
-		}
-
-		return m_NumPaths ? 0 : 1;
+		return 0;
 	}
 
 	void LoadPaths(const char *pArgv0)
@@ -111,8 +86,6 @@ public:
 
 	void AddDefaultPaths()
 	{
-		AddPath("$USERDIR");
-		AddPath("$DATADIR");
 		AddPath("$CURRENTDIR");
 	}
 

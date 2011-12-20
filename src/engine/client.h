@@ -6,6 +6,8 @@
 
 #include "message.h"
 
+#include <base/tl/array.h>
+
 class IClient : public IInterface
 {
 	MACRO_INTERFACE("client", 0)

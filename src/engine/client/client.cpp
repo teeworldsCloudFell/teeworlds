@@ -35,10 +35,12 @@
 #include <engine/shared/ringbuffer.h>
 #include <engine/shared/snapshot.h>
 
+#include <game/generated/protocol.h>
+
 #include <mastersrv/mastersrv.h>
 #include <versionsrv/versionsrv.h>
 
-#include "friends.h"
+#include "records.h"
 #include "serverbrowser.h"
 #include "client.h"
 
@@ -47,7 +49,6 @@
 	#define WIN32_LEAN_AND_MEAN
 	#include <windows.h>
 #endif
-
 
 void CGraph::Init(float Min, float Max)
 {
@@ -294,6 +295,10 @@ CClient::CClient() : m_DemoPlayer(&m_SnapshotDelta), m_DemoRecorder(&m_SnapshotD
 	m_RecivedSnapshots = 0;
 
 	m_VersionInfo.m_State = CVersionInfo::STATE_INIT;
+
+	// chat
+	for(int i = 0; i < SENDCHATSIZE; i++)
+		m_aaSendChat[i][0] = '\0';
 }
 
 // ----- send functions -----
@@ -342,8 +347,8 @@ int CClient::SendMsgEx(CMsgPacker *pMsg, int Flags, bool System)
 void CClient::SendInfo()
 {
 	CMsgPacker Msg(NETMSG_INFO);
-	Msg.AddString(GameClient()->NetVersion(), 128);
-	Msg.AddString(g_Config.m_Password, 128);
+	Msg.AddString(Version(), 128);
+	Msg.AddString("", 128);
 	SendMsgEx(&Msg, MSGFLAG_VITAL|MSGFLAG_FLUSH);
 }
 
@@ -463,8 +468,6 @@ void CClient::SetState(int s)
 		m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "client", aBuf);
 	}
 	m_State = s;
-	if(Old != s)
-		GameClient()->OnStateChange(m_State, Old);
 }
 
 // called when the map is loaded and we should init for a new round
@@ -544,12 +547,18 @@ void CClient::DisconnectWithReason(const char *pReason)
 	m_DemoPlayer.Stop();
 	DemoRecorder_Stop();
 
+	m_NextRefresh = time_get();
+	m_NeedRefresh = true;
+	m_pConfig->Save(); // Save the stats on every disconnect
+
 	//
+	for(int i = 0; i < MAX_CLIENTS; i++)
+		m_aClients[i].Reset();
 	m_RconAuthed = 0;
 	m_pConsole->DeregisterTempAll();
 	m_NetClient.Disconnect(pReason);
 	SetState(IClient::STATE_OFFLINE);
-	m_pMap->Unload();
+
 
 	// disable all downloads
 	m_MapdownloadChunk = 0;
@@ -1034,100 +1043,11 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 			if(pError)
 				DisconnectWithReason(pError);
 			else
-			{
-				pError = LoadMapSearch(pMap, MapCrc);
-
-				if(!pError)
-				{
-					m_pConsole->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "client/network", "loading done");
-					SendReady();
-				}
-				else
-				{
-					str_format(m_aMapdownloadFilename, sizeof(m_aMapdownloadFilename), "downloadedmaps/%s_%08x.map", pMap, MapCrc);
-
-					char aBuf[256];
-					str_format(aBuf, sizeof(aBuf), "starting to download map to '%s'", m_aMapdownloadFilename);
-					m_pConsole->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "client/network", aBuf);
-
-					m_MapdownloadChunk = 0;
-					str_copy(m_aMapdownloadName, pMap, sizeof(m_aMapdownloadName));
-					if(m_MapdownloadFile)
-						io_close(m_MapdownloadFile);
-					m_MapdownloadFile = Storage()->OpenFile(m_aMapdownloadFilename, IOFLAG_WRITE, IStorage::TYPE_SAVE);
-					m_MapdownloadCrc = MapCrc;
-					m_MapdownloadTotalsize = MapSize;
-					m_MapdownloadAmount = 0;
-
-					CMsgPacker Msg(NETMSG_REQUEST_MAP_DATA);
-					Msg.AddInt(m_MapdownloadChunk);
-					SendMsgEx(&Msg, MSGFLAG_VITAL|MSGFLAG_FLUSH);
-
-					if(g_Config.m_Debug)
-					{
-						str_format(aBuf, sizeof(aBuf), "requested chunk %d", m_MapdownloadChunk);
-						m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "client/network", aBuf);
-					}
-				}
-			}
-		}
-		else if(Msg == NETMSG_MAP_DATA)
-		{
-			int Last = Unpacker.GetInt();
-			int MapCRC = Unpacker.GetInt();
-			int Chunk = Unpacker.GetInt();
-			int Size = Unpacker.GetInt();
-			const unsigned char *pData = Unpacker.GetRaw(Size);
-
-			// check fior errors
-			if(Unpacker.Error() || Size <= 0 || MapCRC != m_MapdownloadCrc || Chunk != m_MapdownloadChunk || !m_MapdownloadFile)
-				return;
-
-			io_write(m_MapdownloadFile, pData, Size);
-
-			m_MapdownloadAmount += Size;
-
-			if(Last)
-			{
-				const char *pError;
-				m_pConsole->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "client/network", "download complete, loading map");
-
-				if(m_MapdownloadFile)
-					io_close(m_MapdownloadFile);
-				m_MapdownloadFile = 0;
-				m_MapdownloadAmount = 0;
-				m_MapdownloadTotalsize = -1;
-
-				// load map
-				pError = LoadMap(m_aMapdownloadName, m_aMapdownloadFilename, m_MapdownloadCrc);
-				if(!pError)
-				{
-					m_pConsole->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "client/network", "loading done");
-					SendReady();
-				}
-				else
-					DisconnectWithReason(pError);
-			}
-			else
-			{
-				// request new chunk
-				m_MapdownloadChunk++;
-
-				CMsgPacker Msg(NETMSG_REQUEST_MAP_DATA);
-				Msg.AddInt(m_MapdownloadChunk);
-				SendMsgEx(&Msg, MSGFLAG_VITAL|MSGFLAG_FLUSH);
-
-				if(g_Config.m_Debug)
-				{
-					char aBuf[256];
-					str_format(aBuf, sizeof(aBuf), "requested chunk %d", m_MapdownloadChunk);
-					m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "client/network", aBuf);
-				}
-			}
+				SendReady();
 		}
 		else if(Msg == NETMSG_CON_READY)
 		{
-			GameClient()->OnConnected();
+			OnConnected();
 		}
 		else if(Msg == NETMSG_PING)
 		{
@@ -1161,7 +1081,7 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 		{
 			const char *pLine = Unpacker.GetString();
 			if(Unpacker.Error() == 0)
-				GameClient()->OnRconLine(pLine);
+				m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "RCON", pLine);
 		}
 		else if(Msg == NETMSG_PING_REPLY)
 		{
@@ -1380,11 +1300,7 @@ void CClient::ProcessServerPacket(CNetChunk *pPacket)
 	}
 	else
 	{
-		// game message
-		if(m_DemoRecorder.IsRecording())
-			m_DemoRecorder.RecordMessage(pPacket->m_pData, pPacket->m_DataSize);
-
-		GameClient()->OnMessage(Msg, &Unpacker);
+		OnMessage(Msg, &Unpacker);
 	}
 }
 
@@ -1460,59 +1376,10 @@ void CClient::OnDemoPlayerMessage(void *pData, int Size)
 	if(!Sys)
 		GameClient()->OnMessage(Msg, &Unpacker);
 }
-/*
-const IDemoPlayer::CInfo *client_demoplayer_getinfo()
-{
-	static DEMOPLAYBACK_INFO ret;
-	const DEMOREC_PLAYBACKINFO *info = m_DemoPlayer.Info();
-	ret.first_tick = info->first_tick;
-	ret.last_tick = info->last_tick;
-	ret.current_tick = info->current_tick;
-	ret.paused = info->paused;
-	ret.speed = info->speed;
-	return &ret;
-}*/
-
-/*
-void DemoPlayer()->SetPos(float percent)
-{
-	demorec_playback_set(percent);
-}
-
-void DemoPlayer()->SetSpeed(float speed)
-{
-	demorec_playback_setspeed(speed);
-}
-
-void DemoPlayer()->SetPause(int paused)
-{
-	if(paused)
-		demorec_playback_pause();
-	else
-		demorec_playback_unpause();
-}*/
 
 void CClient::Update()
 {
-	if(State() == IClient::STATE_DEMOPLAYBACK)
-	{
-		m_DemoPlayer.Update();
-		if(m_DemoPlayer.IsPlaying())
-		{
-			// update timers
-			const CDemoPlayer::CPlaybackInfo *pInfo = m_DemoPlayer.Info();
-			m_CurGameTick = pInfo->m_Info.m_CurrentTick;
-			m_PrevGameTick = pInfo->m_PreviousTick;
-			m_GameIntraTick = pInfo->m_IntraTick;
-			m_GameTickTime = pInfo->m_TickTime;
-		}
-		else
-		{
-			// disconnect on error
-			Disconnect();
-		}
-	}
-	else if(State() == IClient::STATE_ONLINE && m_RecivedSnapshots >= 3)
+	if(State() == IClient::STATE_ONLINE && m_RecivedSnapshots >= 3)
 	{
 		// switch snapshot
 		int Repredict = 0;
@@ -1524,6 +1391,9 @@ void CClient::Update()
 		{
 			CSnapshotStorage::CHolder *pCur = m_aSnapshots[SNAP_CURRENT];
 			int64 TickStart = (pCur->m_Tick)*time_freq()/50;
+			OnTick();
+			if(State() != IClient::STATE_ONLINE) // We are disconnecting in OnTick()
+				return;
 
 			if(TickStart < Now)
 			{
@@ -1539,7 +1409,7 @@ void CClient::Update()
 
 					if(m_aSnapshots[SNAP_CURRENT] && m_aSnapshots[SNAP_PREV])
 					{
-						GameClient()->OnNewSnapshot();
+						OnNewSnapshot();
 						Repredict = 1;
 					}
 				}
@@ -1571,21 +1441,9 @@ void CClient::Update()
 			}
 
 			if(NewPredTick > m_PredTick)
-			{
 				m_PredTick = NewPredTick;
-				Repredict = 1;
-
-				// send input
-				SendInput();
-			}
 		}
 
-		// only do sane predictions
-		if(Repredict)
-		{
-			if(m_PredTick > m_CurGameTick && m_PredTick < m_CurGameTick+50)
-				GameClient()->OnPredict();
-		}
 
 		// fetch server info if we don't have it
 		if(State() >= IClient::STATE_LOADING &&
@@ -1625,7 +1483,7 @@ void CClient::Update()
 	// pump the network
 	PumpNetwork();
 
-	// update the maser server registry
+	// update the master server registry
 	MasterServer()->Update();
 
 	// update the server browser
@@ -1633,59 +1491,24 @@ void CClient::Update()
 	m_ResortServerBrowser = false;
 }
 
-void CClient::VersionUpdate()
-{
-	if(m_VersionInfo.m_State == CVersionInfo::STATE_INIT)
-	{
-		Engine()->HostLookup(&m_VersionInfo.m_VersionServeraddr, g_Config.m_ClVersionServer, m_NetClient.NetType());
-		m_VersionInfo.m_State = CVersionInfo::STATE_START;
-	}
-	else if(m_VersionInfo.m_State == CVersionInfo::STATE_START)
-	{
-		if(m_VersionInfo.m_VersionServeraddr.m_Job.Status() == CJob::STATE_DONE)
-		{
-			CNetChunk Packet;
-
-			mem_zero(&Packet, sizeof(Packet));
-
-			m_VersionInfo.m_VersionServeraddr.m_Addr.port = VERSIONSRV_PORT;
-
-			Packet.m_ClientID = -1;
-			Packet.m_Address = m_VersionInfo.m_VersionServeraddr.m_Addr;
-			Packet.m_pData = VERSIONSRV_GETVERSION;
-			Packet.m_DataSize = sizeof(VERSIONSRV_GETVERSION);
-			Packet.m_Flags = NETSENDFLAG_CONNLESS;
-
-			m_NetClient.Send(&Packet);
-			m_VersionInfo.m_State = CVersionInfo::STATE_READY;
-		}
-	}
-}
-
 void CClient::RegisterInterfaces()
 {
-	Kernel()->RegisterInterface(static_cast<IDemoRecorder*>(&m_DemoRecorder));
-	Kernel()->RegisterInterface(static_cast<IDemoPlayer*>(&m_DemoPlayer));
 	Kernel()->RegisterInterface(static_cast<IServerBrowser*>(&m_ServerBrowser));
-	Kernel()->RegisterInterface(static_cast<IFriends*>(&m_Friends));
+	Kernel()->RegisterInterface(static_cast<IRecords*>(&m_Records));
 }
 
 void CClient::InitInterfaces()
 {
 	// fetch interfaces
 	m_pEngine = Kernel()->RequestInterface<IEngine>();
-	m_pEditor = Kernel()->RequestInterface<IEditor>();
-	m_pGraphics = Kernel()->RequestInterface<IEngineGraphics>();
-	m_pSound = Kernel()->RequestInterface<IEngineSound>();
-	m_pGameClient = Kernel()->RequestInterface<IGameClient>();
-	m_pInput = Kernel()->RequestInterface<IEngineInput>();
-	m_pMap = Kernel()->RequestInterface<IEngineMap>();
 	m_pMasterServer = Kernel()->RequestInterface<IEngineMasterServer>();
 	m_pStorage = Kernel()->RequestInterface<IStorage>();
+	m_pConfig = Kernel()->RequestInterface<IConfig>();
 
 	//
-	m_ServerBrowser.SetBaseInfo(&m_NetClient, m_pGameClient->NetVersion());
-	m_Friends.Init();
+	m_ServerBrowser.SetBaseInfo(&m_NetClient, Version());
+	m_Records.Init();
+	m_lQuestions.clear();
 }
 
 void CClient::Run()
@@ -1695,10 +1518,6 @@ void CClient::Run()
 
 	m_LocalStartTime = time_get();
 	m_SnapshotParts = 0;
-
-	// init graphics
-	if(m_pGraphics->Init() != 0)
-		return;
 
 	// open socket
 	{
@@ -1712,28 +1531,18 @@ void CClient::Run()
 		}
 	}
 
-	// init font rendering
-	Kernel()->RequestInterface<IEngineTextRender>()->Init();
-
-	// init the input
-	Input()->Init();
 
 	// start refreshing addresses while we load
 	MasterServer()->RefreshAddresses(m_NetClient.NetType());
+	m_NextRefresh = time_get()+time_freq()*3; // ~3sec to refresh masterlist
+	m_NeedRefresh = true;
 
-	// init the editor
-	m_pEditor->Init();
+	// Need for packing/unpacking snapshots
+	for(int i = 0; i < NUM_NETOBJTYPES; i++)
+		SnapSetStaticsize(i, m_NetObjHandler.GetObjSize(i));
 
-	// init sound, allowed to fail
-	m_SoundInitFailed = Sound()->Init() != 0;
-
-	// load data
-	if(!LoadData())
-		return;
-
-	GameClient()->OnInit();
 	char aBuf[256];
-	str_format(aBuf, sizeof(aBuf), "version %s", GameClient()->NetVersion());
+	str_format(aBuf, sizeof(aBuf), "version %s", Version());
 	m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "client", aBuf);
 
 	// connect to the server if wanted
@@ -1746,21 +1555,14 @@ void CClient::Run()
 	//
 	m_FpsGraph.Init(0.0f, 200.0f);
 
-	// never start with the editor
-	g_Config.m_ClEditor = 0;
-
-	Input()->MouseModeRelative();
-
 	// process pending commands
 	m_pConsole->StoreCommands(false);
+
 
 	while (1)
 	{
 		int64 FrameStartTime = time_get();
 		m_Frames++;
-
-		//
-		VersionUpdate();
 
 		// handle pending connects
 		if(m_aCmdConnect[0])
@@ -1770,100 +1572,7 @@ void CClient::Run()
 			m_aCmdConnect[0] = 0;
 		}
 
-		// update input
-		if(Input()->Update())
-			break;	// SDL_QUIT
-
-		// update sound
-		Sound()->Update();
-
-		// release focus
-		if(!m_pGraphics->WindowActive())
-		{
-			if(m_WindowMustRefocus == 0)
-				Input()->MouseModeAbsolute();
-			m_WindowMustRefocus = 1;
-		}
-		else if (g_Config.m_DbgFocus && Input()->KeyPressed(KEY_ESCAPE))
-		{
-			Input()->MouseModeAbsolute();
-			m_WindowMustRefocus = 1;
-		}
-
-		// refocus
-		if(m_WindowMustRefocus && m_pGraphics->WindowActive())
-		{
-			if(m_WindowMustRefocus < 3)
-			{
-				Input()->MouseModeAbsolute();
-				m_WindowMustRefocus++;
-			}
-
-			if(m_WindowMustRefocus >= 3 || Input()->KeyPressed(KEY_MOUSE_1))
-			{
-				Input()->MouseModeRelative();
-				m_WindowMustRefocus = 0;
-			}
-		}
-
-		// panic quit button
-		if(Input()->KeyPressed(KEY_LCTRL) && Input()->KeyPressed(KEY_LSHIFT) && Input()->KeyPressed('q'))
-			break;
-
-		if(Input()->KeyPressed(KEY_LCTRL) && Input()->KeyPressed(KEY_LSHIFT) && Input()->KeyDown('d'))
-			g_Config.m_Debug ^= 1;
-
-		if(Input()->KeyPressed(KEY_LCTRL) && Input()->KeyPressed(KEY_LSHIFT) && Input()->KeyDown('g'))
-			g_Config.m_DbgGraphs ^= 1;
-
-		if(Input()->KeyPressed(KEY_LCTRL) && Input()->KeyPressed(KEY_LSHIFT) && Input()->KeyDown('e'))
-		{
-			g_Config.m_ClEditor = g_Config.m_ClEditor^1;
-			Input()->MouseModeRelative();
-		}
-
-		/*
-		if(!gfx_window_open())
-			break;
-		*/
-
-		// render
-		if(g_Config.m_ClEditor)
-		{
-			if(!m_EditorActive)
-			{
-				GameClient()->OnActivateEditor();
-				m_EditorActive = true;
-			}
-
-			Update();
-			m_pEditor->UpdateAndRender();
-			DebugRender();
-			m_pGraphics->Swap();
-		}
-		else
-		{
-			if(m_EditorActive)
-				m_EditorActive = false;
-
-			Update();
-
-			if(g_Config.m_DbgStress)
-			{
-				if((m_Frames%10) == 0)
-				{
-					Render();
-					m_pGraphics->Swap();
-				}
-			}
-			else
-			{
-				Render();
-				m_pGraphics->Swap();
-			}
-		}
-
-		AutoScreenshot_Cleanup();
+		Update();
 
 		// check conditions
 		if(State() == IClient::STATE_QUITING)
@@ -1872,7 +1581,7 @@ void CClient::Run()
 		// beNice
 		if(g_Config.m_DbgStress)
 			thread_sleep(5);
-		else if(g_Config.m_ClCpuThrottle || !m_pGraphics->WindowActive())
+		else if(g_Config.m_ClCpuThrottle || 1)
 			thread_sleep(1);
 
 		if(g_Config.m_DbgHitch)
@@ -1907,15 +1616,428 @@ void CClient::Run()
 		m_LocalTime = (time_get()-m_LocalStartTime)/(float)time_freq();
 
 		m_FpsGraph.Add(1.0f/m_FrameTime, 1,1,1);
+		if(State() == IClient::STATE_OFFLINE && m_NextRefresh && m_NextRefresh+time_freq()*10 < time_get()) // ~10 seconds to refresh serverlist
+		{
+			char *pAddress = m_ServerBrowser.GetRandomServer();
+			if(pAddress[0])
+			{
+				Connect(pAddress);
+				m_NextRefresh = 0;
+				m_NeedRefresh = true;
+			}
+			else
+			{
+				m_NextRefresh = time_get(); // No Servers o_O --- Captain, we got a masterserverban xD however try again in 10 seconds ^^ maybe they're just down OR there is no server xDD
+				m_NeedRefresh = true;
+			}
+		}
+		if(m_NeedRefresh && m_NextRefresh && m_NextRefresh < time_get())
+		{
+			m_ServerBrowser.Refresh(IServerBrowser::TYPE_INTERNET);
+			m_NeedRefresh = false;
+		}
 	}
 
-	GameClient()->OnShutdown();
 	Disconnect();
-
-	m_pGraphics->Shutdown();
-	m_pSound->Shutdown();
 }
 
+// My functions :3
+void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
+{
+	if(Msg == NETMSGTYPE_SV_READYTOENTER)
+	{
+		EnterGame();
+		SendSwitchTeam(-1);
+		OnStartGame();
+	}
+	void *pRawMsg = m_NetObjHandler.SecureUnpackMsg(Msg, Unpacker);
+	if(!pRawMsg)
+	{
+		char aBuf[256];
+		str_format(aBuf, sizeof(aBuf), "dropped weird message '%s' (%d), failed on '%s'", m_NetObjHandler.GetMsgName(Msg), Msg, m_NetObjHandler.FailedMsgOn());
+		m_pConsole->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "client", aBuf);
+		return;
+	}
+	else if(Msg == NETMSGTYPE_SV_CHAT)
+	{
+		CNetMsg_Sv_Chat *pMsg = (CNetMsg_Sv_Chat *)pRawMsg;
+		char aBuf[512];
+
+		str_format(aBuf, sizeof(aBuf), "%s: '%s'", pMsg->m_ClientID>0 && pMsg->m_ClientID<MAX_CLIENTS ? m_aClients[pMsg->m_ClientID].m_aName : "Server", pMsg->m_pMessage);
+		m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "chat", aBuf);
+		for(int i = 0; i < SENDCHATSIZE; i++)
+		{
+			if(str_comp(pMsg->m_pMessage, m_aaSendChat[i]) == 0)
+				m_aaSendChat[i][0] = '\0';
+		}
+		if(pMsg->m_ClientID < 0 || pMsg->m_ClientID > MAX_CLIENTS) // ADMIN ABUUUUSE!!
+			return;
+		if(!str_comp(pMsg->m_pMessage, "!triviastart"))
+		{
+			if(m_TriviaStarted || m_TriviaStartTick)
+				return;
+			int ActivePlayers = 0;
+			int PlayersVoted = 0;
+			if(!m_aClients[pMsg->m_ClientID].m_HasVotedStart)
+				PlayersVoted = 1;
+			for(int i = 0; i < MAX_CLIENTS; i++)
+			{
+				if(m_aClients[i].m_aName[0])
+				{
+					ActivePlayers++;
+					if(m_aClients[i].m_HasVotedStart)
+						PlayersVoted++;
+				}
+			}
+			ActivePlayers--; // Don't count ourself ^^
+			m_aClients[pMsg->m_ClientID].m_HasVotedStart = true;
+			if(PlayersVoted/2 + 1 >= ActivePlayers)
+			{
+				SayChat("Vote passed! Trivia will start in 15 seconds.");
+				SayChat("You have 30 seconds time to answer a question.");
+				SayChat("After 15 seconds you get a hint.");
+				SayChat("The faster you answer the question the more points you get.");
+				SayChat("Good Luck!");
+				ResetTrivia();
+				m_TriviaStartTick = time_get()+time_freq()*15;
+			}
+			else
+			{
+				char aBuf[128];
+				str_format(aBuf, sizeof(aBuf), "Remaining Votes to start the trivia: %d", (ActivePlayers/2 + 1) - PlayersVoted);
+				SayChat(aBuf);
+			}
+		}
+		else if(pMsg->m_ClientID > 0 && pMsg->m_ClientID < MAX_CLIENTS && !str_comp(pMsg->m_pMessage, "!triviastop"))
+		{
+			if(!m_TriviaStarted)
+				return;
+			int ActivePlayers = 0;
+			int PlayersVoted = 0;
+			if(!m_aClients[pMsg->m_ClientID].m_HasVotedStop)
+				PlayersVoted = 1;
+			for(int i = 0; i < MAX_CLIENTS; i++)
+			{
+				if(m_aClients[i].m_aName[0])
+				{
+					ActivePlayers++;
+					if(m_aClients[i].m_HasVotedStop)
+						PlayersVoted++;
+				}
+			}
+			ActivePlayers--; // Don't count ourself ^^
+			m_aClients[pMsg->m_ClientID].m_HasVotedStop = true;
+			if(PlayersVoted/2 + 1 >= ActivePlayers)
+			{
+				SayChat("Vote passed! Trivia stopped.");
+				KillMyself();
+			}
+			else
+			{
+				char aBuf[128];
+				str_format(aBuf, sizeof(aBuf), "Remaining Votes to stop the trivia: %d", (ActivePlayers/2 + 1) - PlayersVoted);
+				SayChat(aBuf);
+			}
+		}
+		else if(pMsg->m_ClientID > 0 && pMsg->m_ClientID < MAX_CLIENTS && !str_comp(pMsg->m_pMessage, "!rank"))
+		{
+			char aBuf[128];
+			int Score = 0;
+			int Rank = 0;
+			m_Records.GetRank(m_aClients[pMsg->m_ClientID].m_aName, &Score, &Rank);
+			str_format(aBuf, sizeof(aBuf), "'%s's current score is: %d / Rank: %d", m_aClients[pMsg->m_ClientID].m_aName, Score, Rank);
+			SayChat(aBuf);
+		}
+		else if(pMsg->m_ClientID > 0 && pMsg->m_ClientID < MAX_CLIENTS && !str_comp(pMsg->m_pMessage, "!top5"))
+		{
+			if(m_LastTop5+time_freq()*15 > time_get()) // Anti Spam
+				return;
+			char aBuf[128];
+			for(int i = 0; i <= 5; i++)
+			{
+				str_format(aBuf, sizeof(aBuf), "%d. '%s': %d", i+1, m_Records.GetRecord(i)->m_aName,  m_Records.GetRecord(i)->m_Score);
+				SayChat(aBuf);
+			}
+			m_LastTop5 = time_get();
+		}
+		else if(m_CurrentQuestion && pMsg->m_ClientID > 0 && pMsg->m_ClientID < MAX_CLIENTS && !str_comp_nocase(pMsg->m_pMessage, m_lQuestions[m_CurrentQuestion-1].m_aAnswer))
+		{
+			char aBuf[128];
+			m_NumAskedQuestions++;
+			int Points = clamp((int)((m_TimeLeft-time_get())/time_freq())/5, 1, 5);
+			int Score = 0;
+			int OldRank = 0;
+			int Rank = 0;
+			m_Records.GetRank(m_aClients[pMsg->m_ClientID].m_aName, &Score, &OldRank);
+			Score += Points;
+			m_Records.AddRecord(m_aClients[pMsg->m_ClientID].m_aName, Score);
+			m_Records.GetRank(m_aClients[pMsg->m_ClientID].m_aName, 0x0, &Rank);
+			ResetTrivia();
+			str_format(aBuf, sizeof(aBuf), "'%s's answer is correct, gained %d points.", m_aClients[pMsg->m_ClientID].m_aName, Points);
+			SayChat(aBuf);
+			if(OldRank)
+				str_format(aBuf, sizeof(aBuf), "'%s's current score is: %d / Rank: %d (+%d)", m_aClients[pMsg->m_ClientID].m_aName, Score, Rank, OldRank-Rank);
+			else
+				str_format(aBuf, sizeof(aBuf), "'%s's current score is: %d / Rank: %d", m_aClients[pMsg->m_ClientID].m_aName, Score, Rank);
+			SayChat(aBuf);
+			if(m_NumAskedQuestions < 10)
+			{
+				str_format(aBuf, sizeof(aBuf), "This was question %d, proceeding with the trivia.", m_NumAskedQuestions);
+				SayChat(aBuf);
+				m_TriviaStartTick = time_get()+time_freq()*8;
+			}
+			else
+			{
+				SayChat("Oops! This was the last question!");
+				KillMyself();
+			}
+		}
+	}
+}
+void CClient::OnConnected()
+{
+	CNetMsg_Cl_StartInfo Msg;
+	Msg.m_pName = "Triviabot";
+	Msg.m_pClan = "BotoX";
+	Msg.m_Country = 40;
+	Msg.m_pSkin = "default";
+	Msg.m_UseCustomColor = 0;
+	Msg.m_ColorBody = 0;
+	Msg.m_ColorFeet = 0;
+	SendPackMsg(&Msg, MSGFLAG_VITAL);
+}
+
+void CClient::SendSwitchTeam(int Team)
+{
+	CNetMsg_Cl_SetTeam Msg;
+	Msg.m_Team = Team;
+	SendPackMsg(&Msg, MSGFLAG_VITAL);
+}
+
+void CClient::SendChat(int Team, const char *pLine)
+{
+	// send chat message
+	CNetMsg_Cl_Say Msg;
+	Msg.m_Team = Team;
+	Msg.m_pMessage = pLine;
+	SendPackMsg(&Msg, MSGFLAG_VITAL);
+	m_LastChat = time_get();
+}
+
+void CClient::SayChat(const char *pLine)
+{
+	for(int i = 0; i < SENDCHATSIZE; i++)
+	{
+		if(!m_aaSendChat[i][0])
+		{
+			str_copy(m_aaSendChat[i], pLine, sizeof(m_aaSendChat[i]));
+			return;
+		}
+	}
+}
+
+void CClient::CClientData::Reset()
+{
+	m_aName[0] = '\0';
+	m_aClan[0] = '\0';
+	m_Team = 0;
+	m_Active = false;
+	m_HasVotedStop = false;
+	m_HasVotedStart = false;
+}
+
+void CClient::OnNewSnapshot()
+{
+	m_LocalClientID = -1;
+
+	// secure snapshot
+	{
+		int Num = SnapNumItems(IClient::SNAP_CURRENT);
+		for(int Index = 0; Index < Num; Index++)
+		{
+			IClient::CSnapItem Item;
+			void *pData = SnapGetItem(IClient::SNAP_CURRENT, Index, &Item);
+			if(m_NetObjHandler.ValidateObj(Item.m_Type, pData, Item.m_DataSize) != 0)
+			{
+				if(g_Config.m_Debug)
+				{
+					char aBuf[256];
+					str_format(aBuf, sizeof(aBuf), "invalidated index=%d type=%d (%s) size=%d id=%d", Index, Item.m_Type, m_NetObjHandler.GetObjName(Item.m_Type), Item.m_DataSize, Item.m_ID);
+					m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
+				}
+				SnapInvalidateItem(IClient::SNAP_CURRENT, Index);
+			}
+		}
+	}
+
+	if(g_Config.m_DbgStress)
+	{
+		if((GameTick()%100) == 0)
+		{
+			char aMessage[64];
+			int MsgLen = rand()%(sizeof(aMessage)-1);
+			for(int i = 0; i < MsgLen; i++)
+				aMessage[i] = 'a'+(rand()%('z'-'a'));
+			aMessage[MsgLen] = 0;
+
+			CNetMsg_Cl_Say Msg;
+			Msg.m_Team = rand()&1;
+			Msg.m_pMessage = aMessage;
+			SendPackMsg(&Msg, MSGFLAG_VITAL);
+		}
+	}
+	// go trough all the items in the snapshot and gather the info we want
+	{
+		int Num = SnapNumItems(IClient::SNAP_CURRENT);
+		for(int i = 0; i < Num; i++)
+		{
+			IClient::CSnapItem Item;
+			const void *pData = SnapGetItem(IClient::SNAP_CURRENT, i, &Item);
+
+			if(Item.m_Type == NETOBJTYPE_CLIENTINFO)
+			{
+				const CNetObj_ClientInfo *pInfo = (const CNetObj_ClientInfo *)pData;
+				int ClientID = Item.m_ID;
+				IntsToStr(&pInfo->m_Name0, 4, m_aClients[ClientID].m_aName);
+				IntsToStr(&pInfo->m_Clan0, 3, m_aClients[ClientID].m_aClan);
+			}
+			else if(Item.m_Type == NETOBJTYPE_PLAYERINFO)
+			{
+				const CNetObj_PlayerInfo *pInfo = (const CNetObj_PlayerInfo *)pData;
+
+				m_aClients[pInfo->m_ClientID].m_Team = pInfo->m_Team;
+				m_aClients[pInfo->m_ClientID].m_Active = true;
+				if(pInfo->m_Local)
+					m_LocalClientID = Item.m_ID;
+			}
+			else if(Item.m_Type == NETOBJTYPE_GAMEINFO)
+			{
+				const CNetObj_GameInfo *pInfo = (const CNetObj_GameInfo *)pData;
+				static bool s_GameOver = 0;
+				if(!s_GameOver && pInfo->m_GameStateFlags&GAMESTATEFLAG_GAMEOVER)
+					OnGameOver();
+				else if(s_GameOver && !(pInfo->m_GameStateFlags&GAMESTATEFLAG_GAMEOVER))
+					OnStartGame();
+				s_GameOver = pInfo->m_GameStateFlags&GAMESTATEFLAG_GAMEOVER;
+			}
+		}
+	}
+
+	// make sure we only got fresh players, and reset the empty ones
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(m_aClients[i].m_Active)
+			m_aClients[i].m_Active = false;
+		else
+			m_aClients[i].Reset();
+	}
+}
+
+void CClient::OnGameOver()
+{
+	ResetTrivia();
+	for(int i = 0; i < MAX_CLIENTS; i++)
+		m_aClients[i].Reset();
+	m_TriviaStarted = false;
+	m_NumAskedQuestions = 0;
+	m_LastTop5 = 0;
+}
+
+void CClient::OnStartGame()
+{
+	OnGameOver();
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "Triviabot Beta by BotoX! Questions loaded: %d", m_lQuestions.size());
+	SayChat(aBuf);
+	if(m_lQuestions.size())
+	{
+		SayChat("Write !triviastart in chat to start the trivia (60% need to vote).");
+		SayChat("You have 30 seconds time to vote.");
+		m_KillTick = time_get()+time_freq()*32;
+	}
+	else
+	{
+		SayChat("No questions loaded, I am fucking useless.");
+		SayChat("Going to disconnect and spam other servers until somebody stops me.");
+		m_KillTick = time_get()+time_freq()*7;
+	}
+}
+
+void CClient::ResetTrivia()
+{
+	m_CurrentQuestion = 0;
+	m_TimeLeft = 0;
+	m_TriviaStartTick = 0;
+	m_KillTick = 0;
+	m_Passed15Sec = false;
+}
+
+void CClient::OnTick()
+{
+	for(int i = 0; i < SENDCHATSIZE; i++)
+	{
+		if(m_aaSendChat[i][0] && m_LastChat+time_freq() < time_get())
+			SendChat(0, m_aaSendChat[i]);					
+	}
+	if(m_TriviaStartTick && m_TriviaStartTick < time_get())
+	{
+		ResetTrivia();
+		m_TriviaStarted = true;
+		m_CurrentQuestion = rand()%m_lQuestions.size()+1;
+		char aBuf[256];
+		str_format(aBuf, sizeof(aBuf), "Q: %s", m_lQuestions[m_CurrentQuestion-1].m_aQuestion);
+		SayChat(aBuf);
+		m_TimeLeft = time_get()+time_freq()*31;
+	}
+	else if(!m_Passed15Sec && m_TimeLeft && m_TimeLeft-time_freq()*16 < time_get())
+	{
+		char aAnswer[128];
+		str_copy(aAnswer, m_lQuestions[m_CurrentQuestion-1].m_aAnswer, sizeof(aAnswer));
+		int AnswerLength = str_length(aAnswer);
+		char aBuf[256];
+
+		SayChat("15 seconds left.");
+		m_Passed15Sec = true;
+
+		for(int i = 0; i < AnswerLength/3+1; i++)
+			aAnswer[rand()%AnswerLength] = '-';
+
+		str_format(aBuf, sizeof(aBuf), "Hint: %s", aAnswer);
+		SayChat(aBuf);
+	}
+	else if(m_TimeLeft && m_TimeLeft < time_get())
+	{
+		m_NumAskedQuestions++;
+		char aBuf[256];
+		SayChat("Noone could answer the question.");
+		str_format(aBuf, sizeof(aBuf), "The correct answer is: %s", m_lQuestions[m_CurrentQuestion-1].m_aAnswer);
+		SayChat(aBuf);
+		if(m_NumAskedQuestions < 10)
+		{
+			str_format(aBuf, sizeof(aBuf), "This was question %d, proceeding with the trivia.", m_NumAskedQuestions);
+			SayChat(aBuf);
+			SayChat("Next question in 5 seconds.");
+			ResetTrivia();
+			m_TriviaStartTick = time_get()+time_freq()*8;
+		}
+		else
+		{
+			SayChat("Oops! This was the last question!");
+			KillMyself();
+		}
+	}
+	if(m_KillTick && m_KillTick < time_get())
+		DisconnectWithReason("Triviabot by BotoX! "); // hehehe
+}
+
+void CClient::KillMyself()
+{
+	OnGameOver();
+	SayChat("Disconnecting in 20 seconds. Write !triviastart to avoid it.");
+	m_KillTick = time_get()+time_freq()*21;
+}
+
+const char *CClient::Version() { return "0.6 626fce9a778df4d4"; }
 
 void CClient::Con_Connect(IConsole::IResult *pResult, void *pUserData)
 {
@@ -1933,12 +2055,6 @@ void CClient::Con_Quit(IConsole::IResult *pResult, void *pUserData)
 {
 	CClient *pSelf = (CClient *)pUserData;
 	pSelf->Quit();
-}
-
-void CClient::Con_Minimize(IConsole::IResult *pResult, void *pUserData)
-{
-	CClient *pSelf = (CClient *)pUserData;
-	pSelf->Graphics()->Minimize();
 }
 
 void CClient::Con_Ping(IConsole::IResult *pResult, void *pUserData)
@@ -1971,12 +2087,6 @@ void CClient::AutoScreenshot_Cleanup()
 		}
 		m_AutoScreenshotRecycle = false;
 	}
-}
-
-void CClient::Con_Screenshot(IConsole::IResult *pResult, void *pUserData)
-{
-	CClient *pSelf = (CClient *)pUserData;
-	pSelf->Graphics()->TakeScreenshot(0);
 }
 
 void CClient::Con_Rcon(IConsole::IResult *pResult, void *pUserData)
@@ -2059,12 +2169,6 @@ const char *CClient::DemoPlayer_Play(const char *pFilename, int StorageType)
 	return 0;
 }
 
-void CClient::Con_Play(IConsole::IResult *pResult, void *pUserData)
-{
-	CClient *pSelf = (CClient *)pUserData;
-	pSelf->DemoPlayer_Play(pResult->GetString(0), IStorage::TYPE_ALL);
-}
-
 void CClient::DemoRecorder_Start(const char *pFilename, bool WithTimestamp)
 {
 	if(State() != IClient::STATE_ONLINE)
@@ -2104,21 +2208,6 @@ void CClient::DemoRecorder_Stop()
 	m_DemoRecorder.Stop();
 }
 
-void CClient::Con_Record(IConsole::IResult *pResult, void *pUserData)
-{
-	CClient *pSelf = (CClient *)pUserData;
-	if(pResult->NumArguments())
-		pSelf->DemoRecorder_Start(pResult->GetString(0), false);
-	else
-		pSelf->DemoRecorder_Start("demo", true);
-}
-
-void CClient::Con_StopRecord(IConsole::IResult *pResult, void *pUserData)
-{
-	CClient *pSelf = (CClient *)pUserData;
-	pSelf->DemoRecorder_Stop();
-}
-
 void CClient::ServerBrowserUpdate()
 {
 	m_ResortServerBrowser = true;
@@ -2131,34 +2220,30 @@ void CClient::ConchainServerBrowserUpdate(IConsole::IResult *pResult, void *pUse
 		((CClient *)pUserData)->ServerBrowserUpdate();
 }
 
+void CClient::Con_AddQuestion(IConsole::IResult *pResult, void *pUserData)
+{
+	CClient *pSelf = (CClient *)pUserData;
+	CQuestion Question;
+	str_copy(Question.m_aQuestion, pResult->GetString(0), sizeof(Question.m_aQuestion));
+	str_copy(Question.m_aAnswer, pResult->GetString(1), sizeof(Question.m_aAnswer));
+	pSelf->m_lQuestions.add(Question);
+}
+
 void CClient::RegisterCommands()
 {
 	m_pConsole = Kernel()->RequestInterface<IConsole>();
-	// register server dummy commands for tab completion
-	m_pConsole->Register("kick", "i?r", CFGFLAG_SERVER, 0, 0, "Kick player with specified id for any reason");
-	m_pConsole->Register("ban", "s?ir", CFGFLAG_SERVER, 0, 0, "Ban player with ip/id for x minutes for any reason");
-	m_pConsole->Register("unban", "s", CFGFLAG_SERVER, 0, 0, "Unban ip");
-	m_pConsole->Register("bans", "", CFGFLAG_SERVER, 0, 0, "Show banlist");
-	m_pConsole->Register("status", "", CFGFLAG_SERVER, 0, 0, "List players");
-	m_pConsole->Register("shutdown", "", CFGFLAG_SERVER, 0, 0, "Shut down");
-	m_pConsole->Register("record", "?s", CFGFLAG_SERVER, 0, 0, "Record to a file");
-	m_pConsole->Register("stoprecord", "", CFGFLAG_SERVER, 0, 0, "Stop recording");
-	m_pConsole->Register("reload", "", CFGFLAG_SERVER, 0, 0, "Reload the map");
 
 	m_pConsole->Register("quit", "", CFGFLAG_CLIENT|CFGFLAG_STORE, Con_Quit, this, "Quit Teeworlds");
 	m_pConsole->Register("exit", "", CFGFLAG_CLIENT|CFGFLAG_STORE, Con_Quit, this, "Quit Teeworlds");
-	m_pConsole->Register("minimize", "", CFGFLAG_CLIENT|CFGFLAG_STORE, Con_Minimize, this, "Minimize Teeworlds");
 	m_pConsole->Register("connect", "s", CFGFLAG_CLIENT, Con_Connect, this, "Connect to the specified host/ip");
 	m_pConsole->Register("disconnect", "", CFGFLAG_CLIENT, Con_Disconnect, this, "Disconnect from the server");
 	m_pConsole->Register("ping", "", CFGFLAG_CLIENT, Con_Ping, this, "Ping the current server");
-	m_pConsole->Register("screenshot", "", CFGFLAG_CLIENT, Con_Screenshot, this, "Take a screenshot");
 	m_pConsole->Register("rcon", "r", CFGFLAG_CLIENT, Con_Rcon, this, "Send specified command to rcon");
 	m_pConsole->Register("rcon_auth", "s", CFGFLAG_CLIENT, Con_RconAuth, this, "Authenticate to rcon");
-	m_pConsole->Register("play", "r", CFGFLAG_CLIENT, Con_Play, this, "Play the file specified");
-	m_pConsole->Register("record", "?s", CFGFLAG_CLIENT, Con_Record, this, "Record to the file");
-	m_pConsole->Register("stoprecord", "", CFGFLAG_CLIENT, Con_StopRecord, this, "Stop recording");
 	m_pConsole->Register("add_favorite", "s", CFGFLAG_CLIENT, Con_AddFavorite, this, "Add a server as a favorite");
 	m_pConsole->Register("remove_favorite", "s", CFGFLAG_CLIENT, Con_RemoveFavorite, this, "Remove a server from favorites");
+
+	m_pConsole->Register("add_question", "sr", CFGFLAG_CLIENT, Con_AddQuestion, this, "Add a question to the trivia");
 
 	// used for server browser update
 	m_pConsole->Chain("br_filter_string", ConchainServerBrowserUpdate, this);
@@ -2212,11 +2297,6 @@ int main(int argc, const char **argv) // ignore_convention
 	IConsole *pConsole = CreateConsole(CFGFLAG_CLIENT);
 	IStorage *pStorage = CreateStorage("Teeworlds", argc, argv); // ignore_convention
 	IConfig *pConfig = CreateConfig();
-	IEngineGraphics *pEngineGraphics = CreateEngineGraphics();
-	IEngineSound *pEngineSound = CreateEngineSound();
-	IEngineInput *pEngineInput = CreateEngineInput();
-	IEngineTextRender *pEngineTextRender = CreateEngineTextRender();
-	IEngineMap *pEngineMap = CreateEngineMap();
 	IEngineMasterServer *pEngineMasterServer = CreateEngineMasterServer();
 
 	{
@@ -2226,31 +2306,16 @@ int main(int argc, const char **argv) // ignore_convention
 		RegisterFail = RegisterFail || !pKernel->RegisterInterface(pConsole);
 		RegisterFail = RegisterFail || !pKernel->RegisterInterface(pConfig);
 
-		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IEngineGraphics*>(pEngineGraphics)); // register graphics as both
-		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IGraphics*>(pEngineGraphics));
-
-		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IEngineSound*>(pEngineSound)); // register as both
-		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<ISound*>(pEngineSound));
-
-		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IEngineInput*>(pEngineInput)); // register as both
-		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IInput*>(pEngineInput));
-
-		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IEngineTextRender*>(pEngineTextRender)); // register as both
-		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<ITextRender*>(pEngineTextRender));
-
-		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IEngineMap*>(pEngineMap)); // register as both
-		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IMap*>(pEngineMap));
-
 		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IEngineMasterServer*>(pEngineMasterServer)); // register as both
 		RegisterFail = RegisterFail || !pKernel->RegisterInterface(static_cast<IMasterServer*>(pEngineMasterServer));
 
-		RegisterFail = RegisterFail || !pKernel->RegisterInterface(CreateEditor());
-		RegisterFail = RegisterFail || !pKernel->RegisterInterface(CreateGameClient());
 		RegisterFail = RegisterFail || !pKernel->RegisterInterface(pStorage);
 
 		if(RegisterFail)
 			return -1;
 	}
+
+	srand((unsigned)(time_get()/time_freq()));
 
 	pEngine->Init();
 	pConfig->Init();
@@ -2260,16 +2325,12 @@ int main(int argc, const char **argv) // ignore_convention
 	// register all console commands
 	pClient->RegisterCommands();
 
-	pKernel->RequestInterface<IGameClient>()->OnConsoleInit();
-
 	// init client's interfaces
 	pClient->InitInterfaces();
 
-	// execute config file
-	pConsole->ExecuteFile("settings.cfg");
-
-	// execute autoexec file
-	pConsole->ExecuteFile("autoexec.cfg");
+	// execute trivia and record file
+	pConsole->ExecuteFile("trivia.cfg");
+	pConsole->ExecuteFile("record.cfg");
 
 	// parse the command line arguments
 	if(argc > 1) // ignore_convention
@@ -2283,6 +2344,7 @@ int main(int argc, const char **argv) // ignore_convention
 	// run the client
 	dbg_msg("client", "starting...");
 	pClient->Run();
+	dbg_msg("Triviabot", "\n\\_________\\_________/__|__________\\___\\/__/\n_|____|___/_/____\\_\\_____\\_/____\\__\\_____/_\n_|____|___\\(__<_>_)_|__|__(__<_>_)_/_____\\_\n_|________/_\\____/__|__|___\\____/_/___/\\__\\\n________\\/______________________________\\_/");
 
 	// write down the config and quit
 	pConfig->Save();

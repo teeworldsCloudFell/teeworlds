@@ -12,7 +12,6 @@
 
 #include <engine/config.h>
 #include <engine/console.h>
-#include <engine/friends.h>
 #include <engine/masterserver.h>
 
 #include <mastersrv/mastersrv.h>
@@ -67,7 +66,6 @@ void CServerBrowser::SetBaseInfo(class CNetClient *pClient, const char *pNetVers
 	str_copy(m_aNetVersion, pNetVersion, sizeof(m_aNetVersion));
 	m_pMasterServer = Kernel()->RequestInterface<IMasterServer>();
 	m_pConsole = Kernel()->RequestInterface<IConsole>();
-	m_pFriends = Kernel()->RequestInterface<IFriends>();
 	IConfig *pConfig = Kernel()->RequestInterface<IConfig>();
 	if(pConfig)
 		pConfig->RegisterCallback(ConfigSaveCallback, this);
@@ -142,117 +140,8 @@ void CServerBrowser::Filter()
 	// filter the servers
 	for(i = 0; i < m_NumServers; i++)
 	{
-		int Filtered = 0;
-
-		if(g_Config.m_BrFilterEmpty && ((g_Config.m_BrFilterSpectators && m_ppServerlist[i]->m_Info.m_NumPlayers == 0) || m_ppServerlist[i]->m_Info.m_NumClients == 0))
-			Filtered = 1;
-		else if(g_Config.m_BrFilterFull && ((g_Config.m_BrFilterSpectators && m_ppServerlist[i]->m_Info.m_NumPlayers == m_ppServerlist[i]->m_Info.m_MaxPlayers) ||
-				m_ppServerlist[i]->m_Info.m_NumClients == m_ppServerlist[i]->m_Info.m_MaxClients))
-			Filtered = 1;
-		else if(g_Config.m_BrFilterPw && m_ppServerlist[i]->m_Info.m_Flags&SERVER_FLAG_PASSWORD)
-			Filtered = 1;
-		else if(g_Config.m_BrFilterPure &&
-			(str_comp(m_ppServerlist[i]->m_Info.m_aGameType, "DM") != 0 &&
-			str_comp(m_ppServerlist[i]->m_Info.m_aGameType, "TDM") != 0 &&
-			str_comp(m_ppServerlist[i]->m_Info.m_aGameType, "CTF") != 0))
-		{
-			Filtered = 1;
-		}
-		else if(g_Config.m_BrFilterPureMap &&
-			!(str_comp(m_ppServerlist[i]->m_Info.m_aMap, "dm1") == 0 ||
-			str_comp(m_ppServerlist[i]->m_Info.m_aMap, "dm2") == 0 ||
-			str_comp(m_ppServerlist[i]->m_Info.m_aMap, "dm6") == 0 ||
-			str_comp(m_ppServerlist[i]->m_Info.m_aMap, "dm7") == 0 ||
-			str_comp(m_ppServerlist[i]->m_Info.m_aMap, "dm8") == 0 ||
-			str_comp(m_ppServerlist[i]->m_Info.m_aMap, "dm9") == 0 ||
-			str_comp(m_ppServerlist[i]->m_Info.m_aMap, "ctf1") == 0 ||
-			str_comp(m_ppServerlist[i]->m_Info.m_aMap, "ctf2") == 0 ||
-			str_comp(m_ppServerlist[i]->m_Info.m_aMap, "ctf3") == 0 ||
-			str_comp(m_ppServerlist[i]->m_Info.m_aMap, "ctf4") == 0 ||
-			str_comp(m_ppServerlist[i]->m_Info.m_aMap, "ctf5") == 0 ||
-			str_comp(m_ppServerlist[i]->m_Info.m_aMap, "ctf6") == 0 ||
-			str_comp(m_ppServerlist[i]->m_Info.m_aMap, "ctf7") == 0)
-		)
-		{
-			Filtered = 1;
-		}
-		else if(g_Config.m_BrFilterPing < m_ppServerlist[i]->m_Info.m_Latency)
-			Filtered = 1;
-		else if(g_Config.m_BrFilterCompatversion && str_comp_num(m_ppServerlist[i]->m_Info.m_aVersion, m_aNetVersion, 3) != 0)
-			Filtered = 1;
-		else if(g_Config.m_BrFilterServerAddress[0] && !str_find_nocase(m_ppServerlist[i]->m_Info.m_aAddress, g_Config.m_BrFilterServerAddress))
-			Filtered = 1;
-		else if(g_Config.m_BrFilterGametypeStrict && g_Config.m_BrFilterGametype[0] && str_comp_nocase(m_ppServerlist[i]->m_Info.m_aGameType, g_Config.m_BrFilterGametype))
-			Filtered = 1;
-		else if(!g_Config.m_BrFilterGametypeStrict && g_Config.m_BrFilterGametype[0] && !str_find_nocase(m_ppServerlist[i]->m_Info.m_aGameType, g_Config.m_BrFilterGametype))
-			Filtered = 1;
-		else
-		{
-			if(g_Config.m_BrFilterCountry)
-			{
-				Filtered = 1;
-				// match against player country
-				for(p = 0; p < m_ppServerlist[i]->m_Info.m_NumClients; p++)
-				{
-					if(m_ppServerlist[i]->m_Info.m_aClients[p].m_Country == g_Config.m_BrFilterCountryIndex)
-					{
-						Filtered = 0;
-						break;
-					}
-				}
-			}
-
-			if(!Filtered && g_Config.m_BrFilterString[0] != 0)
-			{
-				int MatchFound = 0;
-
-				m_ppServerlist[i]->m_Info.m_QuickSearchHit = 0;
-
-				// match against server name
-				if(str_find_nocase(m_ppServerlist[i]->m_Info.m_aName, g_Config.m_BrFilterString))
-				{
-					MatchFound = 1;
-					m_ppServerlist[i]->m_Info.m_QuickSearchHit |= IServerBrowser::QUICK_SERVERNAME;
-				}
-
-				// match against players
-				for(p = 0; p < m_ppServerlist[i]->m_Info.m_NumClients; p++)
-				{
-					if(str_find_nocase(m_ppServerlist[i]->m_Info.m_aClients[p].m_aName, g_Config.m_BrFilterString) ||
-						str_find_nocase(m_ppServerlist[i]->m_Info.m_aClients[p].m_aClan, g_Config.m_BrFilterString))
-					{
-						MatchFound = 1;
-						m_ppServerlist[i]->m_Info.m_QuickSearchHit |= IServerBrowser::QUICK_PLAYER;
-						break;
-					}
-				}
-
-				// match against map
-				if(str_find_nocase(m_ppServerlist[i]->m_Info.m_aMap, g_Config.m_BrFilterString))
-				{
-					MatchFound = 1;
-					m_ppServerlist[i]->m_Info.m_QuickSearchHit |= IServerBrowser::QUICK_MAPNAME;
-				}
-
-				if(!MatchFound)
-					Filtered = 1;
-			}
-		}
-
-		if(Filtered == 0)
-		{
-			// check for friend
-			m_ppServerlist[i]->m_Info.m_FriendState = IFriends::FRIEND_NO;
-			for(p = 0; p < m_ppServerlist[i]->m_Info.m_NumClients; p++)
-			{
-				m_ppServerlist[i]->m_Info.m_aClients[p].m_FriendState = m_pFriends->GetFriendState(m_ppServerlist[i]->m_Info.m_aClients[p].m_aName,
-					m_ppServerlist[i]->m_Info.m_aClients[p].m_aClan);
-				m_ppServerlist[i]->m_Info.m_FriendState = max(m_ppServerlist[i]->m_Info.m_FriendState, m_ppServerlist[i]->m_Info.m_aClients[p].m_FriendState);
-			}
-
-			if(!g_Config.m_BrFilterFriends || m_ppServerlist[i]->m_Info.m_FriendState != IFriends::FRIEND_NO)
-				m_pSortedServerlist[m_NumSortedServers++] = i;
-		}
+		if(m_ppServerlist[i]->m_Info.m_NumClients >= 6 && m_ppServerlist[i]->m_Info.m_NumClients != m_ppServerlist[i]->m_Info.m_MaxClients && !(m_ppServerlist[i]->m_Info.m_Flags&SERVER_FLAG_PASSWORD)) // min. 6 players, not full, no password
+			m_pSortedServerlist[m_NumSortedServers++] = i;
 	}
 }
 
@@ -743,4 +632,11 @@ void CServerBrowser::ConfigSaveCallback(IConfig *pConfig, void *pUserData)
 		str_format(aBuffer, sizeof(aBuffer), "add_favorite %s", aAddrStr);
 		pConfig->WriteLine(aBuffer);
 	}
+}
+
+char *CServerBrowser::GetRandomServer()
+{
+	if(!m_NumSortedServers)
+		return "";
+	return m_ppServerlist[m_pSortedServerlist[rand()%m_NumSortedServers]]->m_Info.m_aAddress;
 }

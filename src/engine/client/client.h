@@ -64,19 +64,22 @@ class CClient : public IClient, public CDemoPlayer::IListner
 	IConsole *m_pConsole;
 	IStorage *m_pStorage;
 	IEngineMasterServer *m_pMasterServer;
+	IConfig *m_pConfig;
 
 	enum
 	{
 		NUM_SNAPSHOT_TYPES=2,
 		PREDICTION_MARGIN=1000/50/2, // magic network prediction value
+		SENDCHATSIZE = 10,
 	};
 
 	class CNetClient m_NetClient;
 	class CDemoPlayer m_DemoPlayer;
 	class CDemoRecorder m_DemoRecorder;
 	class CServerBrowser m_ServerBrowser;
-	class CFriends m_Friends;
+	class CRecords m_Records;
 	class CMapChecker m_MapChecker;
+	class CNetObjHandler m_NetObjHandler;
 
 	char m_aServerAddressStr[256];
 
@@ -172,6 +175,45 @@ class CClient : public IClient, public CDemoPlayer::IListner
 		class CHostLookup m_VersionServeraddr;
 	} m_VersionInfo;
 
+	// client data
+	struct CClientData
+	{
+		char m_aName[MAX_NAME_LENGTH];
+		char m_aClan[MAX_CLAN_LENGTH];
+		int m_Team;
+		bool m_HasVotedStop;
+		bool m_HasVotedStart;
+		bool m_Active;
+
+		void Reset();
+	};
+	CClientData m_aClients[MAX_CLIENTS];
+
+	int m_LocalClientID;
+
+	// Trivia
+	struct CQuestion
+	{
+		char m_aQuestion[256];
+		char m_aAnswer[128];
+	};
+	array<CQuestion> m_lQuestions;
+
+	int m_CurrentQuestion;
+	bool m_TriviaStarted;
+	bool m_Passed15Sec;
+	int64 m_TimeLeft;
+	int64 m_TriviaStartTick;
+	int m_NumAskedQuestions;
+	int64 m_KillTick;
+	int64 m_LastTop5;
+
+	int64 m_NextRefresh;
+	bool m_NeedRefresh;
+
+	int64 m_LastChat;
+	char m_aaSendChat[SENDCHATSIZE][512];
+
 public:
 	IEngine *Engine() { return m_pEngine; }
 	IEngineGraphics *Graphics() { return m_pGraphics; }
@@ -190,6 +232,20 @@ public:
 	void SendInfo();
 	void SendEnterGame();
 	void SendReady();
+
+	// My functions :3
+	void OnMessage(int Msg, CUnpacker *Unpacker);
+	void OnConnected();
+	void SendSwitchTeam(int Team);
+	void SendChat(int Team, const char *pLine);
+	void SayChat(const char *pLine);
+	void OnNewSnapshot();
+	void OnGameOver();
+	void OnStartGame();
+	void ResetTrivia();
+	void OnTick();
+	void KillMyself();
+	const char *Version();
 
 	virtual bool RconAuthed() { return m_RconAuthed != 0; }
 	virtual bool UseTempRconCommands() { return m_UseTempRconCommands != 0; }
@@ -270,16 +326,12 @@ public:
 	static void Con_Connect(IConsole::IResult *pResult, void *pUserData);
 	static void Con_Disconnect(IConsole::IResult *pResult, void *pUserData);
 	static void Con_Quit(IConsole::IResult *pResult, void *pUserData);
-	static void Con_Minimize(IConsole::IResult *pResult, void *pUserData);
 	static void Con_Ping(IConsole::IResult *pResult, void *pUserData);
-	static void Con_Screenshot(IConsole::IResult *pResult, void *pUserData);
 	static void Con_Rcon(IConsole::IResult *pResult, void *pUserData);
 	static void Con_RconAuth(IConsole::IResult *pResult, void *pUserData);
 	static void Con_AddFavorite(IConsole::IResult *pResult, void *pUserData);
 	static void Con_RemoveFavorite(IConsole::IResult *pResult, void *pUserData);
-	static void Con_Play(IConsole::IResult *pResult, void *pUserData);
-	static void Con_Record(IConsole::IResult *pResult, void *pUserData);
-	static void Con_StopRecord(IConsole::IResult *pResult, void *pUserData);
+	static void Con_AddQuestion(IConsole::IResult *pResult, void *pUserData);
 	static void ConchainServerBrowserUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 
 	void RegisterCommands();
@@ -293,5 +345,22 @@ public:
 	void AutoScreenshot_Cleanup();
 
 	void ServerBrowserUpdate();
+	
+	inline void IntsToStr(const int *pInts, int Num, char *pStr)
+	{
+		while(Num)
+		{
+			pStr[0] = (((*pInts)>>24)&0xff)-128;
+			pStr[1] = (((*pInts)>>16)&0xff)-128;
+			pStr[2] = (((*pInts)>>8)&0xff)-128;
+			pStr[3] = ((*pInts)&0xff)-128;
+			pStr += 4;
+			pInts++;
+			Num--;
+		}
+
+		// null terminate
+		pStr[-1] = 0;
+	}
 };
 #endif

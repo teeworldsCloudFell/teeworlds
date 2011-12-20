@@ -51,6 +51,8 @@ public:
 
 	void SetBaseInfo(class CNetClient *pClient, const char *pNetVersion);
 
+	char *GetRandomServer();
+
 private:
 	CNetClient *m_pNetClient;
 	IMasterServer *m_pMasterServer;
