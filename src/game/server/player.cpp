@@ -252,13 +252,13 @@ void CPlayer::SetTeam(int Team)
 		GameServer()->SendBroadcast("You only can join the human team when round hasn't started.", m_ClientID);
 		return; }
 	if(Team == TEAM_RED && ((GameServer()->zESCController()->ZombStarted() && GameServer()->m_pController->m_ZombWarmup) || !GameServer()->zESCController()->ZombStarted())) {
-		GameServer()->SendBroadcast("Zombie will be choosen randomly.", m_ClientID);
+		GameServer()->SendBroadcast("Zombie will be chosen randomly.", m_ClientID);
 		return; }
 	if(m_Team == TEAM_BLUE && GameServer()->zESCController()->ZombStarted()) {
 		GameServer()->SendBroadcast("You can't join the zombie team.", m_ClientID);
 		return; }
 	if(m_Team == TEAM_RED && GameServer()->zESCController()->CountZombs() < 2 && GameServer()->zESCController()->ZombStarted()) {
-		GameServer()->SendBroadcast("You are the last zombie.", m_ClientID);
+		GameServer()->SendBroadcast("You are the only zombie.", m_ClientID);
 		return; }
 
 	char aBuf[512];
@@ -363,7 +363,6 @@ void CPlayer::SetZomb(int From)
 			m_pCharacter->m_Core.m_TriggeredEvents |= COREEVENT_HOOK_RETRACT;
 			m_pCharacter->m_Core.m_HookState = HOOK_RETRACTED;
 			m_pCharacter->m_Core.m_Pos = SpawnPos;
-			m_pCharacter->m_PrevDoorPos = SpawnPos;
 			m_pCharacter->m_Core.m_Vel = vec2(0,0);
 			m_pCharacter->m_Core.m_HookPos = m_pCharacter->m_Core.m_Pos;
 			GameServer()->CreatePlayerSpawn(SpawnPos);

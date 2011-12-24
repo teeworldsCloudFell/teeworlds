@@ -61,12 +61,12 @@ protected:
 public:
 	struct CTimedEvent
 	{
-		int m_Time;
+		float m_Time;
 		int64 m_Tick;
 		char *m_pAction;
 
 		CTimedEvent() {}
-		CTimedEvent(int Time, int64 Tick, const char *pAction)
+		CTimedEvent(float Time, int64 Tick, const char *pAction)
 		{
 			m_Time = Time;
 			m_Tick = Tick;
@@ -115,7 +115,7 @@ public:
 
 	bool IsForceBalanced();
 
-	bool RegisterTimedEvent(int Time, const char *pCommand);
+	bool RegisterTimedEvent(float Time, const char *pCommand);
 	void ResetEvents();
 	bool RegisterTriggeredEvent(int ID, const char *pCommand);
 	void OnTrigger(int ID);

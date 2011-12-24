@@ -52,7 +52,9 @@ public:
 
 	void SetZomb();
 	vec2 m_PrevPos;
-	vec2 m_PrevDoorPos;
+	vec2 m_OldPos;
+	bool m_HittingDoor;
+	vec2 m_PushDirection;
 	int m_FreezeTick;
 	int m_BurnTick;
 	// the player core for the physics

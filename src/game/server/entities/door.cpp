@@ -46,11 +46,9 @@ void CDoor::Tick()
 	{
 		if(!apCloseCCharacters[i]->IsAlive() || apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_SPECTATORS || GameServer()->Collision()->IntersectLine(m_Pos, apCloseCCharacters[i]->m_Pos, NULL, NULL) || (m_State == DOOR_ZCLOSED && apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_BLUE))
 			continue;
-		if(apCloseCCharacters[i]->m_PrevDoorPos == vec2(0.0f, 0.0f) || distance(apCloseCCharacters[i]->m_PrevDoorPos, apCloseCCharacters[i]->m_Core.m_Pos) > 10.0f)
-			apCloseCCharacters[i]->m_PrevDoorPos = apCloseCCharacters[i]->m_PrevPos;
-		apCloseCCharacters[i]->m_Core.m_Pos = apCloseCCharacters[i]->m_PrevDoorPos;
-		apCloseCCharacters[i]->m_Core.m_Vel = vec2(0.0f, 0.0f);
-		//apCloseCCharacters[i]->m_Ninja.m_CurrentMoveTime = 0; Player gets stuck in door xD
+		apCloseCCharacters[i]->m_HittingDoor = true;
+		apCloseCCharacters[i]->m_PushDirection = normalize(apCloseCCharacters[i]->m_OldPos - m_Pos);
+		apCloseCCharacters[i]->m_Ninja.m_CurrentMoveTime = 0;
 	}
 }
 

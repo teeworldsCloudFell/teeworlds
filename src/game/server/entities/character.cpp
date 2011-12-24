@@ -67,6 +67,8 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 
 	m_pPlayer = pPlayer;
 	m_Pos = Pos;
+	m_HittingDoor = false;
+	m_PushDirection = vec2(0,0);
 
 	m_Core.Reset();
 	m_Core.Init(&GameServer()->m_World.m_Core, GameServer()->Collision());
@@ -791,6 +793,23 @@ void CCharacter::Tick()
 	// handle Weapons
 	HandleWeapons();
 
+	// check if character is hitting a door
+	if(m_HittingDoor)
+	{
+		if(length(m_Core.m_Vel) < 5)
+			m_Core.m_Vel = m_PushDirection*5;
+		else
+			m_Core.m_Vel = m_PushDirection*clamp(length(m_Core.m_Vel), 0.f, 10.f)*1.05f;
+		if(m_Core.m_Jumped&3)
+			m_Core.m_Jumped &= ~2;
+	}
+	
+	if(!m_HittingDoor)
+		m_OldPos = m_Core.m_Pos;
+		
+	// reset hitting door state
+	m_HittingDoor = false;
+
 	// Previnput
 	m_PrevInput = m_Input;
 
@@ -982,6 +1001,7 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 				m_Item ? m_FreezeTick = Server()->TickSpeed()*1.0f : m_FreezeTick = Server()->TickSpeed()*1.5f;
 			else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item == HITEM_RIFLE)
 				m_Item ? m_FreezeTick = Server()->TickSpeed()*1.5f : m_FreezeTick = Server()->TickSpeed()*2.0f;
+			GameServer()->CreatePlayerSpawn(m_Pos);
 		}
 		if(m_BurnTick)
 			AddVel *= 2.5f;

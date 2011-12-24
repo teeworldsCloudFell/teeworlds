@@ -451,7 +451,6 @@ void CGameControllerZESC::OnEndRound()
 			}
 		}
 	}
-	ResetDoors();
 }
 
 int CGameControllerZESC::CountPlayers()
@@ -498,6 +497,7 @@ void CGameControllerZESC::Reset()
 	m_NukeTick = 0;
 	m_LevelEarned = false;
 	GameServer()->SendBroadcast("", -1);
+	ResetDoors();
 }
 
 void CGameControllerZESC::ResetDoors()

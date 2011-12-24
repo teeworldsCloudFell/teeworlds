@@ -102,6 +102,8 @@ void CItem::Tick()
 		}
 		else if(pChr->GetPlayer()->GetTeam() == TEAM_BLUE && m_Item == ZITEM_HAMMER)
 			GameServer()->SendBroadcast("This is a zombie item, you can't pick it up.", pChr->GetPlayer()->GetCID());
+		else if(pChr->GetPlayer()->GetTeam() == TEAM_RED && m_Item != ZITEM_HAMMER)
+			GameServer()->SendBroadcast("This is a human item, you can't pick it up.", pChr->GetPlayer()->GetCID());
 		else if(pChr->GetPlayer()->GetTeam() == TEAM_RED && pChr->GetPlayer()->m_Score/10 >= GetLevel() && m_Item == ZITEM_HAMMER)
 		{
 			pChr->m_Item = m_Item;

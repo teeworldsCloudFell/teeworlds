@@ -1431,7 +1431,7 @@ void CGameContext::ConZDoorSetState(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConRegisterTimedEvent(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	int Time = pResult->GetInteger(0);
+	float Time = pResult->GetFloat(0);
 	const char *pCommand = pResult->GetString(1);
 
 	if(pSelf->m_pController->RegisterTimedEvent(Time, pCommand))
@@ -1627,6 +1627,11 @@ void CGameContext::ConTeleportTeam(IConsole::IResult *pResult, void *pUserData)
 	}
 }
 
+void CGameContext::ConCreateExplosion(IConsole::IResult *pResult, void *pUserData)
+{
+	((CGameContext *)pUserData)->CreateExplosion(vec2(pResult->GetInteger(0)*32, pResult->GetInteger(1)*32), -1, WEAPON_WORLD, true);
+	((CGameContext *)pUserData)->CreateSound(vec2(pResult->GetInteger(0)*32, pResult->GetInteger(1)*32), SOUND_GRENADE_EXPLODE);
+}
 void CGameContext::OnConsoleInit()
 {
 	m_pServer = Kernel()->RequestInterface<IServer>();
@@ -1660,7 +1665,7 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("door_state", "ii", CFGFLAG_SERVER, ConDoorSetState, this, "Set the doorstate: door_state <id> <state (0=open, 1=closed, 2=zclosed, 3=reopened)>");
 	Console()->Register("zdoor_state", "ii", CFGFLAG_SERVER, ConZDoorSetState, this, "Set the zdoorstate: zdoor_state <id> <state (0=open, 1=zclosed, 2=reopened)>");
 
-	Console()->Register("event_timed_register", "ir", CFGFLAG_SERVER, ConRegisterTimedEvent, this, "Register a timed event: event_timed_register <seconds> <command>");
+	Console()->Register("event_timed_register", "fr", CFGFLAG_SERVER, ConRegisterTimedEvent, this, "Register a timed event: event_timed_register <seconds> <command>");
 	Console()->Register("event_timed_list", "", CFGFLAG_SERVER, ConListTimedEvents, this, "List all timed events");
 	Console()->Register("event_timed_flush", "", CFGFLAG_SERVER, ConFlushTimedEvents, this, "Delete all timed events");
 
@@ -1668,7 +1673,7 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("event_triggered_list", "", CFGFLAG_SERVER, ConListTriggeredEvents, this, "List all triggered events");
 	Console()->Register("event_triggered_flush", "", CFGFLAG_SERVER, ConFlushTriggeredEvents, this, "Delete all triggered events");
 
-	Console()->Register("event_onteamwin_register", "is", CFGFLAG_SERVER, ConRegisterOnTeamWinEvent, this, "Register a on-teamwin event: event_onteamwin_register <team (-1=Both, 0=Red, 1=Blue)> <command>");
+	Console()->Register("event_onteamwin_register", "ir", CFGFLAG_SERVER, ConRegisterOnTeamWinEvent, this, "Register a on-teamwin event: event_onteamwin_register <team (-1=Both, 0=Red, 1=Blue)> <command>");
 	Console()->Register("event_onteamwin_flush", "", CFGFLAG_SERVER, ConFlushOnTeamWinEvent, this, "Flush on-teamwin events");
 
 	Console()->Register("cteleporter_register", "ii?i", CFGFLAG_SERVER, ConCustomTeleporterRegister, this, "Assign teleport to a custom teleporter: cteleport_register <id> <to X> [team]");
@@ -1677,7 +1682,9 @@ void CGameContext::OnConsoleInit()
 
 	Console()->Register("teleport_team", "ii", CFGFLAG_SERVER, ConTeleportTeam, this, "Teleport team to a ToX teleport: teleport_team <Team> <ToX>");
 
-	Console()->Register("reload_map_defaults", "", CFGFLAG_SERVER, ConReloadMapDefaults, this, "Reload the map internal settings. ");
+	Console()->Register("reload_map_defaults", "", CFGFLAG_SERVER, ConReloadMapDefaults, this, "Reload the map internal settings.");
+
+	Console()->Register("create_explosion", "ii", CFGFLAG_SERVER, ConCreateExplosion, this, "Create explosion: create_explosion <x> <y>");
 }
 
 void CGameContext::OnInit(/*class IKernel *pKernel*/)

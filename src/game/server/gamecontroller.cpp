@@ -213,11 +213,6 @@ void IGameController::EndRound()
 
 	GameServer()->zESCController()->OnEndRound();
 
-	if(m_aTeamscore[TEAM_RED] >= 100 && m_aTeamscore[TEAM_BLUE] < 100 && m_aaOnTeamWinEvent[TEAM_RED][0])
-		GameServer()->Console()->ExecuteLine(m_aaOnTeamWinEvent[TEAM_RED]);
-	else if(m_aTeamscore[TEAM_BLUE] >= 100 && m_aTeamscore[TEAM_RED] < 100 && m_aaOnTeamWinEvent[TEAM_BLUE][0])
-		GameServer()->Console()->ExecuteLine(m_aaOnTeamWinEvent[TEAM_BLUE]);
-
 	GameServer()->m_World.m_Paused = true;
 	m_GameOverTick = Server()->Tick();
 	m_SuddenDeath = 0;
@@ -250,8 +245,15 @@ static bool IsSeparator(char c) { return c == ';' || c == ' ' || c == ',' || c =
 
 void IGameController::StartRound()
 {
+	if(m_aTeamscore[TEAM_RED] >= 100 && m_aTeamscore[TEAM_BLUE] < 100 && m_aaOnTeamWinEvent[TEAM_RED][0])
+		GameServer()->Console()->ExecuteLine(m_aaOnTeamWinEvent[TEAM_RED]);
+	else if(m_aTeamscore[TEAM_BLUE] >= 100 && m_aTeamscore[TEAM_RED] < 100 && m_aaOnTeamWinEvent[TEAM_BLUE][0])
+		GameServer()->Console()->ExecuteLine(m_aaOnTeamWinEvent[TEAM_BLUE]);
+	if(m_aaOnTeamWinEvent[2][0])
+		GameServer()->Console()->ExecuteLine(m_aaOnTeamWinEvent[2]);
 	ResetGame();
 
+	m_ZombWarmup = 0;
 	m_RoundStartTick = Server()->Tick();
 	m_SuddenDeath = 0;
 	m_GameOverTick = -1;
@@ -264,8 +266,6 @@ void IGameController::StartRound()
 	m_aTeamscore[TEAM_BLUE] = 0;
 	m_ForceBalanced = false;
 	Server()->DemoRecorder_HandleAutoStart();
-	if(m_aaOnTeamWinEvent[2][0])
-		GameServer()->Console()->ExecuteLine(m_aaOnTeamWinEvent[2]);
 	ResetEvents();
 	char aBuf[256];
 	str_format(aBuf, sizeof(aBuf), "start round type='%s' teamplay='%d'", m_pGameType, m_GameFlags&GAMEFLAG_TEAMS);
@@ -549,9 +549,9 @@ void IGameController::Tick()
 	}
 }
 
-bool IGameController::RegisterTimedEvent(int Time, const char *pCommand)
+bool IGameController::RegisterTimedEvent(float Time, const char *pCommand)
 {
-	if(pCommand[0] == '\0' || Time < 1) // Why use an event with no command or that gets executed immediately?
+	if(pCommand[0] == '\0' || Time < 0.5f) // Why use an event with no command or that gets executed immediately?
 		return false;
 
 	CTimedEvent TimedEvent(Time, Server()->Tick() + Time*Server()->TickSpeed(), pCommand);
