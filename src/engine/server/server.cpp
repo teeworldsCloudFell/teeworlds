@@ -1735,6 +1735,9 @@ int main(int argc, const char **argv) // ignore_convention
 	// restore empty config strings to their defaults
 	pConfig->RestoreStrings();
 
+	// save standard server settings
+	pGameServer->SaveStandardSettings();
+
 	pEngine->InitLogfile();
 
 	// run the server

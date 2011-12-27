@@ -85,6 +85,23 @@ class CGameContext : public IGameServer
 	void Construct(int Resetting);
 
 	bool m_Resetting;
+
+	struct CStandardSettings
+	{
+		int m_SvZombieRatio;
+		int m_SvZWarmup;
+		int m_SvDoors;
+		int m_SvHdoorReopenTime;
+		int m_SvNukeTime;
+		int m_SvInfiniteAmmo;
+		int m_SvPickupRespawn;
+		int m_SvTeleportGrenade;
+		int m_SvRegen;
+		int m_SvRegenHp;
+		int m_SvZombieHp;
+		CTuningParams m_Tuning;
+	} m_StandardSettings;
+
 public:
 	IServer *Server() const { return m_pServer; }
 	class IConsole *Console() { return m_pConsole; }
@@ -164,6 +181,8 @@ public:
 	void SendTuningParams(int ClientID);
 
 	void LoadMapSettings();
+	virtual void SaveStandardSettings();
+	void LoadStandardSettings();
 
 	// engine events
 	virtual void OnInit();

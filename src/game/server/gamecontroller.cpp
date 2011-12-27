@@ -184,7 +184,7 @@ bool IGameController::OnEntity(int Index, vec2 Pos)
 		Item = HITEM_RIFLE;
 		RealWeapon = WEAPON_RIFLE;
 	}
-	else if(Index >= 17 && Index <= 64)
+	else if((Index >= ENTITY_DOOR_BEGIN && Index <= ENTITY_DOOR_END) || (Index >= ENTITY_ZDOOR_BEGIN && Index <= ENTITY_ZDOOR_END))
 	{
 		CDoor *pDoor = new CDoor(&GameServer()->m_World, Index-17, -1);
 		pDoor->m_Pos = Pos;
@@ -463,10 +463,10 @@ void IGameController::Tick()
 		if(!m_ZombWarmup)
 		{
 			// Make players sad :> / mad :D
-			if(GameServer()->zESCController()->CountPlayers() > 1 && g_Config.m_SvZombieRatio)
+			if(GameServer()->zESCController()->NumPlayers() > 1 && g_Config.m_SvZombieRatio)
 			{
 				int ZAtStart = 1;
-				ZAtStart = (int)GameServer()->zESCController()->CountPlayers()/(int)g_Config.m_SvZombieRatio;
+				ZAtStart = (int)GameServer()->zESCController()->NumPlayers()/(int)g_Config.m_SvZombieRatio;
 				if(!ZAtStart)
 					ZAtStart = 1;
 				for(; ZAtStart; ZAtStart--)
@@ -536,7 +536,7 @@ void IGameController::Tick()
 			}
 		}
 	}
-	if(GameServer()->zESCController()->CountPlayers())
+	if(GameServer()->zESCController()->NumPlayers())
 	{
 		for(int i = 0; i < m_lTimedEvents.size(); i++)
 		{
@@ -703,7 +703,7 @@ void IGameController::RandomZomb(int Mode)
 	int ZombCID = rand()%MAX_CLIENTS;
 	int WTF = 100; // 100 Trys should be enough
 	while(!GameServer()->m_apPlayers[ZombCID] || (GameServer()->m_apPlayers[ZombCID] && GameServer()->m_apPlayers[ZombCID]->GetTeam() == TEAM_SPECTATORS) ||
-			m_LastZomb == ZombCID || (GameServer()->zESCController()->CountPlayers() > 2 && m_LastZomb2 == ZombCID) || !GameServer()->m_apPlayers[ZombCID]->GetCharacter() ||
+			m_LastZomb == ZombCID || (GameServer()->zESCController()->NumPlayers() > 2 && m_LastZomb2 == ZombCID) || !GameServer()->m_apPlayers[ZombCID]->GetCharacter() ||
 			(GameServer()->m_apPlayers[ZombCID]->GetCharacter() && !GameServer()->m_apPlayers[ZombCID]->GetCharacter()->IsAlive()))	// <- End ^^
 	{
 		ZombCID = rand()%MAX_CLIENTS;

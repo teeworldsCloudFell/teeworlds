@@ -19,8 +19,6 @@ CGameControllerZESC::CGameControllerZESC(class CGameContext *pGameServer) : IGam
 	m_NukeTick = 0;
 	m_NukeLaunched = false;
 	m_LevelEarned = false;
-	LoadStandardSettings();
-
 	for(int i = 0; i < 48; i++)
 	{
 		if(i < 32)
@@ -37,26 +35,6 @@ CGameControllerZESC::CGameControllerZESC(class CGameContext *pGameServer) : IGam
 CGameControllerZESC::~CGameControllerZESC()
 {
 	delete[] m_pTeleporter;
-}
-
-void CGameControllerZESC::LoadStandardSettings()
-{
-	for(int i = 0; i < 48; i++)
-	{
-		if(i < 32)
-			m_Door[i].m_State = DOOR_CLOSED;
-		else
-			m_Door[i].m_State = DOOR_OPEN;
-		m_Door[i].m_Tick = 0;
-		m_Door[i].m_OpenTime = 10;
-		m_Door[i].m_CloseTime = 3;
-		m_Door[i].m_ReopenTime = 10;
-	}
-	g_Config.m_SvZombieRatio = 16;
-	g_Config.m_SvZWarmup = 15;
-	g_Config.m_SvDoors = 1;
-	g_Config.m_SvNukeTime = 15;
-	g_Config.m_SvFlushCustomTeleporter = 0;
 }
 
 void CGameControllerZESC::InitTeleporter()
@@ -153,29 +131,28 @@ void CGameControllerZESC::Tick()
 
 	GameServer()->m_pController->DoTeamScoreWincheck();
 
-	// Damn fuckin door stuff
 	for(int i = 0; i < 48; i++)
 	{
 		if(m_Door[i].m_Tick > 0)
 		{
-			m_Door[i].m_Tick--;
 			if(m_Door[i].m_State == DOOR_CLOSED)
 			{
-				if(m_Door[i].m_Tick == 5*Server()->TickSpeed())
+				if(m_Door[i].m_Tick == Server()->Tick() + 5*Server()->TickSpeed())
 				{
 					char aBuf[128];
 					str_format(aBuf, sizeof(aBuf), "(All) Door %d opening in 5 seconds.", i+1);
 					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
 				}
-				else if(!m_Door[i].m_Tick)
+				else if(m_Door[i].m_Tick <= Server()->Tick())
 				{
 					SetDoorState(i, DOOR_OPEN);
 					char aBuf[128];
 					str_format(aBuf, sizeof(aBuf), "(All) Door %d is open. Run!", i+1);
-					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf); 
+					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+					m_Door[i].m_Tick = 0;
 				}
 			}
-			else if(!m_Door[i].m_Tick)
+			else if(m_Door[i].m_Tick <= Server()->Tick())
 			{
 				if(m_Door[i].m_State == DOOR_ZCLOSING && i < 32)
 				{
@@ -183,7 +160,7 @@ void CGameControllerZESC::Tick()
 					char aBuf[128];
 					str_format(aBuf, sizeof(aBuf), "(Zombies) Door %d closed. Reopening in %d seconds.", i+1, GetDoorTime(i));
 					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
-					m_Door[i].m_Tick = Server()->TickSpeed()*GetDoorTime(i);
+					m_Door[i].m_Tick = Server()->Tick() + Server()->TickSpeed()*GetDoorTime(i);
 				}
 				else if(m_Door[i].m_State == DOOR_ZCLOSED && i < 32)
 				{
@@ -191,6 +168,7 @@ void CGameControllerZESC::Tick()
 					char aBuf[128];
 					str_format(aBuf, sizeof(aBuf), "(Zombies) Door %d is open. Run!", i+1);
 					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+					m_Door[i].m_Tick = 0;
 				}
 				else if(m_Door[i].m_State == DOOR_ZCLOSING && i >= 32)
 				{
@@ -198,7 +176,7 @@ void CGameControllerZESC::Tick()
 					char aBuf[128];
 					str_format(aBuf, sizeof(aBuf), "(Zombies) ZDoor %d closed. Reopening in %d seconds.", i-31, GetDoorTime(i));
 					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
-					m_Door[i].m_Tick = Server()->TickSpeed()*GetDoorTime(i);
+					m_Door[i].m_Tick = Server()->Tick() + Server()->TickSpeed()*GetDoorTime(i);
 				}
 				else if(m_Door[i].m_State == DOOR_ZCLOSED && i >= 32)
 				{
@@ -206,6 +184,7 @@ void CGameControllerZESC::Tick()
 					char aBuf[128];
 					str_format(aBuf, sizeof(aBuf), "(Zombies) ZDoor %d is open. Run!", i-31);
 					GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+					m_Door[i].m_Tick = 0;
 				}
 			}
 		}
@@ -223,7 +202,7 @@ void CGameControllerZESC::Tick()
 			m_NukeLaunched = true;
 			for(int i = 0; i < MAX_CLIENTS; i++)
 			{
-				if(GameServer()->m_apPlayers[i] && GameServer()->m_apPlayers[i]->GetCharacter() && !GameServer()->Collision()->IsBunker(GameServer()->m_apPlayers[i]->GetCharacter()->m_Pos))
+				if(GameServer()->m_apPlayers[i] && GameServer()->m_apPlayers[i]->GetCharacter() && !GameServer()->m_apPlayers[i]->GetCharacter()->m_InBunker)
 					GameServer()->m_apPlayers[i]->Nuke();
 			}
 			CheckZomb();
@@ -333,8 +312,8 @@ void CGameControllerZESC::Snap(int SnappingClient)
 
 	if(m_aTeamscore[TEAM_RED] < 100 && m_aTeamscore[TEAM_BLUE] < 100)
 	{
-		pGameDataObj->m_TeamscoreRed = CountZombs();
-		pGameDataObj->m_TeamscoreBlue = CountHumans();
+		pGameDataObj->m_TeamscoreRed = NumZombs();
+		pGameDataObj->m_TeamscoreBlue = NumHumans();
 	}
 	else
 	{
@@ -362,27 +341,46 @@ void CGameControllerZESC::Snap(int SnappingClient)
 
 void CGameControllerZESC::OnHoldpoint(int Index)
 {
-	if(m_Door[Index].m_Tick || (m_Door[Index].m_State >= DOOR_OPEN && m_Door[Index].m_State <= DOOR_REOPENED && m_Door[Index].m_State != 1) || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
+	if(m_Door[Index].m_Tick || !(m_Door[Index].m_State == DOOR_CLOSED) || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
 		return;
 
-	m_Door[Index].m_Tick = Server()->TickSpeed()*GetDoorTime(Index);
-	char aBuf[128];
-	str_format(aBuf, sizeof(aBuf), "(All) Door %d opening in %d seconds.", Index+1, GetDoorTime(Index));
-	GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+	m_Door[Index].m_Tick = Server()->Tick() +  Server()->TickSpeed()*GetDoorTime(Index)-1; // -1: if doortime is 5 we get a doublemessage
+	if(m_Door[Index].m_Tick)
+	{
+		char aBuf[128];
+		str_format(aBuf, sizeof(aBuf), "(All) Door %d opening in %d seconds.", Index+1, GetDoorTime(Index));
+		GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+	}
+}
+
+void CGameControllerZESC::OnZHoldpoint(int Index)
+{
+	if(m_Door[Index].m_State > DOOR_OPEN || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
+		return;
+
+	SetDoorState(Index, DOOR_ZCLOSING);
+	m_Door[Index].m_Tick = Server()->Tick() + Server()->TickSpeed()*GetDoorTime(Index);
+	if(m_Door[Index].m_Tick)
+	{
+		char aBuf[128];
+		str_format(aBuf, sizeof(aBuf), "(Zombies) ZDoor %d closing in %d seconds.", Index-31, GetDoorTime(Index));
+		GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+	}
 }
 
 void CGameControllerZESC::OnZStop(int Index)
 {
-	if(m_Door[Index].m_State || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
+	if(m_Door[Index].m_State > DOOR_OPEN || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
 		return;
 
 	SetDoorState(Index, DOOR_ZCLOSING);
-	m_Door[Index].m_Tick = Server()->TickSpeed()*GetDoorTime(Index);
-	char aBuf[128];
-	str_format(aBuf, sizeof(aBuf), "(Zombies) Door %d closing in %d seconds.", Index+1, GetDoorTime(Index));
-	if(Index >= 32)
-		str_format(aBuf, sizeof(aBuf), "(Zombies) ZDoor %d closing in %d seconds.", Index-31, GetDoorTime(Index));
-	GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+	m_Door[Index].m_Tick = Server()->Tick() + Server()->TickSpeed()*GetDoorTime(Index);
+	if(m_Door[Index].m_Tick)
+	{
+		char aBuf[128];
+		str_format(aBuf, sizeof(aBuf), "(Zombies) Door %d closing in %d seconds.", Index+1, GetDoorTime(Index));
+		GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+	}
 }
 
 bool CGameControllerZESC::ZombStarted()
@@ -399,7 +397,7 @@ void CGameControllerZESC::StartZomb(bool Value)
 
 void CGameControllerZESC::CheckZomb()
 {
-	if(CountPlayers() < 2)
+	if(NumPlayers() < 2)
 	{
 		StartZomb(0);
 		GameServer()->m_pController->ZombWarmup(0);
@@ -420,7 +418,7 @@ void CGameControllerZESC::CheckZomb()
 		StartZomb(true);
 		GameServer()->m_pController->ZombWarmup(g_Config.m_SvZWarmup);
 	}
-	if((!CountHumans() || !CountZombs()) && m_RoundStarted && !GameServer()->m_pController->m_ZombWarmup)
+	if((!NumHumans() || !NumZombs()) && m_RoundStarted && !GameServer()->m_pController->m_ZombWarmup)
 		m_RoundEndTick = Server()->TickSpeed()*0.5;
 }
 
@@ -428,15 +426,15 @@ void CGameControllerZESC::OnEndRound()
 {
 	if(!ZombStarted())
 		return;
-	if(!CountHumans() || !CountZombs() || (CountHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-GameServer()->m_pController->m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !GameServer()->m_pController->m_SuddenDeath))
+	if(!NumHumans() || !NumZombs() || (NumHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-GameServer()->m_pController->m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !GameServer()->m_pController->m_SuddenDeath))
 	{
 		m_aTeamscore[TEAM_RED] = 0;
 		m_aTeamscore[TEAM_BLUE] = 0;
-		if(!CountHumans())
+		if(!NumHumans())
 		{
 			m_aTeamscore[TEAM_RED] = 100;
 		}
-		if(!CountZombs() || (CountHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-GameServer()->m_pController->m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !GameServer()->m_pController->m_SuddenDeath))
+		if(!NumZombs() || (NumHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-GameServer()->m_pController->m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !GameServer()->m_pController->m_SuddenDeath))
 		{
 			m_aTeamscore[TEAM_BLUE] = 100;
 			for(int i = 0; i < MAX_CLIENTS; i++)
@@ -453,7 +451,7 @@ void CGameControllerZESC::OnEndRound()
 	}
 }
 
-int CGameControllerZESC::CountPlayers()
+int CGameControllerZESC::NumPlayers()
 {
 	int NumPlayers = 0;
 	for(int i = 0; i < MAX_CLIENTS; i++)
@@ -464,7 +462,7 @@ int CGameControllerZESC::CountPlayers()
 	return NumPlayers;
 }
 
-int CGameControllerZESC::CountZombs()
+int CGameControllerZESC::NumZombs()
 {
 	int NumZombs = 0;
 	for(int i = 0; i < MAX_CLIENTS; i++)
@@ -475,7 +473,7 @@ int CGameControllerZESC::CountZombs()
 	return NumZombs;
 }
 
-int CGameControllerZESC::CountHumans()
+int CGameControllerZESC::NumHumans()
 {
 	int NumHumans = 0;
 	for(int i = 0; i < MAX_CLIENTS; i++)

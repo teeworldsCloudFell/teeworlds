@@ -41,7 +41,7 @@ void CDoor::Tick()
 	if(m_State == DOOR_OPEN || m_State == DOOR_ZCLOSING || m_State == DOOR_REOPENED || !m_Time || !g_Config.m_SvDoors)
 		return;
 	CCharacter *apCloseCCharacters[MAX_CLIENTS];
-	int Num = GameServer()->m_World.FindEntities(m_Pos, 16.0f, (CEntity**)apCloseCCharacters, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
+	int Num = GameServer()->m_World.FindEntities(m_Pos, 8.0f, (CEntity**)apCloseCCharacters, MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
 	for(int i = 0; i < Num; i++)
 	{
 		if(!apCloseCCharacters[i]->IsAlive() || apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_SPECTATORS || GameServer()->Collision()->IntersectLine(m_Pos, apCloseCCharacters[i]->m_Pos, NULL, NULL) || (m_State == DOOR_ZCLOSED && apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_BLUE))

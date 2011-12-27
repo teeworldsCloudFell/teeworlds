@@ -23,6 +23,7 @@ CPlayer::CPlayer(CGameContext *pGameServer, int ClientID, int Team)
 	m_SpectatorID = SPEC_FREEVIEW;
 	m_LastActionTick = Server()->Tick();
 	m_TeamChangeTick = Server()->Tick();
+	m_ShowHP = true;
 }
 
 CPlayer::~CPlayer()
@@ -257,7 +258,7 @@ void CPlayer::SetTeam(int Team)
 	if(m_Team == TEAM_BLUE && GameServer()->zESCController()->ZombStarted()) {
 		GameServer()->SendBroadcast("You can't join the zombie team.", m_ClientID);
 		return; }
-	if(m_Team == TEAM_RED && GameServer()->zESCController()->CountZombs() < 2 && GameServer()->zESCController()->ZombStarted()) {
+	if(m_Team == TEAM_RED && GameServer()->zESCController()->NumZombs() < 2 && GameServer()->zESCController()->ZombStarted()) {
 		GameServer()->SendBroadcast("You are the only zombie.", m_ClientID);
 		return; }
 
@@ -374,6 +375,8 @@ void CPlayer::SetZomb(int From)
 	GameServer()->m_pController->OnPlayerInfoChange(GameServer()->m_apPlayers[m_ClientID]);
 	GameServer()->zESCController()->CheckZomb();
 	GameServer()->SendChatTarget(m_ClientID, "You are now a zombie! Eat some brains.");
+	if(g_Config.m_SvZombieHp)
+		GameServer()->SendChatTarget(m_ClientID, "Write !hp to disable or enable the hp display.");
 }
 
 void CPlayer::ResetZomb()

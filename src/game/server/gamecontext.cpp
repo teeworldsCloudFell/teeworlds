@@ -62,6 +62,7 @@ void CGameContext::Clear()
 	CVoteOptionServer *pVoteOptionLast = m_pVoteOptionLast;
 	int NumVoteOptions = m_NumVoteOptions;
 	CTuningParams Tuning = m_Tuning;
+	CStandardSettings StandardSettings = m_StandardSettings;
 
 	m_Resetting = true;
 	this->~CGameContext();
@@ -73,6 +74,7 @@ void CGameContext::Clear()
 	m_pVoteOptionLast = pVoteOptionLast;
 	m_NumVoteOptions = NumVoteOptions;
 	m_Tuning = Tuning;
+	m_StandardSettings = StandardSettings;
 }
 
 
@@ -517,7 +519,7 @@ void CGameContext::OnClientEnter(int ClientID)
 	m_VoteUpdate = true;
 
 	zESCController()->CheckZomb();
-	if(zESCController()->CountPlayers() <= 2)
+	if(zESCController()->NumPlayers() <= 2)
 		m_pController->ResetEvents();
 }
 
@@ -558,7 +560,7 @@ void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 	delete m_apPlayers[ClientID];
 	m_apPlayers[ClientID] = 0;
 
-	if(!zESCController()->CountZombs() && zESCController()->ZombStarted() && !m_pController->m_ZombWarmup && !zESCController()->NukeLaunched())
+	if(!zESCController()->NumZombs() && zESCController()->ZombStarted() && !m_pController->m_ZombWarmup && !zESCController()->NukeLaunched())
 		m_pController->RandomZomb(-2);
 
 	zESCController()->CheckZomb();
@@ -601,18 +603,35 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 		{
 			pPlayer->m_LastChat = Server()->Tick();
 
-			if(!str_comp(pMsg->m_pMessage, "/info"))
+			if(!str_comp(pMsg->m_pMessage, "/info") || !str_comp(pMsg->m_pMessage, "!info"))
 			{
 				char aBuf[128];
 				str_format(aBuf, sizeof(aBuf), "Zombie Escape mod %s by BotoX.", ZESC_VERSION);
 				SendChatTarget(ClientID, aBuf);
 				SendChatTarget(ClientID, "Teleport system taken from the race mod (C)Rajh, Redix & SushiTee. Thx for other cool stuff from SushiTee :*");
+				return;
 			}
-			else if(!str_comp(pMsg->m_pMessage, "/help"))
+			else if(!str_comp(pMsg->m_pMessage, "/help") || !str_comp(pMsg->m_pMessage, "!help"))
 			{
 				SendChatTarget(ClientID, "---HELP---");
 				SendChatTarget(ClientID, "\"/info\" information about the mod");
+				SendChatTarget(ClientID, "\"/hp\" shows or hides current hp (as zombie)");
 				SendChatTarget(ClientID, "The human goal is to survive in the given time, or to reach the end of the map. Zombies have to infect all humans.");
+				return;
+			}
+			else if(!str_comp(pMsg->m_pMessage, "/hp") || !str_comp(pMsg->m_pMessage, "!hp"))
+			{
+				pPlayer->m_ShowHP = !pPlayer->m_ShowHP;
+				if(pPlayer->m_ShowHP && pPlayer->GetCharacter())
+				{
+					char aBuf[16];
+					str_format(aBuf, sizeof(aBuf), "HP: %d", pPlayer->GetCharacter()->m_Health);
+					SendBroadcast(aBuf, pPlayer->GetCID());
+				}
+				else if(!pPlayer->m_ShowHP)
+					SendBroadcast("", pPlayer->GetCID());
+
+				return;
 			}
 			else
 			{
@@ -1632,6 +1651,7 @@ void CGameContext::ConCreateExplosion(IConsole::IResult *pResult, void *pUserDat
 	((CGameContext *)pUserData)->CreateExplosion(vec2(pResult->GetInteger(0)*32, pResult->GetInteger(1)*32), -1, WEAPON_WORLD, true);
 	((CGameContext *)pUserData)->CreateSound(vec2(pResult->GetInteger(0)*32, pResult->GetInteger(1)*32), SOUND_GRENADE_EXPLODE);
 }
+
 void CGameContext::OnConsoleInit()
 {
 	m_pServer = Kernel()->RequestInterface<IServer>();
@@ -1762,6 +1782,8 @@ void CGameContext::OnShutdown()
 {
 	delete m_pController;
 	m_pController = 0;
+	// Load standard settings before new map loads
+	LoadStandardSettings();
 	Clear();
 }
 
@@ -1790,6 +1812,41 @@ void CGameContext::LoadMapSettings()
 			delete[] pBuf;
 		}
 	}
+}
+
+void CGameContext::SaveStandardSettings()
+{
+	m_StandardSettings.m_SvZombieRatio = g_Config.m_SvZombieRatio;
+	m_StandardSettings.m_SvZWarmup = g_Config.m_SvZWarmup;
+	m_StandardSettings.m_SvDoors = g_Config.m_SvDoors;
+	m_StandardSettings.m_SvHdoorReopenTime = g_Config.m_SvHdoorReopenTime;
+	m_StandardSettings.m_SvNukeTime = g_Config.m_SvNukeTime;
+	m_StandardSettings.m_SvInfiniteAmmo = g_Config.m_SvInfiniteAmmo;
+	m_StandardSettings.m_SvPickupRespawn = g_Config.m_SvPickupRespawn;
+	m_StandardSettings.m_SvTeleportGrenade = g_Config.m_SvTeleportGrenade;
+	m_StandardSettings.m_SvRegen = g_Config.m_SvRegen;
+	m_StandardSettings.m_SvRegenHp = g_Config.m_SvRegenHp;
+	m_StandardSettings.m_SvZombieHp = g_Config.m_SvZombieHp;
+	m_StandardSettings.m_Tuning = m_Tuning;
+	dbg_msg("server", "Standardsettings saved!");
+}
+
+void CGameContext::LoadStandardSettings()
+{
+	g_Config.m_SvZombieRatio = m_StandardSettings.m_SvZombieRatio;
+	g_Config.m_SvZWarmup = m_StandardSettings.m_SvZWarmup;
+	g_Config.m_SvDoors = m_StandardSettings.m_SvDoors;
+	g_Config.m_SvHdoorReopenTime = m_StandardSettings.m_SvHdoorReopenTime;
+	g_Config.m_SvNukeTime = m_StandardSettings.m_SvNukeTime;
+	g_Config.m_SvInfiniteAmmo = m_StandardSettings.m_SvInfiniteAmmo;
+	g_Config.m_SvPickupRespawn = m_StandardSettings.m_SvPickupRespawn;
+	g_Config.m_SvTeleportGrenade = m_StandardSettings.m_SvTeleportGrenade;
+	g_Config.m_SvRegen = m_StandardSettings.m_SvRegen;
+	g_Config.m_SvRegenHp = m_StandardSettings.m_SvRegenHp;
+	g_Config.m_SvZombieHp = m_StandardSettings.m_SvZombieHp;
+	g_Config.m_SvFlushCustomTeleporter = 0; // Map sets this
+	m_Tuning = m_StandardSettings.m_Tuning;
+	dbg_msg("server", "Standardsettings loaded!");
 }
 
 void CGameContext::OnSnap(int ClientID)

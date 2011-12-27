@@ -24,7 +24,7 @@ public:
 	struct CDoor
 	{
 		int m_State;
-		int m_Tick;
+		int64 m_Tick;
 		int m_OpenTime;
 		int m_CloseTime;
 		int m_ReopenTime;
@@ -33,20 +33,20 @@ public:
 	int m_NukeTick;
 	bool m_NukeLaunched;
 
-	virtual void LoadStandardSettings();
 	virtual void Tick();
 	virtual void Snap(int SnappingClient);
 	virtual int OnCharacterDeath(class CCharacter *pVictim, class CPlayer *pKiller, int Weapon);
 	virtual bool OnEntity(int Index, vec2 Pos);
 	virtual void OnHoldpoint(int Index);
+	virtual void OnZHoldpoint(int Index);
 	virtual void OnZStop(int Index);
 	virtual bool ZombStarted();
 	virtual void StartZomb(bool Value);
 	virtual void CheckZomb();
 	virtual void OnEndRound();
-	virtual int CountPlayers();
-	virtual int CountZombs();
-	virtual int CountHumans();
+	virtual int NumPlayers();
+	virtual int NumZombs();
+	virtual int NumHumans();
 	virtual void Reset();
 	virtual void ResetDoors();
 	virtual int DoorState(int Index);

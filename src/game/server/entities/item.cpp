@@ -74,19 +74,19 @@ void CItem::Tick()
 			switch(m_Item)
 			{
 			case HITEM_HAMMER:
-				str_copy(aBuf, "Special item hammer: You can build 10 zdoors with it.", sizeof(aBuf));
+				str_copy(aBuf, "Special item hammer: You can build 10 zdoors with it. Use with care!", sizeof(aBuf));
 				break;
 			case HITEM_GUN:
-				str_copy(aBuf, "Gun upgraded.", sizeof(aBuf));
+				str_copy(aBuf, "Gun upgraded. +Knockback -Regentime", sizeof(aBuf));
 				break;
 			case HITEM_SHOTGUN:
-				str_copy(aBuf, "Shotgun upgraded.", sizeof(aBuf));
+				str_copy(aBuf, "Shotgun upgraded. +Knockback", sizeof(aBuf));
 				break;
 			case HITEM_GRENADE:
-				str_copy(aBuf, "Grenade upgraded.", sizeof(aBuf));
+				str_copy(aBuf, "Grenade upgraded. +Knockback +Burntime", sizeof(aBuf));
 				break;
 			case HITEM_RIFLE:
-				str_copy(aBuf, "Rifle upgraded.", sizeof(aBuf));
+				str_copy(aBuf, "Rifle upgraded. +Freezetime", sizeof(aBuf));
 				break;
 			}
 

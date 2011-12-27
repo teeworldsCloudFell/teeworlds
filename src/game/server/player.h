@@ -69,6 +69,7 @@ public:
 	char m_OriginSkinName[64];
 	
 	bool m_Nuked;
+	bool m_ShowHP;
 
 	// TODO: clean this up
 	struct

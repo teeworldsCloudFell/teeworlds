@@ -479,6 +479,7 @@ container.weapons.id.Add(weapon)
 
 weapon = WeaponSpec(container, "shotgun")
 weapon.firedelay.Set(500)
+weapon.ammoregentime.Set(1000)
 weapon.visual_size.Set(96)
 weapon.offsetx.Set(24)
 weapon.offsety.Set(-2)
@@ -489,6 +490,7 @@ container.weapons.id.Add(weapon)
 
 weapon = WeaponSpec(container, "grenade")
 weapon.firedelay.Set(500) # TODO: fix this
+weapon.ammoregentime.Set(1000)
 weapon.visual_size.Set(96)
 weapon.offsetx.Set(24)
 weapon.offsety.Set(-2)
@@ -497,6 +499,7 @@ container.weapons.id.Add(weapon)
 
 weapon = WeaponSpec(container, "rifle")
 weapon.firedelay.Set(800)
+weapon.ammoregentime.Set(2000) # This can be unfair if to low ^^
 weapon.visual_size.Set(92)
 weapon.damage.Set(5)
 weapon.offsetx.Set(24)

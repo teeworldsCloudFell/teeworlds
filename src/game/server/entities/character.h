@@ -76,6 +76,8 @@ public:
 
 	class CItem *m_HookedItem;
 	int m_Item;
+	bool m_InBunker;
+	int m_Health;
 
 	// ninja
 	struct
@@ -132,7 +134,6 @@ private:
 
 	int m_DamageTakenTick;
 
-	int m_Health;
 	int m_Armor;
 
 	// info for dead reckoning
@@ -141,6 +142,8 @@ private:
 	CCharacterCore m_ReckoningCore; // the dead reckoning core
 
 	int m_LastSpeedup;
+
+	int64 m_LastRegenTick;
 };
 
 #endif
