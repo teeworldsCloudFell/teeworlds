@@ -543,6 +543,9 @@ void CClient::DisconnectWithReason(const char *pReason)
 	str_format(aBuf, sizeof(aBuf), "disconnecting. reason='%s'", pReason?pReason:"unknown");
 	m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "client", aBuf);
 
+	for(int i = 0; i < SENDCHATSIZE; i++)
+		m_aaSendChat[i][0] = '\0';
+
 	// stop demo playback and recorder
 	m_DemoPlayer.Stop();
 	DemoRecorder_Stop();
@@ -1649,6 +1652,7 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 		EnterGame();
 		SendSwitchTeam(-1);
 		OnStartGame();
+		return;
 	}
 	void *pRawMsg = m_NetObjHandler.SecureUnpackMsg(Msg, Unpacker);
 	if(!pRawMsg)
@@ -1657,6 +1661,16 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 		str_format(aBuf, sizeof(aBuf), "dropped weird message '%s' (%d), failed on '%s'", m_NetObjHandler.GetMsgName(Msg), Msg, m_NetObjHandler.FailedMsgOn());
 		m_pConsole->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "client", aBuf);
 		return;
+	}
+	else if(Msg == NETMSGTYPE_SV_MOTD)
+	{
+		CNetMsg_Sv_Motd *pMsg = (CNetMsg_Sv_Motd *)pRawMsg;
+
+		if(str_find(pMsg->m_pMessage, "#noTrivia"))
+		{
+			ResetTrivia(true);
+			DisconnectWithReason("Server disallows Triviabots. ");
+		}
 	}
 	else if(Msg == NETMSGTYPE_SV_CHAT)
 	{
@@ -1672,43 +1686,26 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 		}
 		if(pMsg->m_ClientID < 0 || pMsg->m_ClientID > MAX_CLIENTS) // ADMIN ABUUUUSE!!
 			return;
-		if(!str_comp(pMsg->m_pMessage, "!triviastart"))
+		if(str_find(pMsg->m_pMessage, "!info") || str_find(pMsg->m_pMessage, "!help"))
 		{
-			if(m_TriviaStarted || m_TriviaStartTick)
-				return;
-			int ActivePlayers = 0;
-			int PlayersVoted = 0;
-			if(!m_aClients[pMsg->m_ClientID].m_HasVotedStart)
-				PlayersVoted = 1;
-			for(int i = 0; i < MAX_CLIENTS; i++)
-			{
-				if(m_aClients[i].m_aName[0])
-				{
-					ActivePlayers++;
-					if(m_aClients[i].m_HasVotedStart)
-						PlayersVoted++;
-				}
-			}
-			ActivePlayers--; // Don't count ourself ^^
-			m_aClients[pMsg->m_ClientID].m_HasVotedStart = true;
-			if(PlayersVoted/2 + 1 >= ActivePlayers)
-			{
-				SayChat("Vote passed! Trivia will start in 15 seconds.");
-				SayChat("You have 30 seconds time to answer a question.");
-				SayChat("After 15 seconds you get a hint.");
-				SayChat("The faster you answer the question the more points you get.");
-				SayChat("Good Luck!");
-				ResetTrivia();
-				m_TriviaStartTick = time_get()+time_freq()*15;
-			}
-			else
-			{
-				char aBuf[128];
-				str_format(aBuf, sizeof(aBuf), "Remaining Votes to start the trivia: %d", (ActivePlayers/2 + 1) - PlayersVoted);
-				SayChat(aBuf);
-			}
+			char aBuf[128];
+			str_format(aBuf, sizeof(aBuf), "Triviabot Beta by BotoX! Questions loaded: %d", m_lQuestions.size());
+			SayChat(aBuf);
+			SayChat("English motherfucker! Do you speak it?! TRIVIABOT!!! A FUCKING BOT WHICH IS ASKING FUCKING QUESTIONS!");
 		}
-		else if(pMsg->m_ClientID > 0 && pMsg->m_ClientID < MAX_CLIENTS && !str_comp(pMsg->m_pMessage, "!triviastop"))
+		else if(!str_comp(pMsg->m_pMessage, "!triviastart"))
+		{
+			if(m_TriviaStarted || m_TriviaStartTick || m_TriviaForceStopped)
+				return;
+
+			SayChat("Trivia will start in 15 seconds.");
+			SayChat("You have 30 seconds time to answer a question.");
+			SayChat("After 15 seconds you get a hint.");
+			SayChat("The faster you answer the question the more points you get.");
+			SayChat("Good Luck!");
+			m_TriviaStartTick = time_get()+time_freq()*15;
+		}
+		else if(!str_comp(pMsg->m_pMessage, "!triviastop"))
 		{
 			if(!m_TriviaStarted)
 				return;
@@ -1730,7 +1727,7 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 			if(PlayersVoted/2 + 1 >= ActivePlayers)
 			{
 				SayChat("Vote passed! Trivia stopped.");
-				KillMyself();
+				KillMyself(true);
 			}
 			else
 			{
@@ -1739,7 +1736,7 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 				SayChat(aBuf);
 			}
 		}
-		else if(pMsg->m_ClientID > 0 && pMsg->m_ClientID < MAX_CLIENTS && !str_comp(pMsg->m_pMessage, "!rank"))
+		else if(!str_comp(pMsg->m_pMessage, "!rank"))
 		{
 			char aBuf[128];
 			int Score = 0;
@@ -1748,7 +1745,7 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 			str_format(aBuf, sizeof(aBuf), "'%s's current score is: %d / Rank: %d", m_aClients[pMsg->m_ClientID].m_aName, Score, Rank);
 			SayChat(aBuf);
 		}
-		else if(pMsg->m_ClientID > 0 && pMsg->m_ClientID < MAX_CLIENTS && !str_comp(pMsg->m_pMessage, "!top5"))
+		else if(!str_comp(pMsg->m_pMessage, "!top5"))
 		{
 			if(m_LastTop5+time_freq()*15 > time_get()) // Anti Spam
 				return;
@@ -1760,7 +1757,7 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 			}
 			m_LastTop5 = time_get();
 		}
-		else if(m_CurrentQuestion && pMsg->m_ClientID > 0 && pMsg->m_ClientID < MAX_CLIENTS && !str_comp_nocase(pMsg->m_pMessage, m_lQuestions[m_CurrentQuestion-1].m_aAnswer))
+		else if(m_CurrentQuestion && !str_comp_nocase(pMsg->m_pMessage, m_lQuestions[m_CurrentQuestion-1].m_aAnswer))
 		{
 			char aBuf[128];
 			m_NumAskedQuestions++;
@@ -1772,7 +1769,7 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 			Score += Points;
 			m_Records.AddRecord(m_aClients[pMsg->m_ClientID].m_aName, Score);
 			m_Records.GetRank(m_aClients[pMsg->m_ClientID].m_aName, 0x0, &Rank);
-			ResetTrivia();
+			ResetTrivia(false);
 			str_format(aBuf, sizeof(aBuf), "'%s's answer is correct, gained %d points.", m_aClients[pMsg->m_ClientID].m_aName, Points);
 			SayChat(aBuf);
 			if(OldRank)
@@ -1789,7 +1786,7 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 			else
 			{
 				SayChat("Oops! This was the last question!");
-				KillMyself();
+				KillMyself(false);
 			}
 		}
 	}
@@ -1923,7 +1920,7 @@ void CClient::OnNewSnapshot()
 		}
 	}
 
-	// make sure we only got fresh players, and reset the empty ones
+	// make sure we only got fresh playerdata, and reset the empty ones
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
 		if(m_aClients[i].m_Active)
@@ -1935,41 +1932,48 @@ void CClient::OnNewSnapshot()
 
 void CClient::OnGameOver()
 {
-	ResetTrivia();
-	for(int i = 0; i < MAX_CLIENTS; i++)
-		m_aClients[i].Reset();
-	m_TriviaStarted = false;
-	m_NumAskedQuestions = 0;
-	m_LastTop5 = 0;
+	SayChat("gg"); // loooooool
 }
 
 void CClient::OnStartGame()
 {
-	OnGameOver();
-	char aBuf[128];
-	str_format(aBuf, sizeof(aBuf), "Triviabot Beta by BotoX! Questions loaded: %d", m_lQuestions.size());
-	SayChat(aBuf);
-	if(m_lQuestions.size())
+	if(!m_TriviaStarted)
 	{
-		SayChat("Write !triviastart in chat to start the trivia (60% need to vote).");
-		SayChat("You have 30 seconds time to vote.");
-		m_KillTick = time_get()+time_freq()*32;
-	}
-	else
-	{
-		SayChat("No questions loaded, I am fucking useless.");
-		SayChat("Going to disconnect and spam other servers until somebody stops me.");
-		m_KillTick = time_get()+time_freq()*7;
+		ResetTrivia(true);
+		char aBuf[128];
+		str_format(aBuf, sizeof(aBuf), "Triviabot Beta by BotoX! Questions loaded: %d", m_lQuestions.size());
+		SayChat(aBuf);
+		if(m_lQuestions.size())
+		{
+			SayChat("Write !triviastart in chat to start the trivia.");
+			SayChat("You have 30 seconds time to vote.");
+			m_KillTick = time_get()+time_freq()*32;
+		}
+		else
+		{
+			SayChat("No questions loaded, I am fucking useless.");
+			SayChat("Going to disconnect and spam other servers until somebody stops me.");
+			m_KillTick = time_get()+time_freq()*4;
+		}
 	}
 }
 
-void CClient::ResetTrivia()
+void CClient::ResetTrivia(bool Hard)
 {
 	m_CurrentQuestion = 0;
 	m_TimeLeft = 0;
 	m_TriviaStartTick = 0;
 	m_KillTick = 0;
 	m_Passed15Sec = false;
+	if(Hard)
+	{
+		for(int i = 0; i < MAX_CLIENTS; i++)
+			m_aClients[i].Reset();
+		m_TriviaStarted = false;
+		m_TriviaForceStopped = false;
+		m_NumAskedQuestions = 0;
+		m_LastTop5 = 0;
+	}
 }
 
 void CClient::OnTick()
@@ -1981,7 +1985,7 @@ void CClient::OnTick()
 	}
 	if(m_TriviaStartTick && m_TriviaStartTick < time_get())
 	{
-		ResetTrivia();
+		ResetTrivia(false);
 		m_TriviaStarted = true;
 		m_CurrentQuestion = rand()%m_lQuestions.size()+1;
 		char aBuf[256];
@@ -2017,24 +2021,33 @@ void CClient::OnTick()
 			str_format(aBuf, sizeof(aBuf), "This was question %d, proceeding with the trivia.", m_NumAskedQuestions);
 			SayChat(aBuf);
 			SayChat("Next question in 5 seconds.");
-			ResetTrivia();
+			ResetTrivia(false);
 			m_TriviaStartTick = time_get()+time_freq()*8;
 		}
 		else
 		{
 			SayChat("Oops! This was the last question!");
-			KillMyself();
+			KillMyself(false);
 		}
 	}
 	if(m_KillTick && m_KillTick < time_get())
 		DisconnectWithReason("Triviabot by BotoX! "); // hehehe
 }
 
-void CClient::KillMyself()
+void CClient::KillMyself(bool Forced)
 {
-	OnGameOver();
-	SayChat("Disconnecting in 20 seconds. Write !triviastart to avoid it.");
-	m_KillTick = time_get()+time_freq()*21;
+	ResetTrivia(true);
+	if(Forced)
+	{
+		SayChat("Nobody likes me :(");
+		m_TriviaForceStopped = true;
+		m_KillTick = time_get()+time_freq()*5;
+	}
+	else
+	{
+		SayChat("Disconnecting in 20 seconds. Write !triviastart to avoid it.");
+		m_KillTick = time_get()+time_freq()*21;
+	}
 }
 
 const char *CClient::Version() { return "0.6 626fce9a778df4d4"; }

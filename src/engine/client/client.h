@@ -201,6 +201,7 @@ class CClient : public IClient, public CDemoPlayer::IListner
 
 	int m_CurrentQuestion;
 	bool m_TriviaStarted;
+	bool m_TriviaForceStopped;
 	bool m_Passed15Sec;
 	int64 m_TimeLeft;
 	int64 m_TriviaStartTick;
@@ -242,9 +243,9 @@ public:
 	void OnNewSnapshot();
 	void OnGameOver();
 	void OnStartGame();
-	void ResetTrivia();
+	void ResetTrivia(bool Hard);
 	void OnTick();
-	void KillMyself();
+	void KillMyself(bool Forced);
 	const char *Version();
 
 	virtual bool RconAuthed() { return m_RconAuthed != 0; }
