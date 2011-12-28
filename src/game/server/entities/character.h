@@ -57,6 +57,7 @@ public:
 	vec2 m_PushDirection;
 	int m_FreezeTick;
 	int m_BurnTick;
+	int m_BurnedFrom;
 	// the player core for the physics
 	CCharacterCore m_Core;
 

@@ -83,16 +83,17 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 	m_Alive = true;
 
 	m_LastSpeedup = -1;
+	m_BurnedFrom = pPlayer->GetCID();
 
 	m_LastRegenTick = Server()->Tick();
 	if(g_Config.m_SvZombieHp && pPlayer->GetTeam() == TEAM_RED)
 	{
 		m_Health = g_Config.m_SvZombieHp;
-		if(GetPlayer() && GetPlayer()->m_ShowHP)
+		if(m_pPlayer->m_ShowHP)
 		{
 			char aBuf[16];
 			str_format(aBuf, sizeof(aBuf), "HP: %d", m_Health);
-			GameServer()->SendBroadcast(aBuf, GetPlayer()->GetCID());
+			GameServer()->SendBroadcast(aBuf, m_pPlayer->GetCID());
 		}
 	}
 
@@ -616,7 +617,7 @@ void CCharacter::Tick()
 
 	CGameControllerZESC *pzESC = GameServer()->zESCController();
 
-	if(g_Config.m_SvRegen > 0 && m_LastRegenTick+g_Config.m_SvRegen*Server()->TickSpeed() < Server()->Tick() && GetPlayer() && GetPlayer()->GetTeam() == TEAM_RED)
+	if(g_Config.m_SvRegen > 0 && m_LastRegenTick+g_Config.m_SvRegen*Server()->TickSpeed() < Server()->Tick() && m_pPlayer->GetTeam() == TEAM_RED)
 	{
 		if(m_Health < g_Config.m_SvZombieHp-g_Config.m_SvRegenHp)
 		{
@@ -628,11 +629,11 @@ void CCharacter::Tick()
 			m_Health = g_Config.m_SvZombieHp;
 			m_LastRegenTick = Server()->Tick();
 		}
-		if(GetPlayer() && GetPlayer()->m_ShowHP)
+		if(m_pPlayer->m_ShowHP)
 		{
 			char aBuf[16];
 			str_format(aBuf, sizeof(aBuf), "HP: %d", m_Health);
-			GameServer()->SendBroadcast(aBuf, GetPlayer()->GetCID());
+			GameServer()->SendBroadcast(aBuf, m_pPlayer->GetCID());
 		}
 	}
 
@@ -694,13 +695,13 @@ void CCharacter::Tick()
 		else if(TileIndex >= TILE_HOLDPOINT_BEGIN && TileIndex <= TILE_HOLDPOINT_END)
 			pzESC->OnHoldpoint(TileIndex-TILE_HOLDPOINT_BEGIN);
 
-		else if(TileIndex >= TILE_ZSTOP_BEGIN && TileIndex <= TILE_ZSTOP_END && GetPlayer() && GetPlayer()->GetTeam() == TEAM_BLUE)
+		else if(TileIndex >= TILE_ZSTOP_BEGIN && TileIndex <= TILE_ZSTOP_END && m_pPlayer->GetTeam() == TEAM_BLUE)
 			pzESC->OnZStop(TileIndex-TILE_ZSTOP_BEGIN);
 
-		else if(TileIndex >= TILE_ZHOLDPOINT_BEGIN && TileIndex <= TILE_ZHOLDPOINT_END && GetPlayer() && GetPlayer()->GetTeam() == TEAM_BLUE)
+		else if(TileIndex >= TILE_ZHOLDPOINT_BEGIN && TileIndex <= TILE_ZHOLDPOINT_END && m_pPlayer->GetTeam() == TEAM_BLUE)
 			pzESC->OnZHoldpoint(TileIndex-TILE_ZHOLDPOINT_BEGIN+32);
 
-		else if((TileIndex >= TILE_TRIGGERALL_BEGIN && TileIndex <= TILE_TRIGGERALL_END) || (TileIndex >= TILE_TRIGGERRED_BEGIN && TileIndex <= TILE_TRIGGERRED_END && GetPlayer() && GetPlayer()->GetTeam() == TEAM_RED) || (TileIndex >= TILE_TRIGGERBLUE_BEGIN && TileIndex <= TILE_TRIGGERBLUE_END && GetPlayer() && GetPlayer()->GetTeam() == TEAM_BLUE))
+		else if((TileIndex >= TILE_TRIGGERALL_BEGIN && TileIndex <= TILE_TRIGGERALL_END) || (TileIndex >= TILE_TRIGGERRED_BEGIN && TileIndex <= TILE_TRIGGERRED_END && m_pPlayer && m_pPlayer->GetTeam() == TEAM_RED) || (TileIndex >= TILE_TRIGGERBLUE_BEGIN && TileIndex <= TILE_TRIGGERBLUE_END && m_pPlayer && m_pPlayer->GetTeam() == TEAM_BLUE))
 			GameServer()->m_pController->OnTrigger(TileIndex-TILE_TRIGGERALL_BEGIN);
 
 		else if(TileIndex >= TILE_CTELEPORT_BEGIN && TileIndex <= TILE_CTELEPORT_END)
@@ -830,8 +831,8 @@ void CCharacter::Tick()
 		m_Core.m_Vel.x *= 0.9;
 		if(m_BurnTick%20 == 0)
 		{
-			GameServer()->CreateExplosion(m_Core.m_Pos, GetPlayer()->GetCID(), WEAPON_GRENADE, true);
-			TakeDamage(vec2(0, 0), 1, -1, WEAPON_WORLD);
+			GameServer()->CreateExplosion(m_Core.m_Pos, m_pPlayer->GetCID(), WEAPON_GRENADE, true);
+			TakeDamage(vec2(0, 0), 1, m_BurnedFrom, WEAPON_GRENADE);
 		}
 	}
 
@@ -1053,6 +1054,7 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 			m_Item ? AddVel = Force*2 : AddVel = Force*3.0f;
 			m_Item ? m_BurnTick = Server()->TickSpeed()*2.0f : m_BurnTick = Server()->TickSpeed()*3.0f;
 		}
+		m_BurnedFrom = From;
 	}
 	else if(Weapon == WEAPON_RIFLE)
 	{
@@ -1118,11 +1120,11 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 			return false;
 		}
 
-		if(GetPlayer() && GetPlayer()->m_ShowHP)
+		if(m_pPlayer && m_pPlayer->m_ShowHP)
 		{
 			char aBuf[16];
 			str_format(aBuf, sizeof(aBuf), "HP: %d", m_Health);
-			GameServer()->SendBroadcast(aBuf, GetPlayer()->GetCID());
+			GameServer()->SendBroadcast(aBuf, m_pPlayer->GetCID());
 		}
 
 		if(Dmg > 2)
@@ -1160,11 +1162,11 @@ void CCharacter::SetZomb()
 	if(g_Config.m_SvZombieHp)
 	{
 		m_Health = g_Config.m_SvZombieHp;
-		if(GetPlayer() && GetPlayer()->m_ShowHP)
+		if(m_pPlayer->m_ShowHP)
 		{
 			char aBuf[16];
 			str_format(aBuf, sizeof(aBuf), "HP: %d", m_Health);
-			GameServer()->SendBroadcast(aBuf, GetPlayer()->GetCID());
+			GameServer()->SendBroadcast(aBuf, m_pPlayer->GetCID());
 		}
 	}
 }

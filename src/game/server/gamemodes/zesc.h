@@ -37,6 +37,7 @@ public:
 	virtual void Snap(int SnappingClient);
 	virtual int OnCharacterDeath(class CCharacter *pVictim, class CPlayer *pKiller, int Weapon);
 	virtual bool OnEntity(int Index, vec2 Pos);
+	virtual void DoTeamScoreWincheck();
 	virtual void OnHoldpoint(int Index);
 	virtual void OnZHoldpoint(int Index);
 	virtual void OnZStop(int Index);

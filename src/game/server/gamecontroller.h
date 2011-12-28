@@ -48,7 +48,6 @@ protected:
 
 	int m_GameOverTick;
 
-	int m_Warmup;
 	int m_RoundCount;
 
 	int m_GameFlags;
@@ -103,9 +102,6 @@ public:
 	int m_ZombWarmup;
 	int m_SuddenDeath;
 	int m_RoundStartTick;
-
-	void DoWarmup(int Seconds);
-	void DoTeamScoreWincheck();
 
 	void StartRound();
 	void EndRound();

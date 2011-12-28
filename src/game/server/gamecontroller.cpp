@@ -18,7 +18,6 @@ IGameController::IGameController(class CGameContext *pGameServer)
 	m_pGameType = "unknown";
 
 	//
-	DoWarmup(g_Config.m_SvWarmup);
 	m_ZombWarmup = 0;
 	m_LastZomb = -1;
 	m_LastZomb2 = -1;
@@ -208,13 +207,13 @@ bool IGameController::OnEntity(int Index, vec2 Pos)
 
 void IGameController::EndRound()
 {
-	if(m_Warmup || m_ZombWarmup || m_GameOverTick != -1) // game can't end when we are running warmup
+	if(m_ZombWarmup || m_GameOverTick != -1) // game can't end when we are running warmup
 		return;
 
 	GameServer()->zESCController()->OnEndRound();
 
 	GameServer()->m_World.m_Paused = true;
-	m_GameOverTick = Server()->Tick();
+	m_GameOverTick = Server()->Tick()+Server()->TickSpeed()*5;
 	m_SuddenDeath = 0;
 }
 
@@ -413,14 +412,6 @@ void IGameController::OnCharacterSpawn(class CCharacter *pChr)
 	pChr->GiveWeapon(WEAPON_GUN, 10);
 }
 
-void IGameController::DoWarmup(int Seconds)
-{
-	if(Seconds < 0)
-		m_Warmup = 0;
-	else
-		m_Warmup = Seconds*Server()->TickSpeed();
-}
-
 bool IGameController::IsFriendlyFire(int ClientID1, int ClientID2)
 {
 	if(ClientID1 == ClientID2)
@@ -477,22 +468,14 @@ void IGameController::Tick()
 		}
 	}
 
-	// do warmup
-	if(m_Warmup)
-	{
-		m_Warmup--;
-		if(!m_Warmup)
-			StartRound();
-	}
-
 	if(m_GameOverTick != -1)
 	{
 		// game over.. wait for restart
-		if(Server()->Tick() > m_GameOverTick+Server()->TickSpeed()*5)
+		if(Server()->Tick() > m_GameOverTick)
 		{
 			CycleMap();
-			StartRound();
 			m_RoundCount++;
+			StartRound();
 		}
 	}
 
@@ -612,19 +595,6 @@ int IGameController::OnCustomTeleporter(int ID, int Team)
 	return m_aCustomTeleport[ID].m_Teleport;
 }
 
-void IGameController::DoTeamScoreWincheck()
-{
-	if(m_GameOverTick == -1 && !m_Warmup)
-	{
-		// check score win condition
-		if((g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !m_SuddenDeath)
-		{
-			//GameServer()->SendBroadcast("Humans win!", -1);
-			EndRound();
-		}
-	}
-}
-
 bool IGameController::IsTeamplay() const
 {
 	return m_GameFlags&GAMEFLAG_TEAMS;
@@ -646,10 +616,7 @@ void IGameController::Snap(int SnappingClient)
 		pGameInfoObj->m_GameStateFlags |= GAMESTATEFLAG_PAUSED;
 	pGameInfoObj->m_RoundStartTick = m_RoundStartTick;
 
-	if(m_ZombWarmup)
-		pGameInfoObj->m_WarmupTimer = m_ZombWarmup;
-	else
-		pGameInfoObj->m_WarmupTimer = m_Warmup;
+	pGameInfoObj->m_WarmupTimer = m_ZombWarmup;
 
 	pGameInfoObj->m_ScoreLimit = g_Config.m_SvScorelimit;
 	pGameInfoObj->m_TimeLimit = g_Config.m_SvTimelimit;

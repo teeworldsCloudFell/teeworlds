@@ -148,6 +148,21 @@ void CGameContext::CreateExplosion(vec2 Pos, int Owner, int Weapon, bool NoDamag
 	}
 }
 
+void CGameContext::CreateRingExplosion(vec2 Pos, int Rings, int Dist, int Explosions, bool Sound)
+{
+	vec2 CurPos;
+	for(int i = 1; i <= Rings; i++)
+	{
+		for(int j = 0; j < Explosions; j++)
+		{
+			CurPos = vec2(Pos.x+(i*Dist*10*cosf(((float)j/Explosions)*2*pi)), Pos.y+(i*Dist*10*sinf(((float)j/Explosions)*2*pi)));
+			CreateExplosion(CurPos, -1, WEAPON_WORLD, true);
+			if(Sound)
+				CreateSound(CurPos, SOUND_GRENADE_EXPLODE);
+		}
+	}
+}
+
 /*
 void create_smoke(vec2 Pos)
 {
@@ -609,6 +624,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 				str_format(aBuf, sizeof(aBuf), "Zombie Escape mod %s by BotoX.", ZESC_VERSION);
 				SendChatTarget(ClientID, aBuf);
 				SendChatTarget(ClientID, "Teleport system taken from the race mod (C)Rajh, Redix & SushiTee. Thx for other cool stuff from SushiTee :*");
+				SendChatTarget(ClientID, "Say /help for more information.");
 				return;
 			}
 			else if(!str_comp(pMsg->m_pMessage, "/help") || !str_comp(pMsg->m_pMessage, "!help"))
@@ -1056,10 +1072,7 @@ void CGameContext::ConChangeMap(IConsole::IResult *pResult, void *pUserData)
 void CGameContext::ConRestart(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	if(pResult->NumArguments())
-		pSelf->m_pController->DoWarmup(pResult->GetInteger(0));
-	else
-		pSelf->m_pController->StartRound();
+	pSelf->m_pController->StartRound();
 }
 
 void CGameContext::ConBroadcast(IConsole::IResult *pResult, void *pUserData)
@@ -1651,6 +1664,10 @@ void CGameContext::ConCreateExplosion(IConsole::IResult *pResult, void *pUserDat
 	((CGameContext *)pUserData)->CreateExplosion(vec2(pResult->GetInteger(0)*32, pResult->GetInteger(1)*32), -1, WEAPON_WORLD, true);
 	((CGameContext *)pUserData)->CreateSound(vec2(pResult->GetInteger(0)*32, pResult->GetInteger(1)*32), SOUND_GRENADE_EXPLODE);
 }
+void CGameContext::ConCreateRingExplosion(IConsole::IResult *pResult, void *pUserData)
+{
+	((CGameContext *)pUserData)->CreateRingExplosion(vec2(pResult->GetInteger(0)*32, pResult->GetInteger(1)*32), pResult->GetInteger(2), pResult->GetInteger(3), pResult->GetInteger(4), true);
+}
 
 void CGameContext::OnConsoleInit()
 {
@@ -1662,7 +1679,7 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("tune_dump", "", CFGFLAG_SERVER, ConTuneDump, this, "Dump tuning");
 
 	Console()->Register("change_map", "?r", CFGFLAG_SERVER|CFGFLAG_STORE, ConChangeMap, this, "Change map");
-	Console()->Register("restart", "?i", CFGFLAG_SERVER|CFGFLAG_STORE, ConRestart, this, "Restart in x seconds (0 = abort)");
+	Console()->Register("restart", "", CFGFLAG_SERVER|CFGFLAG_STORE, ConRestart, this, "Restart");
 	Console()->Register("broadcast", "r", CFGFLAG_SERVER, ConBroadcast, this, "Broadcast message");
 	Console()->Register("say", "r", CFGFLAG_SERVER, ConSay, this, "Say in chat");
 	Console()->Register("set_team", "ii?i", CFGFLAG_SERVER, ConSetTeam, this, "Set team of player to team");
@@ -1705,6 +1722,7 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("reload_map_defaults", "", CFGFLAG_SERVER, ConReloadMapDefaults, this, "Reload the map internal settings.");
 
 	Console()->Register("create_explosion", "ii", CFGFLAG_SERVER, ConCreateExplosion, this, "Create explosion: create_explosion <x> <y>");
+	Console()->Register("create_ringexplosion", "iiiii", CFGFLAG_SERVER, ConCreateRingExplosion, this, "Create explosion: create_ringexplosion <x> <y> <Rings> <Dist> <Explosions>");
 }
 
 void CGameContext::OnInit(/*class IKernel *pKernel*/)

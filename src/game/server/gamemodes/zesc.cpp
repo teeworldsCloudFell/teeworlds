@@ -115,21 +115,31 @@ int CGameControllerZESC::OnCharacterDeath(class CCharacter *pVictim, class CPlay
 	return 0;
 }
 
+void CGameControllerZESC::DoTeamScoreWincheck()
+{
+	// check timelimit
+	if((g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !m_SuddenDeath)
+	{
+		//GameServer()->SendBroadcast("Humans win!", -1);
+		EndRound();
+	}
+}
+
 void CGameControllerZESC::Tick()
 {
 	IGameController::Tick();
 
-	if(!ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GameServer()->m_World.m_Paused)
+	if(!ZombStarted() || GameServer()->m_World.m_Paused)
 		return;
 
 	if(m_RoundEndTick)
 	{
 		m_RoundEndTick--;
 		if(!m_RoundEndTick)
-			GameServer()->m_pController->EndRound();
+			EndRound();
 	}
 
-	GameServer()->m_pController->DoTeamScoreWincheck();
+	DoTeamScoreWincheck();
 
 	for(int i = 0; i < 48; i++)
 	{
@@ -226,12 +236,12 @@ void CGameControllerZESC::Tick()
 				//GameServer()->SendBroadcast("Humans win!", -1);
 				m_aTeamscore[TEAM_BLUE] = 100;
 				apCloseCCharacters[i]->GetPlayer()->m_Score += 10;
-				GameServer()->m_pController->EndRound();
+				EndRound();
 			}
 			else if(apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_RED) //Zombies win :(
 			{
 				//GameServer()->SendBroadcast("Zombies took over the World!", -1);
-				GameServer()->m_pController->EndRound();
+				EndRound();
 			}
 		}
 	}
@@ -341,10 +351,10 @@ void CGameControllerZESC::Snap(int SnappingClient)
 
 void CGameControllerZESC::OnHoldpoint(int Index)
 {
-	if(m_Door[Index].m_Tick || !(m_Door[Index].m_State == DOOR_CLOSED) || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
+	if(m_Door[Index].m_Tick || !(m_Door[Index].m_State == DOOR_CLOSED) || !ZombStarted() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
 		return;
 
-	m_Door[Index].m_Tick = Server()->Tick() +  Server()->TickSpeed()*GetDoorTime(Index)-1; // -1: if doortime is 5 we get a doublemessage
+	m_Door[Index].m_Tick = Server()->Tick() +  Server()->TickSpeed()*GetDoorTime(Index)-1; // -1: if doortime is 5 we get a doublemessage (but srsly a 5 seconds door?)
 	if(m_Door[Index].m_Tick)
 	{
 		char aBuf[128];
@@ -355,7 +365,7 @@ void CGameControllerZESC::OnHoldpoint(int Index)
 
 void CGameControllerZESC::OnZHoldpoint(int Index)
 {
-	if(m_Door[Index].m_State > DOOR_OPEN || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
+	if(m_Door[Index].m_State > DOOR_OPEN || !ZombStarted() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
 		return;
 
 	SetDoorState(Index, DOOR_ZCLOSING);
@@ -370,7 +380,7 @@ void CGameControllerZESC::OnZHoldpoint(int Index)
 
 void CGameControllerZESC::OnZStop(int Index)
 {
-	if(m_Door[Index].m_State > DOOR_OPEN || !ZombStarted() || GameServer()->m_pController->m_ZombWarmup > (g_Config.m_SvZWarmup-1)*Server()->TickSpeed() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
+	if(m_Door[Index].m_State > DOOR_OPEN || !ZombStarted() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
 		return;
 
 	SetDoorState(Index, DOOR_ZCLOSING);
@@ -400,8 +410,11 @@ void CGameControllerZESC::CheckZomb()
 	if(NumPlayers() < 2)
 	{
 		StartZomb(0);
-		GameServer()->m_pController->ZombWarmup(0);
-		GameServer()->m_pController->m_SuddenDeath = 1;
+		ZombWarmup(0);
+		m_SuddenDeath = 1;
+		m_RoundCount = 0;
+		m_LastZomb = -1;
+		m_LastZomb2 = -1;
 		if(m_apFlags[TEAM_RED] && m_apFlags[TEAM_RED]->m_pCarryingCharacter)
 		{
 			GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", "flag_return");
@@ -411,14 +424,20 @@ void CGameControllerZESC::CheckZomb()
 		}
 		return;
 	}
-	GameServer()->m_pController->m_SuddenDeath = 0;
+	m_SuddenDeath = 0;
 
-	if(!m_RoundStarted && !GameServer()->m_pController->m_ZombWarmup && g_Config.m_SvZombieRatio)
+	if(!m_RoundStarted && !m_ZombWarmup && !m_RoundCount && m_GameOverTick == -1)
+	{
+		GameServer()->m_World.m_Paused = true;
+		m_GameOverTick = Server()->Tick()+Server()->TickSpeed()*g_Config.m_SvWarmup;
+	}
+	else if(!m_RoundStarted && !m_ZombWarmup && m_RoundCount)
 	{
 		StartZomb(true);
-		GameServer()->m_pController->ZombWarmup(g_Config.m_SvZWarmup);
+		if(g_Config.m_SvZombieRatio)
+			ZombWarmup(g_Config.m_SvZWarmup);
 	}
-	if((!NumHumans() || !NumZombs()) && m_RoundStarted && !GameServer()->m_pController->m_ZombWarmup)
+	if((!NumHumans() || !NumZombs()) && m_RoundStarted && !m_ZombWarmup)
 		m_RoundEndTick = Server()->TickSpeed()*0.5;
 }
 
@@ -426,7 +445,7 @@ void CGameControllerZESC::OnEndRound()
 {
 	if(!ZombStarted())
 		return;
-	if(!NumHumans() || !NumZombs() || (NumHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-GameServer()->m_pController->m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !GameServer()->m_pController->m_SuddenDeath))
+	if(!NumHumans() || !NumZombs() || (NumHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !m_SuddenDeath))
 	{
 		m_aTeamscore[TEAM_RED] = 0;
 		m_aTeamscore[TEAM_BLUE] = 0;
@@ -434,7 +453,7 @@ void CGameControllerZESC::OnEndRound()
 		{
 			m_aTeamscore[TEAM_RED] = 100;
 		}
-		if(!NumZombs() || (NumHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-GameServer()->m_pController->m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !GameServer()->m_pController->m_SuddenDeath))
+		if(!NumZombs() || (NumHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !m_SuddenDeath))
 		{
 			m_aTeamscore[TEAM_BLUE] = 100;
 			for(int i = 0; i < MAX_CLIENTS; i++)
@@ -442,7 +461,7 @@ void CGameControllerZESC::OnEndRound()
 				if(GameServer()->m_apPlayers[i] && GameServer()->m_apPlayers[i]->GetTeam() == TEAM_BLUE)
 					GameServer()->m_apPlayers[i]->m_Score += 10;
 			}
-			if(!m_LevelEarned && m_apFlags[TEAM_RED] && m_apFlags[TEAM_RED]->m_pCarryingCharacter && m_apFlags[TEAM_RED]->m_pCarryingCharacter->GetPlayer())
+			if(!m_LevelEarned && m_apFlags[TEAM_RED] && m_apFlags[TEAM_RED]->m_pCarryingCharacter)
 			{
 				m_apFlags[TEAM_RED]->m_pCarryingCharacter->GetPlayer()->m_Score += 10;
 				m_LevelEarned = true;
