@@ -126,6 +126,8 @@ void CGameClient::OnConsoleInit()
 	m_pVoting = &::gs_Voting;
 	m_pScoreboard = &::gs_Scoreboard;
 	m_pItems = &::gs_Items;
+	m_pMapLayersBackGround = &::gs_MapLayersBackGround;
+	m_pMapLayersForeGround = &::gs_MapLayersForeGround;
 
 	// make a list of all the systems, make sure to add them in the corrent render order
 	m_All.Add(m_pSkins);
@@ -860,6 +862,17 @@ void CGameClient::OnNewSnapshot()
 				m_Snap.m_paInfoByScore[i] = m_Snap.m_paInfoByScore[i+1];
 				m_Snap.m_paInfoByScore[i+1] = pTmp;
 			}
+		}
+	}
+	// sort player infos by team
+	int Teams[3] = { TEAM_RED, TEAM_BLUE, TEAM_SPECTATORS };
+	int Index = 0;
+	for(int Team = 0; Team < 3; ++Team)
+	{
+		for(int i = 0; i < MAX_CLIENTS && Index < MAX_CLIENTS; ++i)
+		{
+			if(m_Snap.m_paPlayerInfos[i] && m_Snap.m_paPlayerInfos[i]->m_Team == Teams[Team])
+				m_Snap.m_paInfoByTeam[Index++] = m_Snap.m_paPlayerInfos[i];
 		}
 	}
 

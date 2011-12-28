@@ -7,7 +7,7 @@
 enum
 {
 	LAYERTYPE_INVALID=0,
-	LAYERTYPE_GAME, // not used
+	LAYERTYPE_GAME,
 	LAYERTYPE_TILES,
 	LAYERTYPE_QUADS,
 
@@ -178,7 +178,7 @@ struct CEnvPoint
 	bool operator<(const CEnvPoint &Other) { return m_Time < Other.m_Time; }
 } ;
 
-struct CMapItemEnvelope
+struct CMapItemEnvelope_v1
 {
 	int m_Version;
 	int m_Channels;
@@ -186,5 +186,11 @@ struct CMapItemEnvelope
 	int m_NumPoints;
 	int m_aName[8];
 } ;
+
+struct CMapItemEnvelope : public CMapItemEnvelope_v1
+{
+	enum { CURRENT_VERSION=2 };
+	int m_Synchronized;
+};
 
 #endif

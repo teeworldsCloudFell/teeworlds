@@ -6,6 +6,7 @@
 #include <engine/console.h>
 #include <engine/graphics.h>
 #include <engine/storage.h>
+#include <engine/shared/config.h>
 #include <engine/shared/linereader.h>
 
 #include "countryflags.h"
@@ -72,8 +73,11 @@ void CCountryFlags::LoadCountryflagsIndexfile()
 		str_copy(CountryFlag.m_aCountryCodeString, aOrigin, sizeof(CountryFlag.m_aCountryCodeString));
 		CountryFlag.m_Texture = Graphics()->LoadTextureRaw(Info.m_Width, Info.m_Height, Info.m_Format, Info.m_pData, Info.m_Format, 0);
 		mem_free(Info.m_pData);
-		str_format(aBuf, sizeof(aBuf), "loaded country flag '%s'", aOrigin);
-		Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "countryflags", aBuf);
+		if(g_Config.m_Debug)
+		{
+			str_format(aBuf, sizeof(aBuf), "loaded country flag '%s'", aOrigin);
+			Console()->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "countryflags", aBuf);
+		}
 		m_aCountryFlags.add(CountryFlag);
 	}
 	io_close(File);
@@ -94,6 +98,7 @@ void CCountryFlags::OnInit()
 		CCountryFlag DummyEntry;
 		DummyEntry.m_CountryCode = -1;
 		DummyEntry.m_Texture = -1;
+		mem_zero(DummyEntry.m_aCountryCodeString, sizeof(DummyEntry.m_aCountryCodeString));
 		m_aCountryFlags.add(DummyEntry);
 	}
 }

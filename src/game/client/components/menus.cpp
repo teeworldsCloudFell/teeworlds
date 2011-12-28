@@ -35,10 +35,9 @@ vec4 CMenus::ms_GuiColor;
 vec4 CMenus::ms_ColorTabbarInactiveOutgame;
 vec4 CMenus::ms_ColorTabbarActiveOutgame;
 vec4 CMenus::ms_ColorTabbarInactive;
-vec4 CMenus::ms_ColorTabbarActive;
+vec4 CMenus::ms_ColorTabbarActive = vec4(0,0,0,0.5f);
 vec4 CMenus::ms_ColorTabbarInactiveIngame;
 vec4 CMenus::ms_ColorTabbarActiveIngame;
-
 
 float CMenus::ms_ButtonHeight = 25.0f;
 float CMenus::ms_ListheaderHeight = 17.0f;
@@ -1108,7 +1107,7 @@ int CMenus::Render()
 			Box.HSplitBottom(24.f, &Box, &Part);
 			Box.HSplitBottom(20.f, &Box, 0);
 			Box.VMargin(20.0f, &Box);
-			
+
 			static int ActSelection = -2;
 			if(ActSelection == -2)
 				ActSelection = g_Config.m_BrFilterCountryIndex;
