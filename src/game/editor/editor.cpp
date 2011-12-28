@@ -1051,6 +1051,12 @@ void CEditor::DoQuad(CQuad *q, int Index)
 	if(dx*dx+dy*dy < 50)
 		UI()->SetHotItem(pID);
 
+	bool IgnoreGrid;
+	if(Input()->KeyPressed(KEY_LALT) || Input()->KeyPressed(KEY_RALT))
+		IgnoreGrid = true;
+	else
+		IgnoreGrid = false;
+
 	// draw selection background
 	if(m_SelectedQuad == Index)
 	{
@@ -1066,7 +1072,7 @@ void CEditor::DoQuad(CQuad *q, int Index)
 			// check if we only should move pivot
 			if(s_Operation == OP_MOVE_PIVOT)
 			{
-				if(m_GridActive)
+				if(m_GridActive && !IgnoreGrid)
 				{
 					int LineDistance = GetLineDistance();
 
@@ -1093,7 +1099,7 @@ void CEditor::DoQuad(CQuad *q, int Index)
 			else if(s_Operation == OP_MOVE_ALL)
 			{
 				// move all points including pivot
-				if(m_GridActive)
+				if(m_GridActive && !IgnoreGrid)
 				{
 					int LineDistance = GetLineDistance();
 
@@ -1172,7 +1178,7 @@ void CEditor::DoQuad(CQuad *q, int Index)
 		ms_pUiGotContext = pID;
 
 		Graphics()->SetColor(1,1,1,1);
-		m_pTooltip = "Left mouse button to move. Hold shift to move pivot. Hold ctrl to rotate.";
+		m_pTooltip = "Left mouse button to move. Hold shift to move pivot. Hold ctrl to rotate. Hold alt to ignore grid.";
 
 		if(UI()->MouseButton(0))
 		{
@@ -1249,6 +1255,12 @@ void CEditor::DoQuadPoint(CQuad *pQuad, int QuadIndex, int V)
 	static bool s_Moved;
 	static int s_Operation = OP_NONE;
 
+	bool IgnoreGrid;
+	if(Input()->KeyPressed(KEY_LALT) || Input()->KeyPressed(KEY_RALT))
+		IgnoreGrid = true;
+	else
+		IgnoreGrid = false;
+
 	if(UI()->ActiveItem() == pID)
 	{
 		float dx = m_MouseDeltaWx;
@@ -1263,7 +1275,7 @@ void CEditor::DoQuadPoint(CQuad *pQuad, int QuadIndex, int V)
 		{
 			if(s_Operation == OP_MOVEPOINT)
 			{
-				if(m_GridActive)
+				if(m_GridActive && !IgnoreGrid)
 				{
 					for(int m = 0; m < 4; m++)
 						if(m_SelectedPoints&(1<<m))
@@ -1344,7 +1356,7 @@ void CEditor::DoQuadPoint(CQuad *pQuad, int QuadIndex, int V)
 		ms_pUiGotContext = pID;
 
 		Graphics()->SetColor(1,1,1,1);
-		m_pTooltip = "Left mouse button to move. Hold shift to move the texture.";
+		m_pTooltip = "Left mouse button to move. Hold shift to move the texture. Hold alt to ignore grid.";
 
 		if(UI()->MouseButton(0))
 		{
@@ -1364,6 +1376,7 @@ void CEditor::DoQuadPoint(CQuad *pQuad, int QuadIndex, int V)
 					m_SelectedPoints |= 1<<V;
 				else
 					m_SelectedPoints = 1<<V;
+				s_Moved = true;
 			}
 
 			m_SelectedQuad = QuadIndex;
@@ -1513,11 +1526,17 @@ void CEditor::DoQuadEnvPoint(CQuad *pQuad, int QIndex, int PIndex)
 		s_ActQIndex = QIndex;
 	}
 
+	bool IgnoreGrid;
+	if(Input()->KeyPressed(KEY_LALT) || Input()->KeyPressed(KEY_RALT))
+		IgnoreGrid = true;
+	else
+		IgnoreGrid = false;
+
 	if(UI()->ActiveItem() == pID && s_ActQIndex == QIndex)
 	{
 		if(s_Operation == OP_MOVE)
 		{
-			if(m_GridActive)
+			if(m_GridActive && !IgnoreGrid)
 			{
 				int LineDistance = GetLineDistance();
 
@@ -1561,7 +1580,7 @@ void CEditor::DoQuadEnvPoint(CQuad *pQuad, int QIndex, int PIndex)
 		ms_pUiGotContext = pID;
 
 		Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
-		m_pTooltip = "Left mouse button to move. Hold ctrl to rotate.";
+		m_pTooltip = "Left mouse button to move. Hold ctrl to rotate. Hold alt to ignore grid.";
 
 		if(UI()->MouseButton(0))
 		{
@@ -3178,6 +3197,17 @@ void CEditor::RenderEnvelopeEditor(CUIRect View)
 				if(DoButton_Editor(&s_aChannelButtons[i], s_paNames[pEnvelope->m_Channels-3][i], s_ActiveChannels&Bit, &Button, 0, paDescriptions[pEnvelope->m_Channels-3][i]))
 					s_ActiveChannels ^= Bit;
 			}
+
+			// sync checkbox
+			ToolBar.VSplitLeft(15.0f, &Button, &ToolBar);
+			ToolBar.VSplitLeft(12.0f, &Button, &ToolBar);
+			static int s_SyncButton;
+			if(DoButton_Editor(&s_SyncButton, pEnvelope->m_Synchronized?"X":"", 0, &Button, 0, "Enable envelope synchronization between clients"))
+				pEnvelope->m_Synchronized = !pEnvelope->m_Synchronized;
+
+			ToolBar.VSplitLeft(4.0f, &Button, &ToolBar);
+			ToolBar.VSplitLeft(80.0f, &Button, &ToolBar);
+			UI()->DoLabel(&Button, "Synchronized", 10.0f, -1, -1);
 		}
 
 		float EndTime = pEnvelope->EndTime();
@@ -3785,18 +3815,26 @@ void CEditorMap::DeleteEnvelope(int Index)
 		for(int j = 0; j < m_lGroups[i]->m_lLayers.size(); ++j)
 			if(m_lGroups[i]->m_lLayers[j]->m_Type == LAYERTYPE_QUADS)
 			{
-				CLayerQuads *Layer = static_cast<CLayerQuads *>(m_lGroups[i]->m_lLayers[j]);
-				for(int k = 0; k < Layer->m_lQuads.size(); ++k)
+				CLayerQuads *pLayer = static_cast<CLayerQuads *>(m_lGroups[i]->m_lLayers[j]);
+				for(int k = 0; k < pLayer->m_lQuads.size(); ++k)
 				{
-					if(Layer->m_lQuads[k].m_PosEnv == Index)
-						Layer->m_lQuads[k].m_PosEnv = -1;
-					else if(Layer->m_lQuads[k].m_PosEnv > Index)
-						Layer->m_lQuads[k].m_PosEnv--;
-					if(Layer->m_lQuads[k].m_ColorEnv == Index)
-						Layer->m_lQuads[k].m_ColorEnv = -1;
-					else if(Layer->m_lQuads[k].m_ColorEnv > Index)
-						Layer->m_lQuads[k].m_ColorEnv--;
+					if(pLayer->m_lQuads[k].m_PosEnv == Index)
+						pLayer->m_lQuads[k].m_PosEnv = -1;
+					else if(pLayer->m_lQuads[k].m_PosEnv > Index)
+						pLayer->m_lQuads[k].m_PosEnv--;
+					if(pLayer->m_lQuads[k].m_ColorEnv == Index)
+						pLayer->m_lQuads[k].m_ColorEnv = -1;
+					else if(pLayer->m_lQuads[k].m_ColorEnv > Index)
+						pLayer->m_lQuads[k].m_ColorEnv--;
 				}
+			}
+			else if(m_lGroups[i]->m_lLayers[j]->m_Type == LAYERTYPE_TILES)
+			{
+				CLayerTiles *pLayer = static_cast<CLayerTiles *>(m_lGroups[i]->m_lLayers[j]);
+				if(pLayer->m_ColorEnv == Index)
+					pLayer->m_ColorEnv = -1;
+				if(pLayer->m_ColorEnv > Index)
+					pLayer->m_ColorEnv--;
 			}
 
 	m_lEnvelopes.remove_index(Index);
