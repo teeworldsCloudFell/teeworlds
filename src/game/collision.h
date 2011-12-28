@@ -41,6 +41,7 @@ public:
 	vec2 GetPos(int Index);
 	int GetCollision(int Index);
 	int IsTeleport(int Index);
+	int IsTeleportCheckpoint(int Index);
 	int IsSpeedup(int Index);
 	void GetSpeedup(int Index, vec2 *Dir, int *Force);
 	class CTeleTile *m_pTele;

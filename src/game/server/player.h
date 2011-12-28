@@ -70,6 +70,7 @@ public:
 	
 	bool m_Nuked;
 	bool m_ShowHP;
+	vec2 m_LastCheckpoint;
 
 	// TODO: clean this up
 	struct

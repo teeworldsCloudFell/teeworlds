@@ -150,11 +150,21 @@ int CCollision::IsTeleport(int Index)
 	if(!m_pTele || Index < 0)
 		return 0;
 
-	int Tele = 0;
 	if(m_pTele[Index].m_Type == TILE_TELEIN)
-		Tele = m_pTele[Index].m_Number;
+		return m_pTele[Index].m_Number;
 
-	return Tele;
+	return 0;
+}
+
+int CCollision::IsTeleportCheckpoint(int Index)
+{
+	if(!m_pTele || Index < 0)
+		return 0;
+
+	if(m_pTele[Index].m_Type == TILE_TELECHECKPOINT)
+		return m_pTele[Index].m_Number;
+
+	return 0;
 }
 
 int CCollision::IsSpeedup(int Index)

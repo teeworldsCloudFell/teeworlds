@@ -24,6 +24,7 @@ CPlayer::CPlayer(CGameContext *pGameServer, int ClientID, int Team)
 	m_LastActionTick = Server()->Tick();
 	m_TeamChangeTick = Server()->Tick();
 	m_ShowHP = true;
+	m_LastCheckpoint = vec2(0, 0);
 }
 
 CPlayer::~CPlayer()
@@ -310,6 +311,8 @@ void CPlayer::TryRespawn()
 			if(!GameServer()->m_pController->CanSpawn(TEAM_BLUE, &SpawnPos))
 				return;
 		}
+		if((int)m_LastCheckpoint.x != 0 && (int)m_LastCheckpoint.y != 0)
+			SpawnPos = m_LastCheckpoint;
 	}
 	else if(m_Team == TEAM_BLUE)
 	{
@@ -387,6 +390,7 @@ void CPlayer::ResetZomb()
 	m_Team = TEAM_BLUE;
 	GameServer()->m_pController->OnPlayerInfoChange(GameServer()->m_apPlayers[m_ClientID]);
 	m_Nuked = false;
+	m_LastCheckpoint = vec2(0, 0);
 }
 
 void CPlayer::Nuke()

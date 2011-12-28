@@ -821,6 +821,13 @@ void CCharacter::Tick()
 					m_aWeapons[i].m_Got = false;
 			}
 		}
+
+		z = GameServer()->Collision()->IsTeleportCheckpoint(Tile);
+		if(z)
+		{
+			if(pzESC->m_pTeleporter[z-1])
+				m_pPlayer->m_LastCheckpoint = pzESC->m_pTeleporter[z-1];
+		}
 	}
 
 	if(m_FreezeTick)
