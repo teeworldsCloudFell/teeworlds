@@ -529,6 +529,13 @@ static void IntVariableCommand(IConsole::IResult *pResult, void *pUserData)
 	}
 }
 
+int CConsole::GetIntVariableCommand(IConsole::IResult *pResult, void *pUserData)
+{
+	CIntVariableData *pData = (CIntVariableData *)pUserData;
+
+	return *(pData->m_pVariable);
+}
+
 static void StrVariableCommand(IConsole::IResult *pResult, void *pUserData)
 {
 	CStrVariableData *pData = (CStrVariableData *)pUserData;
@@ -562,6 +569,13 @@ static void StrVariableCommand(IConsole::IResult *pResult, void *pUserData)
 		str_format(aBuf, sizeof(aBuf), "Value: %s", pData->m_pStr);
 		pData->m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "Console", aBuf);
 	}
+}
+
+const char *CConsole::GetStrVariableCommand(IConsole::IResult *pResult, void *pUserData)
+{
+	CStrVariableData *pData = (CStrVariableData *)pUserData;
+
+	return pData->m_pStr;
 }
 
 CConsole::CConsole(int FlagMask)
@@ -815,5 +829,89 @@ const IConsole::CCommandInfo *CConsole::GetCommandInfo(const char *pName, int Fl
 	return 0;
 }
 
+const char *CConsole::ExecuteLineEx(const char *pStr)
+{
+	while(pStr && *pStr)
+	{
+		CResult Result;
+		const char *pEnd = pStr;
+		const char *pNextPart = 0;
+		int InString = 0;
+
+		while(*pEnd)
+		{
+			if(*pEnd == '"')
+				InString ^= 1;
+			else if(*pEnd == '\\') // escape sequences
+			{
+				if(pEnd[1] == '"')
+					pEnd++;
+			}
+			else if(!InString)
+			{
+				if(*pEnd == ';') // command separator
+				{
+					pNextPart = pEnd+1;
+					break;
+				}
+				else if(*pEnd == '#') // comment, no need to do anything more
+					break;
+			}
+
+			pEnd++;
+		}
+
+		if(ParseStart(&Result, pStr, (pEnd-pStr) + 1) != 0)
+			return "error";
+
+		if(!*Result.m_pCommand)
+			return "error";
+
+		CCommand *pCommand = FindCommand(Result.m_pCommand, m_FlagMask);
+
+		if(pCommand)
+		{
+			if(ParseArgs(&Result, pCommand->m_pParams))
+			{
+				// silently ignore and go to next command if any
+			}
+			else
+			{
+				if(pCommand->m_pfnCallback == Con_Chain) // chained, evil matricks is hiding data :o
+				{
+					while(1) // M-M-M-M-M-MULTICHAIN!!!!
+					{
+						CChain *pChainInfo = (CChain *)pCommand->m_pUserData;
+						pCommand->m_pfnCallback = pChainInfo->m_pfnCallback;
+						pCommand->m_pUserData = pChainInfo->m_pCallbackUserData;
+						if(pCommand->m_pfnCallback == Con_Chain)
+							continue;
+
+						if(pCommand->m_pfnCallback == IntVariableCommand) // int saved in here :>
+							return int_tostr(GetIntVariableCommand(&Result, pCommand->m_pUserData));
+						else if(pCommand->m_pfnCallback == StrVariableCommand) // string saved in here :>
+							return GetStrVariableCommand(&Result, pCommand->m_pUserData);
+						break;
+					}
+				}
+				else
+				{
+					if(pCommand->m_pfnCallback == IntVariableCommand) // int saved in here :>
+						return int_tostr(GetIntVariableCommand(&Result, pCommand->m_pUserData));
+					else if(pCommand->m_pfnCallback == StrVariableCommand) // string saved in here :>
+						return GetStrVariableCommand(&Result, pCommand->m_pUserData);
+				}
+				// DAFUQ? The nab called a command :D
+			}
+		}
+		else
+		{
+			// silently ignore and go to next command if any
+		}
+
+		pStr = pNextPart;
+	}
+	return "error - it's your fault";
+}
 
 extern IConsole *CreateConsole(int FlagMask) { return new CConsole(FlagMask); }

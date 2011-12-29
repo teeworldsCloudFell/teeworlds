@@ -5,6 +5,14 @@
 
 #include <base/vmath.h>
 #include <base/tl/array.h>
+#include <engine/shared/protocol.h> // MAX_CLIENTS
+
+enum
+{
+	TRIGGER_ONCE=0,
+	TRIGGER_PLAYERONCE,
+	TRIGGER_MULTI,
+};
 
 /*
 	Class: Game Controller
@@ -58,13 +66,19 @@ protected:
 	int m_LastZomb2;
 
 public:
-	struct CTimedEvent
+	class CTimedEvent
 	{
+	public:
 		float m_Time;
 		int64 m_Tick;
 		char *m_pAction;
 
-		CTimedEvent() {}
+		CTimedEvent() { m_pAction = 0; }
+		~CTimedEvent()
+		{
+			if(m_pAction)
+				delete[] m_pAction;
+		}
 		CTimedEvent(float Time, int64 Tick, const char *pAction)
 		{
 			m_Time = Time;
@@ -74,19 +88,38 @@ public:
 			mem_zero(m_pAction, str_length(pAction)+1);
 			str_copy(m_pAction, pAction, str_length(pAction)+1);
 		}
+
 	};
 	array<CTimedEvent> m_lTimedEvents;
 
 	struct CTriggeredEvent
 	{
 		bool m_State;
+		int m_Type;
+		bool m_aPlayerState[MAX_CLIENTS];
 		char m_aAction[512];
+		void Reset(bool Hard)
+		{
+			m_State = false;
+			for(int i = 0; i < MAX_CLIENTS; i++)
+				m_aPlayerState[i] = false;
+			if(Hard)
+			{
+				m_Type = TRIGGER_ONCE;
+				m_aAction[0] = '\0';
+			}
+		}
 	} m_aTriggeredEvents[32];
 
 	struct CCustomTeleport
 	{
 		int m_Teleport;
 		int m_Team;
+		void Reset()
+		{
+			m_Teleport = -1;
+			m_Team = -1;
+		}
 	} m_aCustomTeleport[32];
 
 	char m_aaOnTeamWinEvent[3][512];
@@ -111,10 +144,11 @@ public:
 
 	bool IsForceBalanced();
 
+	int ParseExec(char *pCommand, int Size);
 	bool RegisterTimedEvent(float Time, const char *pCommand);
 	void ResetEvents();
-	bool RegisterTriggeredEvent(int ID, const char *pCommand);
-	void OnTrigger(int ID);
+	bool RegisterTriggeredEvent(int ID, int Type, const char *pCommand);
+	void OnTrigger(int ID, int TriggeredBy);
 	int OnCustomTeleporter(int ID, int Team);
 
 	/*

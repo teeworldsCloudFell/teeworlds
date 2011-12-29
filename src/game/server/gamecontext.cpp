@@ -1498,9 +1498,17 @@ void CGameContext::ConRegisterTriggeredEvent(IConsole::IResult *pResult, void *p
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
 	int ID = pResult->GetInteger(0);
-	const char *pCommand = pResult->GetString(1);
+	int Type = 0;
+	const char *pCommand = 0;
+	if(pResult->NumArguments() > 2)
+	{
+		Type = pResult->GetInteger(1);
+		pCommand = pResult->GetString(2);
+	}
+	else
+		pCommand = pResult->GetString(1);
 
-	if(pSelf->m_pController->RegisterTriggeredEvent(ID-1, pCommand))
+	if(pSelf->m_pController->RegisterTriggeredEvent(ID-1, Type, pCommand))
 		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Triggered event registered");
 	else
 		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Couldn't register triggered event");
@@ -1524,7 +1532,7 @@ void CGameContext::ConListTriggeredEvents(IConsole::IResult *pResult, void *pUse
 	{
 		if(pSelf->m_pController->m_aTriggeredEvents[i].m_aAction[0])
 		{
-			str_format(aBuf, sizeof(aBuf), "%d. \"%s\"", i+1, pSelf->m_pController->m_aTriggeredEvents[i].m_aAction);
+			str_format(aBuf, sizeof(aBuf), "%d. %d \"%s\"", i+1, pSelf->m_pController->m_aTriggeredEvents[i].m_Type, pSelf->m_pController->m_aTriggeredEvents[i].m_aAction);
 			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
 		}
 	}
@@ -1703,21 +1711,23 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("zdoor_state", "ii", CFGFLAG_SERVER, ConZDoorSetState, this, "Set the zdoorstate: zdoor_state <id> <state (0=open, 1=zclosed, 2=reopened)>");
 
 	Console()->Register("event_timed_register", "fr", CFGFLAG_SERVER, ConRegisterTimedEvent, this, "Register a timed event: event_timed_register <seconds> <command>");
+	Console()->Register("delay", "fr", CFGFLAG_SERVER, ConRegisterTimedEvent, this, "Register a timed event: delay <seconds> <command>");
 	Console()->Register("event_timed_list", "", CFGFLAG_SERVER, ConListTimedEvents, this, "List all timed events");
 	Console()->Register("event_timed_flush", "", CFGFLAG_SERVER, ConFlushTimedEvents, this, "Delete all timed events");
 
-	Console()->Register("event_triggered_register", "ir", CFGFLAG_SERVER, ConRegisterTriggeredEvent, this, "Register a triggered event: event_triggered_register <id> <command>");
+	Console()->Register("event_triggered_register", "i?ir", CFGFLAG_SERVER, ConRegisterTriggeredEvent, this, "Register a triggered event: event_triggered_register <id> [type (0 = once, 1 = playeronce, 2 = multi)] <command>");
+	Console()->Register("trigger", "i?ir", CFGFLAG_SERVER, ConRegisterTriggeredEvent, this, "Register a triggered event: trigger <id> (<type>) <command>");
 	Console()->Register("event_triggered_list", "", CFGFLAG_SERVER, ConListTriggeredEvents, this, "List all triggered events");
 	Console()->Register("event_triggered_flush", "", CFGFLAG_SERVER, ConFlushTriggeredEvents, this, "Delete all triggered events");
 
 	Console()->Register("event_onteamwin_register", "ir", CFGFLAG_SERVER, ConRegisterOnTeamWinEvent, this, "Register a on-teamwin event: event_onteamwin_register <team (-1=Both, 0=Red, 1=Blue)> <command>");
 	Console()->Register("event_onteamwin_flush", "", CFGFLAG_SERVER, ConFlushOnTeamWinEvent, this, "Flush on-teamwin events");
 
-	Console()->Register("cteleporter_register", "ii?i", CFGFLAG_SERVER, ConCustomTeleporterRegister, this, "Assign teleport to a custom teleporter: cteleport_register <id> <to X> [team]");
+	Console()->Register("cteleporter_register", "ii?i", CFGFLAG_SERVER, ConCustomTeleporterRegister, this, "Assign teleport to a custom teleporter: cteleport_register <id> <To X> [team]");
 	Console()->Register("cteleporter_list", "", CFGFLAG_SERVER, ConCustomTeleporterList, this, "List custom teleports");
 	Console()->Register("cteleporter_flush", "", CFGFLAG_SERVER, ConCustomTeleporterFlush, this, "Flush custom teleports");
 
-	Console()->Register("teleport_team", "ii", CFGFLAG_SERVER, ConTeleportTeam, this, "Teleport team to a ToX teleport: teleport_team <Team> <ToX>");
+	Console()->Register("teleport_team", "ii", CFGFLAG_SERVER, ConTeleportTeam, this, "Teleport team to a To X teleport: teleport_team <Team> <To X>");
 
 	Console()->Register("reload_map_defaults", "", CFGFLAG_SERVER, ConReloadMapDefaults, this, "Reload the map internal settings.");
 

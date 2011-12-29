@@ -67,6 +67,8 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 
 	m_pPlayer = pPlayer;
 	m_Pos = Pos;
+	m_PrevPos = Pos;
+	m_OldPos = Pos;
 	m_HittingDoor = false;
 	m_PushDirection = vec2(0,0);
 
@@ -656,13 +658,16 @@ void CCharacter::Tick()
 
 		else if(TileIndex == TILE_NONINJA)
 		{
-			m_aWeapons[WEAPON_NINJA].m_Got = false;
-			m_ActiveWeapon = m_LastWeapon;
 			if(m_ActiveWeapon == WEAPON_NINJA)
-				m_ActiveWeapon = WEAPON_GUN;
+			{
+				m_aWeapons[WEAPON_NINJA].m_Got = false;
+				m_ActiveWeapon = m_LastWeapon;
+				if(m_ActiveWeapon == WEAPON_NINJA)
+					m_ActiveWeapon = WEAPON_GUN;
 
-			SetWeapon(m_ActiveWeapon);
-			m_Ninja.m_CurrentMoveTime = 0;
+				SetWeapon(m_ActiveWeapon);
+				m_Ninja.m_CurrentMoveTime = 0;
+			}
 		}
 
 		else if(TileIndex == TILE_NOWEAPONS)
@@ -706,7 +711,7 @@ void CCharacter::Tick()
 			pzESC->OnZHoldpoint(TileIndex-TILE_ZHOLDPOINT_BEGIN+32);
 
 		else if((TileIndex >= TILE_TRIGGERALL_BEGIN && TileIndex <= TILE_TRIGGERALL_END) || (TileIndex >= TILE_TRIGGERRED_BEGIN && TileIndex <= TILE_TRIGGERRED_END && m_pPlayer && m_pPlayer->GetTeam() == TEAM_RED) || (TileIndex >= TILE_TRIGGERBLUE_BEGIN && TileIndex <= TILE_TRIGGERBLUE_END && m_pPlayer && m_pPlayer->GetTeam() == TEAM_BLUE))
-			GameServer()->m_pController->OnTrigger(TileIndex-TILE_TRIGGERALL_BEGIN);
+			GameServer()->m_pController->OnTrigger(TileIndex-TILE_TRIGGERALL_BEGIN, m_pPlayer->GetCID());
 
 		else if(TileIndex >= TILE_CTELEPORT_BEGIN && TileIndex <= TILE_CTELEPORT_END)
 		{
@@ -1053,7 +1058,7 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 		else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item == HITEM_SHOTGUN)
 			m_Item ? AddVel = Force : AddVel = Force*1.3f;
 	}
-	else if(Weapon == WEAPON_GRENADE)
+	else if(Weapon == WEAPON_GRENADE && Dmg > 1)
 	{
 		if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item != HITEM_GRENADE)
 		{

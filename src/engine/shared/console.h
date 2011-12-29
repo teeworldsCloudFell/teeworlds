@@ -59,6 +59,10 @@ class CConsole : public IConsole
 
 	void ExecuteFileRecurse(const char *pFilename);
 	void ExecuteLineStroked(int Stroke, const char *pStr);
+	const char *ExecuteLineEx(const char *pStr);
+
+	int GetIntVariableCommand(IConsole::IResult *pResult, void *pUserData);
+	const char *GetStrVariableCommand(IConsole::IResult *pResult, void *pUserData);
 
 	struct
 	{

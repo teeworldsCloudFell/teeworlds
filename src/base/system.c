@@ -1701,6 +1701,51 @@ const char *str_find(const char *haystack, const char *needle)
 	return 0;
 }
 
+int str_replace(char *haystack, int size, const char *needle, const char *newneedle)
+{
+	char *str = haystack;
+	char *tmp = haystack;
+	char *result;
+	int found = 0;
+	int length, reslen;
+	int oldlen = strlen(needle);
+	int newlen = strlen(newneedle);
+
+	tmp = str;
+	while((tmp = strstr(tmp, needle)) != NULL)
+	{
+		found++;
+		tmp += oldlen;
+	}
+
+	length = strlen(str) + found * (newlen - oldlen);
+	if((result = (char *)malloc(length+1)) == NULL)
+	{
+		dbg_msg("system", "not enough memory");
+		return -1;
+	}
+	else
+	{
+		tmp = str;
+		reslen = 0; /* length of current result */ 
+		/* Replace each old string found with new string  */
+		while((tmp = strstr(tmp, needle)) != NULL)
+		{
+			length = (tmp - str); /* Number of chars to keep intouched */
+			strncpy(result + reslen, str, length); /* Original part keeped */ 
+			strcpy(result + (reslen += length), newneedle); /* Insert new string */
+			reslen += newlen;
+			tmp += oldlen;
+			str = tmp;
+		}
+		strcpy(result + reslen, str); /* Copies last part and ending nul char */
+	}
+	strncpy(haystack, result, size);
+	haystack[size-1] = 0; /* assure null termination */
+	free(result); /* free memory */
+	return found;
+}
+
 void str_hex(char *dst, int dst_size, const void *data, int data_size)
 {
 	static const char hex[] = "0123456789ABCDEF";
@@ -1794,8 +1839,12 @@ char str_uppercase(char c)
 
 int str_toint(const char *str) { return atoi(str); }
 float str_tofloat(const char *str) { return atof(str); }
-
-
+char *int_tostr(int num)
+{
+	static char buf[10];
+	itoa(num, buf, 10);
+	return buf;
+}
 
 static int str_utf8_isstart(char c)
 {

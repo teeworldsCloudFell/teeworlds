@@ -112,6 +112,9 @@ int CGameControllerZESC::OnCharacterDeath(class CCharacter *pVictim, class CPlay
 			HadFlag |= 1;
 		}
 	}
+	if(pVictim->GetPlayer()->GetCID() != pKiller->GetCID())
+		pKiller->m_Score += 2;
+
 	return 0;
 }
 
@@ -426,12 +429,12 @@ void CGameControllerZESC::CheckZomb()
 	}
 	m_SuddenDeath = 0;
 
-	if(!m_RoundStarted && !m_ZombWarmup && !m_RoundCount && m_GameOverTick == -1)
+	if(!m_RoundStarted && !m_ZombWarmup && !m_RoundCount && g_Config.m_SvZombieRatio && m_GameOverTick == -1)
 	{
 		GameServer()->m_World.m_Paused = true;
 		m_GameOverTick = Server()->Tick()+Server()->TickSpeed()*g_Config.m_SvWarmup;
 	}
-	else if(!m_RoundStarted && !m_ZombWarmup && m_RoundCount)
+	else if(!m_RoundStarted && !m_ZombWarmup && g_Config.m_SvZombieRatio && m_RoundCount)
 	{
 		StartZomb(true);
 		if(g_Config.m_SvZombieRatio)

@@ -79,6 +79,7 @@ public:
 	virtual bool LineIsValid(const char *pStr) = 0;
 	virtual void ExecuteLine(const char *Sptr) = 0;
 	virtual void ExecuteLineStroked(int Stroke, const char *pStr) = 0;
+	virtual const char *ExecuteLineEx(const char *pStr) = 0;
 	virtual void ExecuteFile(const char *pFilename) = 0;
 
 	virtual int RegisterPrintCallback(int OutputLevel, FPrintCallback pfnPrintCallback, void *pUserData) = 0;

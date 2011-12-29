@@ -38,13 +38,9 @@ IGameController::IGameController(class CGameContext *pGameServer)
 
 	for(int i = 0; i < 32; i++)
 	{
-		m_aTriggeredEvents[i].m_aAction[0] = '\0';
-		m_aTriggeredEvents[i].m_State = false;
+		m_aTriggeredEvents[i].Reset(true);
 		if(i < 16)
-		{
-			m_aCustomTeleport[i].m_Teleport = -1;
-			m_aCustomTeleport[i].m_Team = -1;
-		}
+			m_aCustomTeleport[i].Reset();
 	}
 	m_lTimedEvents.clear();
 	m_aaOnTeamWinEvent[TEAM_RED][0] = '\0';
@@ -464,7 +460,7 @@ void IGameController::Tick()
 					RandomZomb(-1);
 			}
 			else
-				GameServer()->zESCController()->StartZomb(0);
+				GameServer()->zESCController()->StartZomb(false);
 		}
 	}
 
@@ -526,18 +522,46 @@ void IGameController::Tick()
 			if(m_lTimedEvents[i].m_Tick && m_lTimedEvents[i].m_Tick <= Server()->Tick())
 			{
 				m_lTimedEvents[i].m_Tick = 0;
-				GameServer()->Console()->ExecuteLine(m_lTimedEvents[i].m_pAction);
+				char aBuf[512];
+				str_copy(aBuf, m_lTimedEvents[i].m_pAction, sizeof(aBuf));
+				// Parse the exec() command
+				ParseExec(aBuf, sizeof(aBuf));
+				GameServer()->Console()->ExecuteLine(aBuf);
 			}
 		}
 	}
 }
 
+int IGameController::ParseExec(char *pCommand, int Size)
+{
+	int Replaced = 0;
+	const char *pExecStart = 0;
+	const char *pExecEnd = 0;
+	while((pExecStart = str_find(pCommand, "exec(")))
+	{
+		if((pExecEnd = str_find(pExecStart, ")")))
+		{
+			char *pBuf = new char[pExecEnd-pExecStart+2]; // +1 for the last char ")" and +1 for null-termination
+			char *pToExec = new char[pExecEnd-pExecStart-5+1]; // -5 for "exec(" +1 for null-termination
+			str_copy(pBuf, pExecStart, pExecEnd-pExecStart+2);
+			str_copy(pToExec, pExecStart+5, pExecEnd-pExecStart-5+1);
+			str_replace(pCommand, Size, pBuf, GameServer()->Console()->ExecuteLineEx(pToExec));
+			delete[] pBuf;
+			delete[] pToExec;
+			Replaced++;
+		}
+		else
+			return -1;
+	}
+	return Replaced;
+}
+
 bool IGameController::RegisterTimedEvent(float Time, const char *pCommand)
 {
-	if(pCommand[0] == '\0' || Time < 0.5f) // Why use an event with no command or that gets executed immediately?
+	if(pCommand[0] == '\0' || Time < 0.1f) // Why use an event with no command or that gets executed immediately?
 		return false;
 
-	CTimedEvent TimedEvent(Time, Server()->Tick() + Time*Server()->TickSpeed(), pCommand);
+	static CTimedEvent TimedEvent(Time, Server()->Tick() + Time*Server()->TickSpeed(), pCommand);
 	m_lTimedEvents.add(TimedEvent);
 
 	return true;
@@ -549,39 +573,57 @@ void IGameController::ResetEvents()
 		m_lTimedEvents[i].m_Tick = Server()->Tick() + m_lTimedEvents[i].m_Time*Server()->TickSpeed();
 	for(int i = 0; i < 32; i++)
 	{
-		m_aTriggeredEvents[i].m_State = false;
+		m_aTriggeredEvents[i].Reset(false);
 		if(i < 16 && g_Config.m_SvFlushCustomTeleporter)
 		{
-			m_aCustomTeleport[i].m_Teleport = -1;
-			m_aCustomTeleport[i].m_Team = -1;
+			m_aCustomTeleport[i].Reset();
 		}
 	}
 }
 
-bool IGameController::RegisterTriggeredEvent(int ID, const char *pCommand)
+bool IGameController::RegisterTriggeredEvent(int ID, int Type, const char *pCommand)
 {
-	if(!*pCommand) // Why use an event with no command?
-		return false;
-
 	if(ID < 0 || ID >= 32) // Notify the user that he's stupid...
 		return false;
 
-	/*if(m_TriggeredEvent[ID].m_pAction[0]) // Change trigger commands is allowed.
-		return false;*/
+	m_aTriggeredEvents[ID].Reset(true);
 
 	str_copy(m_aTriggeredEvents[ID].m_aAction, pCommand, sizeof(m_aTriggeredEvents[ID].m_aAction));
 	m_aTriggeredEvents[ID].m_State = false;
+	m_aTriggeredEvents[ID].m_Type = Type;
 
 	return true;
 }
 
-void IGameController::OnTrigger(int ID)
+void IGameController::OnTrigger(int ID, int TriggeredBy)
 {
-	if(!m_aTriggeredEvents[ID].m_aAction[0] || m_aTriggeredEvents[ID].m_State)
+	if(!m_aTriggeredEvents[ID].m_aAction[0] || m_aTriggeredEvents[ID].m_State || m_aTriggeredEvents[ID].m_aPlayerState[TriggeredBy])
 		return;
 
-	GameServer()->Console()->ExecuteLine(m_aTriggeredEvents[ID].m_aAction);
-	m_aTriggeredEvents[ID].m_State = true;
+	char aBuf[512];
+	const char *pExecStart = aBuf;
+	const char *pExecEnd = 0;
+	str_copy(aBuf, m_aTriggeredEvents[ID].m_aAction, sizeof(aBuf));
+
+	// Replace keywords with values
+	if(str_find(aBuf, "!activator"))
+	{
+		str_replace(aBuf, sizeof(aBuf), "!activator.name", Server()->ClientName(TriggeredBy));
+		str_replace(aBuf, sizeof(aBuf), "!activator.team", int_tostr(GameServer()->m_apPlayers[TriggeredBy]->GetTeam()));
+		str_replace(aBuf, sizeof(aBuf), "!activator.score", int_tostr(GameServer()->m_apPlayers[TriggeredBy]->m_Score));
+		str_replace(aBuf, sizeof(aBuf), "!activator.pos_x", int_tostr(GameServer()->m_apPlayers[TriggeredBy]->m_ViewPos.x/32));
+		str_replace(aBuf, sizeof(aBuf), "!activator.pos_y", int_tostr(GameServer()->m_apPlayers[TriggeredBy]->m_ViewPos.y/32));
+		str_replace(aBuf, sizeof(aBuf), "!activator", int_tostr(TriggeredBy));
+	}
+
+	// Parse the exec() command
+	ParseExec(aBuf, sizeof(aBuf));
+
+	GameServer()->Console()->ExecuteLine(aBuf);
+	if(m_aTriggeredEvents[ID].m_Type == TRIGGER_ONCE)
+		m_aTriggeredEvents[ID].m_State = true;
+	else if(m_aTriggeredEvents[ID].m_Type == TRIGGER_PLAYERONCE)
+		m_aTriggeredEvents[ID].m_aPlayerState[TriggeredBy] = true;
 }
 
 int IGameController::OnCustomTeleporter(int ID, int Team)
