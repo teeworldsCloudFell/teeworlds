@@ -23,7 +23,7 @@ public:
 	virtual void Reset();
 	virtual void Tick();
 	virtual void Snap(int SnappingClient);
-	virtual int GetLevel();
+	int GetLevel();
 
 private:
 	bool m_Enabled;

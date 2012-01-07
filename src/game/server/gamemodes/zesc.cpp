@@ -234,14 +234,14 @@ void CGameControllerZESC::Tick()
 			if(!apCloseCCharacters[i]->IsAlive() || apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_SPECTATORS || GameServer()->Collision()->IntersectLine(F->m_Pos, apCloseCCharacters[i]->m_Pos, NULL, NULL))
 				continue;
 
-			if(apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_BLUE) //Humans Win :D
+			if(apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_BLUE) // Humans Win :D
 			{
 				//GameServer()->SendBroadcast("Humans win!", -1);
 				m_aTeamscore[TEAM_BLUE] = 100;
 				apCloseCCharacters[i]->GetPlayer()->m_Score += 10;
 				EndRound();
 			}
-			else if(apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_RED) //Zombies win :(
+			else if(apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_RED) // Zombies win :(
 			{
 				//GameServer()->SendBroadcast("Zombies took over the World!", -1);
 				EndRound();
@@ -357,7 +357,7 @@ void CGameControllerZESC::OnHoldpoint(int Index)
 	if(m_Door[Index].m_Tick || !(m_Door[Index].m_State == DOOR_CLOSED) || !ZombStarted() || GetDoorTime(Index) == -1 || !g_Config.m_SvDoors)
 		return;
 
-	m_Door[Index].m_Tick = Server()->Tick() +  Server()->TickSpeed()*GetDoorTime(Index)-1; // -1: if doortime is 5 we get a doublemessage (but srsly a 5 seconds door?)
+	m_Door[Index].m_Tick = Server()->Tick() + Server()->TickSpeed()*GetDoorTime(Index)-1; // -1: if doortime is 5 we get a doublemessage (but srsly a 5 seconds door?)
 	if(m_Door[Index].m_Tick)
 	{
 		char aBuf[128];

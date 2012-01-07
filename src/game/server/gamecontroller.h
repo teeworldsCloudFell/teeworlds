@@ -84,11 +84,19 @@ public:
 			m_Time = Time;
 			m_Tick = Tick;
 			// Saving memory ftw! xD
-			m_pAction = new char[str_length(pAction)+1];
-			mem_zero(m_pAction, str_length(pAction)+1);
-			str_copy(m_pAction, pAction, str_length(pAction)+1);
+			int StrLen = str_length(pAction)+1;
+			m_pAction = new char[StrLen];
+			str_copy(m_pAction, pAction, StrLen);
 		}
-
+		const CTimedEvent &operator =(const CTimedEvent &Orig)
+		{
+			m_Time = Orig.m_Time;
+			m_Tick = Orig.m_Tick;
+			int StrLen = str_length(Orig.m_pAction)+1;
+			m_pAction = new char[StrLen];
+			str_copy(m_pAction, Orig.m_pAction, StrLen);
+			return *this;
+		}
 	};
 	array<CTimedEvent> m_lTimedEvents;
 

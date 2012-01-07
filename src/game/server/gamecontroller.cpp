@@ -561,8 +561,7 @@ bool IGameController::RegisterTimedEvent(float Time, const char *pCommand)
 	if(pCommand[0] == '\0' || Time < 0.1f) // Why use an event with no command or that gets executed immediately?
 		return false;
 
-	static CTimedEvent TimedEvent(Time, Server()->Tick() + Time*Server()->TickSpeed(), pCommand);
-	m_lTimedEvents.add(TimedEvent);
+	m_lTimedEvents.add(CTimedEvent(Time, Server()->Tick() + Time*Server()->TickSpeed(), pCommand));
 
 	return true;
 }

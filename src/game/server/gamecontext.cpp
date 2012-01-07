@@ -1439,6 +1439,7 @@ void CGameContext::ConDoorSetState(IConsole::IResult *pResult, void *pUserData)
 		State++;
 
 	pSelf->zESCController()->m_Door[Door-1].m_State = State;
+	pSelf->zESCController()->m_Door[Door-1].m_Tick = 0;
 
 	char aBuf[128];
 	str_format(aBuf, sizeof(aBuf), "changed doorstate %d to %d", Door, State > 1 ? State-1 : State);
@@ -1454,6 +1455,7 @@ void CGameContext::ConZDoorSetState(IConsole::IResult *pResult, void *pUserData)
 		State += 2;
 
 	pSelf->zESCController()->m_Door[Door+31].m_State = State;
+	pSelf->zESCController()->m_Door[Door-1].m_Tick = 0;
 
 	char aBuf[128];
 	str_format(aBuf, sizeof(aBuf), "changed zdoorstate %d to %d", Door, State ? State-2 : 0);
@@ -1543,10 +1545,7 @@ void CGameContext::ConFlushTriggeredEvents(IConsole::IResult *pResult, void *pUs
 	CGameContext *pSelf = (CGameContext *)pUserData;
 
 	for(int i = 0; i < 32; i++)
-	{
-		pSelf->m_pController->m_aTriggeredEvents[i].m_aAction[0] = '\0';
-		pSelf->m_pController->m_aTriggeredEvents[i].m_State = false;
-	}
+		pSelf->m_pController->m_aTriggeredEvents[i].Reset(true);
 
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Triggered events flushed");
 }
@@ -1590,10 +1589,8 @@ void CGameContext::ConCustomTeleporterFlush(IConsole::IResult *pResult, void *pU
 	CGameContext *pSelf = (CGameContext *)pUserData;
 
 	for(int i = 0; i < 16; i++)
-	{
-		pSelf->m_pController->m_aCustomTeleport[i].m_Teleport = -1;
-		pSelf->m_pController->m_aCustomTeleport[i].m_Team = -1;
-	}	
+		pSelf->m_pController->m_aCustomTeleport[i].Reset();
+
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Custom teleports flushed");
 }
 
@@ -1628,13 +1625,9 @@ void CGameContext::ConReloadMapDefaults(IConsole::IResult *pResult, void *pUserD
 	CGameContext *pSelf = (CGameContext *)pUserData;
 	for(int i = 0; i < 32; i++) // First we have to delete all events...
 	{
-		pSelf->m_pController->m_aTriggeredEvents[i].m_aAction[0] = '\0';
-		pSelf->m_pController->m_aTriggeredEvents[i].m_State = false;
+		pSelf->m_pController->m_aTriggeredEvents[i].Reset(true);
 		if(i < 16)
-		{
-			pSelf->m_pController->m_aCustomTeleport[i].m_Teleport = -1;
-			pSelf->m_pController->m_aCustomTeleport[i].m_Team = -1;
-		}
+			pSelf->m_pController->m_aCustomTeleport[i].Reset();
 	}
 	pSelf->m_pController->m_lTimedEvents.clear();
 	pSelf->m_pController->m_aaOnTeamWinEvent[0][0] = '\0';
