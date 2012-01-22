@@ -1867,7 +1867,7 @@ float str_tofloat(const char *str) { return atof(str); }
 char *int_tostr(int num)
 {
 	static char buf[10];
-	itoa(num, buf, 10);
+	sprintf(buf, "%d", num);
 	return buf;
 }
 
