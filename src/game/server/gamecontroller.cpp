@@ -288,9 +288,6 @@ void IGameController::CycleMap()
 	if(!str_length(g_Config.m_SvMaprotation))
 		return;
 
-	if(m_RoundCount < g_Config.m_SvRoundsPerMap-1)
-		return;
-
 	// handle maprotation
 	const char *pMapRotation = g_Config.m_SvMaprotation;
 	const char *pCurrentMap = g_Config.m_SvMap;
@@ -475,11 +472,22 @@ void IGameController::Tick()
 		}
 	}
 
+	// game is Paused
+	if(GameServer()->m_World.m_Paused)
+		++m_RoundStartTick;
+
 	// check for inactive players
 	if(g_Config.m_SvInactiveKickTime > 0)
 	{
 		for(int i = 0; i < MAX_CLIENTS; ++i)
 		{
+		#ifdef CONF_DEBUG
+			if(g_Config.m_DbgDummies)
+			{
+				if(i >= MAX_CLIENTS-g_Config.m_DbgDummies)
+					break;
+			}
+		#endif
 			if(GameServer()->m_apPlayers[i] && GameServer()->m_apPlayers[i]->GetTeam() != TEAM_SPECTATORS && !Server()->IsAuthed(i))
 			{
 				if(Server()->Tick() > GameServer()->m_apPlayers[i]->m_LastActionTick+g_Config.m_SvInactiveKickTime*Server()->TickSpeed()*60)
