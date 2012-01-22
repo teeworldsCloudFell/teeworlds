@@ -608,8 +608,6 @@ void IGameController::OnTrigger(int ID, int TriggeredBy)
 		return;
 
 	char aBuf[512];
-	const char *pExecStart = aBuf;
-	const char *pExecEnd = 0;
 	str_copy(aBuf, m_aTriggeredEvents[ID].m_aAction, sizeof(aBuf));
 
 	// Replace keywords with values
