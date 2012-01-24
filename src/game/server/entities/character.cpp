@@ -840,11 +840,13 @@ void CCharacter::Tick()
 		m_FreezeTick--;
 		m_Core.m_Vel = vec2(0.f, 0.f);
 		m_Core.m_Pos = m_PrevPos;
+		if(!m_FreezeTick)
+			m_Core.m_Vel += m_AddVel;
 	}
 	if(m_BurnTick)
 	{
 		m_BurnTick--;
-		m_Core.m_Vel.x *= 0.9;
+		m_Core.m_Vel *= 0.9;
 		if(m_BurnTick%20 == 0)
 		{
 			GameServer()->CreateExplosion(m_Core.m_Pos, m_pPlayer->GetCID(), WEAPON_GRENADE, true);
@@ -1096,7 +1098,10 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 	}
 	if(m_BurnTick)
 		AddVel *= 2.5f;
-	m_Core.m_Vel += AddVel;
+	if(!m_FreezeTick)
+		m_Core.m_Vel += AddVel;
+	else
+		m_AddVel += AddVel;
 
 	if(g_Config.m_SvZombieHp)
 	{

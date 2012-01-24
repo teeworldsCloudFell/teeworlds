@@ -144,7 +144,7 @@ private:
 	CCharacterCore m_ReckoningCore; // the dead reckoning core
 
 	int m_LastSpeedup;
-
+	vec2 m_AddVel;
 	int64 m_LastRegenTick;
 };
 
