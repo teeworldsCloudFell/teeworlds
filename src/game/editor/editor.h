@@ -570,6 +570,7 @@ public:
 
 		m_Mode = MODE_LAYERS;
 		m_Dialog = 0;
+		m_EditBoxActive = 0;
 		m_pTooltip = 0;
 
 		m_GridActive = false;
@@ -671,6 +672,7 @@ public:
 
 	int m_Mode;
 	int m_Dialog;
+	int m_EditBoxActive;
 	const char *m_pTooltip;
 
 	bool m_GridActive;

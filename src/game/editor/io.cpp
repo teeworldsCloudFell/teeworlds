@@ -269,7 +269,6 @@ int CEditorMap::Save(class IStorage *pStorage, const char *pFileName)
 			Item.m_Settings = df.AddData(Size, pBuf);
 			delete[] pBuf;
 		}
-
 		df.AddItem(MAPITEMTYPE_INFO, 0, sizeof(Item), &Item);
 	}
 
@@ -497,7 +496,23 @@ int CEditorMap::Load(class IStorage *pStorage, const char *pFileName, int Storag
 	}
 	else if(pItem->m_Version == 1)
 	{
-		//editor.reset(false);s
+		//editor.reset(false);
+
+		// load map info
+		{
+			CMapItemInfo *pItem = (CMapItemInfo *)DataFile.FindItem(MAPITEMTYPE_INFO, 0);
+			if(pItem && pItem->m_Version == 1)
+			{
+				if(pItem->m_Author > -1)
+					str_copy(m_MapInfo.m_aAuthor, (char *)DataFile.GetData(pItem->m_Author), sizeof(m_MapInfo.m_aAuthor));
+				if(pItem->m_MapVersion > -1)
+					str_copy(m_MapInfo.m_aVersion, (char *)DataFile.GetData(pItem->m_MapVersion), sizeof(m_MapInfo.m_aVersion));
+				if(pItem->m_Credits > -1)
+					str_copy(m_MapInfo.m_aCredits, (char *)DataFile.GetData(pItem->m_Credits), sizeof(m_MapInfo.m_aCredits));
+				if(pItem->m_License > -1)
+					str_copy(m_MapInfo.m_aLicense, (char *)DataFile.GetData(pItem->m_License), sizeof(m_MapInfo.m_aLicense));
+			}
+		}
 		// load images
 		{
 			int Start, Num;
