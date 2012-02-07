@@ -11,7 +11,7 @@ CGameControllerCRAP::CGameControllerCRAP(class CGameContext *pGameServer)
 	// DM, TDM and CTF are reserved for teeworlds original modes.
 	m_pGameType = "CRAP";
 	m_pTeleporter = 0;
-	for(int i = 0; i < sizeof(m_Switches); i++)
+	for(unsigned int i = 0; i < sizeof(m_Switches); i++)
 		m_Switches[i] = false;
 	//m_GameFlags = GAMEFLAG_TEAMS; // GAMEFLAG_TEAMS makes it a two-team gamemode
 }

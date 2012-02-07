@@ -3,8 +3,13 @@
 #include "entities/door_laser.h"
 #include "entities/door_switch.h"
 
-CDoor::CDoor(CGameContext *pGameServer, int Team, int SwitchNum, array<CDoor::CDoorNode> lNodes, array<CDoor::CDoorNode> lSwitch) : m_pGameServer(pGameServer), m_Team(Team), m_SwitchNum(SwitchNum), m_lNodes(lNodes), m_lSwitch(lSwitch)
+CDoor::CDoor(CGameContext *pGameServer, int Team, int SwitchNum, array<CDoor::CDoorNode> lNodes, array<CDoor::CDoorNode> lSwitch)
 {
+	m_pGameServer = pGameServer;
+	m_Team = Team;
+	m_SwitchNum = SwitchNum;
+	m_lNodes = lNodes;
+	m_lSwitch = lSwitch;
 	m_TurnedOn = true;
 	m_SwitchTick = 0;
 	dbg_msg("Door added", "SwitchNum: %d, Nodes: %d, Switches: %d", m_SwitchNum, m_lNodes.size(), m_lSwitch.size());
