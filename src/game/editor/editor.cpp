@@ -3593,7 +3593,7 @@ void CEditor::RenderServerSettingsEditor(CUIRect View)
 		UI()->DoLabel(&Button, "Command:", 12.0f, -1);
 
 		Button.VSplitLeft(70.0f, 0, &Button);
-		Button.VSplitLeft(180.0f, &Button, 0);
+		Button.VSplitLeft(500.0f, &Button, 0);
 		DoEditBox(&m_CommandBox, &Button, m_aSettingsCommand, sizeof(m_aSettingsCommand), 12.0f, &m_CommandBox);
 
 		// buttons
@@ -3617,6 +3617,8 @@ void CEditor::RenderServerSettingsEditor(CUIRect View)
 					CEditorMap::CSetting Setting;
 					str_copy(Setting.m_aCommand, m_aSettingsCommand, sizeof(Setting.m_aCommand));
 					m_Map.m_lSettings.add(Setting);
+					if(m_IsEditingSettingsCommand)
+						m_IsEditingSettingsCommand = false;
 				}
 			}
 		}
@@ -3625,11 +3627,38 @@ void CEditor::RenderServerSettingsEditor(CUIRect View)
 		{
 			ToolBar.VSplitRight(50.0f, &ToolBar, &Button);
 			Button.VSplitRight(5.0f, &Button, 0);
-			static int s_AddButton = 0;
-			if(DoButton_Editor(&s_AddButton, "Del", 0, &Button, 0, "Delete a command from the command list.")
-				|| Input()->KeyDown(KEY_DELETE))
+			static int s_DeleteButton = 0;
+			if(DoButton_Editor(&s_DeleteButton, "Del", 0, &Button, 0, "Delete a command from the command list."))
 				if(s_CommandSelectedIndex > -1 && s_CommandSelectedIndex < m_Map.m_lSettings.size())
 					m_Map.m_lSettings.remove_index(s_CommandSelectedIndex);
+
+			ToolBar.VSplitRight(50.0f, &ToolBar, &Button);
+			Button.VSplitRight(10.0f, &Button, 0);
+			static int s_EditButton = 0;
+			if(DoButton_Editor(&s_EditButton, "Edit", 0, &Button, 0, "Edit a command from the command list."))
+				if(s_CommandSelectedIndex > -1 && s_CommandSelectedIndex < m_Map.m_lSettings.size())
+				{
+					if(m_IsEditingSettingsCommand && m_aSettingsCommand[0] != 0 && str_find(m_aSettingsCommand, " "))
+					{
+						bool Found = false;
+						for(int i = 0; i < m_Map.m_lSettings.size(); i++)
+							if(!str_comp(m_Map.m_lSettings[i].m_aCommand, m_aSettingsCommand))
+							{
+								Found = true;
+								break;
+							}
+
+							if(!Found)
+							{
+								CEditorMap::CSetting Setting;
+								str_copy(Setting.m_aCommand, m_aSettingsCommand, sizeof(Setting.m_aCommand));
+								m_Map.m_lSettings.add(Setting);
+							}
+					}
+					str_copy(m_aSettingsCommand, m_Map.m_lSettings[s_CommandSelectedIndex].m_aCommand, sizeof(m_aSettingsCommand));
+					m_Map.m_lSettings.remove_index(s_CommandSelectedIndex);
+					m_IsEditingSettingsCommand = true;
+				}
 		}
 	}
 

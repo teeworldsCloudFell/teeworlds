@@ -281,7 +281,7 @@ void CLayerTiles::BrushDraw(CLayer *pBrush, float wx, float wy)
 				continue;
 
 			// dont allow tele in and out tiles... same with speedup tile and tool
-			if(m_pEditor->GetSelectedLayer(0) == m_pEditor->m_Map.m_pGameLayer && (l->m_pTiles[y*l->m_Width+x].m_Index == TILE_TELEIN || l->m_pTiles[y*l->m_Width+x].m_Index == TILE_TELEOUT || l->m_pTiles[y*l->m_Width+x].m_Index == TILE_BOOST || (l->m_pTiles[y*l->m_Width+x].m_Index >= 19 && l->m_pTiles[y*l->m_Width+x].m_Index <= 24)))
+			if(m_pEditor->GetSelectedLayer(0) == m_pEditor->m_Map.m_pGameLayer && l->m_pTiles[y*l->m_Width+x].m_Index >= 19 && l->m_pTiles[y*l->m_Width+x].m_Index <= 27)
 				continue;
 
 			m_pTiles[fy*m_Width+fx] = l->m_pTiles[y*l->m_Width+x];
@@ -681,7 +681,7 @@ void CLayerTele::BrushDraw(CLayer *pBrush, float wx, float wy)
 			if(fx<0 || fx >= m_Width || fy < 0 || fy >= m_Height)
 				continue;
 			
-			if(l->m_pTiles[y*l->m_Width+x].m_Index == TILE_TELEIN || l->m_pTiles[y*l->m_Width+x].m_Index == TILE_TELEOUT)
+			if(l->m_pTiles[y*l->m_Width+x].m_Index == 25 || l->m_pTiles[y*l->m_Width+x].m_Index == TILE_TELEIN || l->m_pTiles[y*l->m_Width+x].m_Index == TILE_TELEOUT)
 			{
 				if(l->m_pTeleTile[y*l->m_Width+x].m_Number)
 					m_pTeleTile[fy*m_Width+fx].m_Number = l->m_pTeleTile[y*l->m_Width+x].m_Number;
@@ -803,7 +803,7 @@ void CLayerTele::FillSelection(bool Empty, CLayer *pBrush, CUIRect Rect)
 			else
 			{
 				m_pTiles[fy*m_Width+fx] = pLt->m_pTiles[(y*pLt->m_Width + x%pLt->m_Width) % (pLt->m_Width*pLt->m_Height)];
-				if(m_pTiles[fy*m_Width+fx].m_Index == TILE_TELEIN || m_pTiles[fy*m_Width+fx].m_Index == TILE_TELEOUT)
+				if(m_pTiles[fy*m_Width+fx].m_Index ==  25 || m_pTiles[fy*m_Width+fx].m_Index == TILE_TELEIN || m_pTiles[fy*m_Width+fx].m_Index == TILE_TELEOUT)
 				{
 					m_pTeleTile[fy*m_Width+fx].m_Type = m_pTiles[fy*m_Width+fx].m_Index;
 					if(!pLt->m_pTeleTile[(y*pLt->m_Width + x%pLt->m_Width) % (pLt->m_Width*pLt->m_Height)].m_Number && m_pEditor->m_TeleNum && m_pTiles[fy*m_Width+fx].m_Index > 0)

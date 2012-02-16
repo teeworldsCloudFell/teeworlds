@@ -631,6 +631,7 @@ public:
 
 		m_CommandBox = 0.0f;
 		m_aSettingsCommand[0] = 0;
+		m_IsEditingSettingsCommand = false;
 
 		ms_CheckerTexture = 0;
 		ms_BackgroundTexture = 0;
@@ -786,6 +787,7 @@ public:
 	static void EnvelopeEval(float TimeOffset, int Env, float *pChannels, void *pUser);
 	float m_CommandBox;
 	char m_aSettingsCommand[512];
+	bool m_IsEditingSettingsCommand;
 
 	void DoMapBorder();
 	int DoButton_Editor_Common(const void *pID, const char *pText, int Checked, const CUIRect *pRect, int Flags, const char *pToolTip);

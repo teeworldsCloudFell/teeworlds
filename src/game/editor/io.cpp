@@ -712,6 +712,8 @@ int CEditorMap::Load(class IStorage *pStorage, const char *pFileName, int Storag
 									((CLayerTiles*)pTiles)->m_pTiles[i].m_Index = TILE_TELEIN;
 								else if(((CLayerTele*)pTiles)->m_pTeleTile[i].m_Type == TILE_TELEOUT)
 									((CLayerTiles*)pTiles)->m_pTiles[i].m_Index = TILE_TELEOUT;
+								else if(((CLayerTele*)pTiles)->m_pTeleTile[i].m_Type == 25)
+									((CLayerTiles*)pTiles)->m_pTiles[i].m_Index = 25;
 								else
 									((CLayerTiles*)pTiles)->m_pTiles[i].m_Index = 0;
 							}
