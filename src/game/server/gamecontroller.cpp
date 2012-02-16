@@ -36,12 +36,8 @@ IGameController::IGameController(class CGameContext *pGameServer)
 	m_aNumSpawnPoints = 0;
 	m_aZSpawn = vec2(-42, -42);
 
-	for(int i = 0; i < 32; i++)
-	{
-		m_aTriggeredEvents[i].Reset(true);
-		if(i < 16)
-			m_aCustomTeleport[i].Reset();
-	}
+	mem_zero(m_apTriggeredEvents, sizeof(m_apTriggeredEvents));
+	mem_zero(m_apCustomTeleport, sizeof(m_apCustomTeleport));
 	m_lTimedEvents.clear();
 	m_aaOnTeamWinEvent[TEAM_RED][0] = '\0';
 	m_aaOnTeamWinEvent[TEAM_BLUE][0] = '\0';
@@ -50,6 +46,11 @@ IGameController::IGameController(class CGameContext *pGameServer)
 
 IGameController::~IGameController()
 {
+	for(int i = 0; i < 256; i++)
+	{
+		delete m_apTriggeredEvents[i];
+		delete m_apCustomTeleport[i];
+	}
 }
 
 void IGameController::EvaluateSpawnType(CSpawnEval *pEval)
@@ -578,37 +579,39 @@ void IGameController::ResetEvents()
 {
 	for(int i = 0; i < m_lTimedEvents.size(); i++)
 		m_lTimedEvents[i].m_Tick = Server()->Tick() + m_lTimedEvents[i].m_Time*Server()->TickSpeed();
-	for(int i = 0; i < 32; i++)
+	for(int i = 0; i < 256; i++)
 	{
-		m_aTriggeredEvents[i].Reset(false);
-		if(i < 16 && g_Config.m_SvFlushCustomTeleporter)
-		{
-			m_aCustomTeleport[i].Reset();
-		}
+		if(m_apTriggeredEvents[i])
+			m_apTriggeredEvents[i]->Reset(false);
+		if(m_apCustomTeleport[i])
+			m_apCustomTeleport[i]->Reset();
 	}
 }
 
 bool IGameController::RegisterTriggeredEvent(int ID, int Type, const char *pCommand)
 {
-	if(ID < 0 || ID >= 32) // Notify the user that he's stupid...
+	if(ID < 0 || ID >= 256) // Notify the user that he's stupid...
 		return false;
 
-	m_aTriggeredEvents[ID].Reset(true);
+	if(m_apTriggeredEvents[ID])
+		m_apTriggeredEvents[ID]->Reset(true);
+	else
+		m_apTriggeredEvents[ID] = new CTriggeredEvent();
 
-	str_copy(m_aTriggeredEvents[ID].m_aAction, pCommand, sizeof(m_aTriggeredEvents[ID].m_aAction));
-	m_aTriggeredEvents[ID].m_State = false;
-	m_aTriggeredEvents[ID].m_Type = Type;
+	str_copy(m_apTriggeredEvents[ID]->m_aAction, pCommand, sizeof(m_apTriggeredEvents[ID]->m_aAction));
+	m_apTriggeredEvents[ID]->m_State = false;
+	m_apTriggeredEvents[ID]->m_Type = Type;
 
 	return true;
 }
 
 void IGameController::OnTrigger(int ID, int TriggeredBy)
 {
-	if(!m_aTriggeredEvents[ID].m_aAction[0] || m_aTriggeredEvents[ID].m_State || m_aTriggeredEvents[ID].m_aPlayerState[TriggeredBy])
+	if(!m_apTriggeredEvents[ID] || !m_apTriggeredEvents[ID]->m_aAction[0] || m_apTriggeredEvents[ID]->m_State || m_apTriggeredEvents[ID]->m_aPlayerState[TriggeredBy])
 		return;
 
 	char aBuf[512];
-	str_copy(aBuf, m_aTriggeredEvents[ID].m_aAction, sizeof(aBuf));
+	str_copy(aBuf, m_apTriggeredEvents[ID]->m_aAction, sizeof(aBuf));
 
 	// Replace keywords with values
 	if(str_find(aBuf, "!activator"))
@@ -625,21 +628,37 @@ void IGameController::OnTrigger(int ID, int TriggeredBy)
 	ParseExec(aBuf, sizeof(aBuf));
 
 	GameServer()->Console()->ExecuteLine(aBuf);
-	if(m_aTriggeredEvents[ID].m_Type == TRIGGER_ONCE)
-		m_aTriggeredEvents[ID].m_State = true;
-	else if(m_aTriggeredEvents[ID].m_Type == TRIGGER_PLAYERONCE)
-		m_aTriggeredEvents[ID].m_aPlayerState[TriggeredBy] = true;
+	if(m_apTriggeredEvents[ID]->m_Type == TRIGGER_ONCE)
+		m_apTriggeredEvents[ID]->m_State = true;
+	else if(m_apTriggeredEvents[ID]->m_Type == TRIGGER_PLAYERONCE)
+		m_apTriggeredEvents[ID]->m_aPlayerState[TriggeredBy] = true;
+}
+
+bool IGameController::RegisterCustomTeleport(int ID, int ToX, int Team)
+{
+	if(ID < 0 || ID >= 256) // Notify the user that he's stupid...
+		return false;
+
+	if(m_apCustomTeleport[ID])
+		m_apCustomTeleport[ID]->Reset();
+	else
+		m_apCustomTeleport[ID] = new CCustomTeleport();
+
+	m_apCustomTeleport[ID]->m_Teleport = ToX;
+	m_apCustomTeleport[ID]->m_Team = Team;
+
+	return true;
 }
 
 int IGameController::OnCustomTeleporter(int ID, int Team)
 {
-	if(m_aCustomTeleport[ID].m_Teleport == -1) // Check if there's any teleport assigned
+	if(!m_apCustomTeleport[ID] || m_apCustomTeleport[ID]->m_Teleport == -1) // Check if there's any teleport assigned
 		return -1;
 
-	if(m_aCustomTeleport[ID].m_Team != -1 && Team != m_aCustomTeleport[ID].m_Team) // Check if there's any team assigned to this teleporter, if yes check if it matches with the players team
+	if(m_apCustomTeleport[ID]->m_Team != -1 && Team != m_apCustomTeleport[ID]->m_Team) // Check if there's any team assigned to this teleporter, if yes check if it matches with the players team
 		return -1;
 
-	return m_aCustomTeleport[ID].m_Teleport;
+	return m_apCustomTeleport[ID]->m_Teleport;
 }
 
 bool IGameController::IsTeamplay() const

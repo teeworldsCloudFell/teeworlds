@@ -117,7 +117,8 @@ public:
 				m_aAction[0] = '\0';
 			}
 		}
-	} m_aTriggeredEvents[32];
+	};
+	CTriggeredEvent *m_apTriggeredEvents[256];
 
 	struct CCustomTeleport
 	{
@@ -128,7 +129,8 @@ public:
 			m_Teleport = -1;
 			m_Team = -1;
 		}
-	} m_aCustomTeleport[32];
+	};
+	CCustomTeleport *m_apCustomTeleport[256];
 
 	char m_aaOnTeamWinEvent[3][512];
 
@@ -158,6 +160,7 @@ public:
 	void ResetEvents();
 	bool RegisterTriggeredEvent(int ID, int Type, const char *pCommand);
 	void OnTrigger(int ID, int TriggeredBy);
+	bool RegisterCustomTeleport(int ID, int ToX, int Team);
 	int OnCustomTeleporter(int ID, int Team);
 
 	/*

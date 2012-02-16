@@ -710,39 +710,6 @@ void CCharacter::Tick()
 		else if(TileIndex >= TILE_ZHOLDPOINT_BEGIN && TileIndex <= TILE_ZHOLDPOINT_END && m_pPlayer->GetTeam() == TEAM_BLUE)
 			pzESC->OnZHoldpoint(TileIndex-TILE_ZHOLDPOINT_BEGIN+32);
 
-		else if((TileIndex >= TILE_TRIGGERALL_BEGIN && TileIndex <= TILE_TRIGGERALL_END) || (TileIndex >= TILE_TRIGGERRED_BEGIN && TileIndex <= TILE_TRIGGERRED_END && m_pPlayer && m_pPlayer->GetTeam() == TEAM_RED) || (TileIndex >= TILE_TRIGGERBLUE_BEGIN && TileIndex <= TILE_TRIGGERBLUE_END && m_pPlayer && m_pPlayer->GetTeam() == TEAM_BLUE))
-			GameServer()->m_pController->OnTrigger(TileIndex-TILE_TRIGGERALL_BEGIN, m_pPlayer->GetCID());
-
-		else if(TileIndex >= TILE_CTELEPORT_BEGIN && TileIndex <= TILE_CTELEPORT_END)
-		{
-			int ct = GameServer()->m_pController->OnCustomTeleporter(TileIndex-TILE_CTELEPORT_BEGIN, m_pPlayer->GetTeam());
-			if(ct != -1)
-			{
-				// check double jump
-				if(Jumped&3 && m_Core.m_Jumped != Jumped)
-					m_Core.m_Jumped = Jumped;
-
-				m_Core.m_HookedPlayer = -1;
-				m_Core.m_HookState = HOOK_RETRACTED;
-				m_Core.m_TriggeredEvents |= COREEVENT_HOOK_RETRACT;
-				m_Core.m_HookState = HOOK_RETRACTED;
-				m_Core.m_Pos = pzESC->m_pTeleporter[ct];
-				m_Core.m_HookPos = m_Core.m_Pos;
-				// Resetting velocity to prevent exploit
-				if(g_Config.m_SvTeleportVelReset)
-					m_Core.m_Vel = vec2(0,0);
-				if(g_Config.m_SvStrip)
-				{
-					m_ActiveWeapon = WEAPON_GUN;
-					m_LastWeapon = WEAPON_HAMMER;
-					m_aWeapons[WEAPON_HAMMER].m_Got = true;
-					m_aWeapons[WEAPON_GUN].m_Got = true;
-					for(int i = 2; i < NUM_WEAPONS; i++)
-						m_aWeapons[i].m_Got = false;
-				}
-			}
-		}
-
 		else if(TileIndex == TILE_STOPL)
 		{
 			if(m_Core.m_Vel.x > 0)
@@ -832,6 +799,47 @@ void CCharacter::Tick()
 		{
 			if(pzESC->m_pTeleporter[z-1])
 				m_pPlayer->m_LastCheckpoint = pzESC->m_pTeleporter[z-1];
+		}
+	}
+
+	int ID = 0;
+	int Team = -1;
+	int Tool = GameServer()->Collision()->GetTool(m_PrevPos, m_Pos, &ID, &Team);
+
+	if(Tool != -1)
+	{
+		if(Tool == TILE_TRIGGER && (Team == -1 || Team == GetPlayer()->GetTeam()))
+		{
+			GameServer()->m_pController->OnTrigger(ID-1, m_pPlayer->GetCID());
+		}
+		else if(Tool == TILE_CTELE && (Team == -1 || Team == GetPlayer()->GetTeam()))
+		{
+			int ct = GameServer()->m_pController->OnCustomTeleporter(ID-1, m_pPlayer->GetTeam());
+			if(ct != -1)
+			{
+				// check double jump
+				if(Jumped&3 && m_Core.m_Jumped != Jumped)
+					m_Core.m_Jumped = Jumped;
+
+				m_Core.m_HookedPlayer = -1;
+				m_Core.m_HookState = HOOK_RETRACTED;
+				m_Core.m_TriggeredEvents |= COREEVENT_HOOK_RETRACT;
+				m_Core.m_HookState = HOOK_RETRACTED;
+				m_Core.m_Pos = pzESC->m_pTeleporter[ct];
+				m_Core.m_HookPos = m_Core.m_Pos;
+				// Resetting velocity to prevent exploit
+				if(g_Config.m_SvTeleportVelReset)
+					m_Core.m_Vel = vec2(0,0);
+				if(g_Config.m_SvStrip)
+				{
+					m_ActiveWeapon = WEAPON_GUN;
+					m_LastWeapon = WEAPON_HAMMER;
+					m_aWeapons[WEAPON_HAMMER].m_Got = true;
+					m_aWeapons[WEAPON_GUN].m_Got = true;
+					for(int i = 2; i < NUM_WEAPONS; i++)
+						m_aWeapons[i].m_Got = false;
+				}
+			}
 		}
 	}
 

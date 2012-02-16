@@ -58,6 +58,8 @@ enum
 	TILE_NONINJA,
 	TILE_NOWEAPONS,
 	TILE_AMMO,
+	TILE_CTELE=19,
+	TILE_TRIGGER,
 	TILE_TELECHECKPOINT=25,
 	TILE_TELEIN,
 	TILE_TELEOUT,
@@ -72,14 +74,6 @@ enum
 	TILE_ZSTOP_END=111,
 	TILE_ZHOLDPOINT_BEGIN=112,
 	TILE_ZHOLDPOINT_END=127,
-	TILE_TRIGGERALL_BEGIN=128,
-	TILE_TRIGGERALL_END=143,
-	TILE_TRIGGERRED_BEGIN=144,
-	TILE_TRIGGERRED_END=151,
-	TILE_TRIGGERBLUE_BEGIN=152,
-	TILE_TRIGGERBLUE_END=159,
-	TILE_CTELEPORT_BEGIN=160,
-	TILE_CTELEPORT_END=175,
 
 	TILEFLAG_VFLIP=1,
 	TILEFLAG_HFLIP=2,
@@ -136,6 +130,13 @@ class CSpeedupTile
 public:
 	unsigned char m_Force;
 	short m_Angle;
+};
+
+struct CToolTile
+{
+	unsigned char m_Number;
+	unsigned char m_Type;
+	short m_Team;
 };
 
 struct CMapItemInfo
@@ -212,6 +213,8 @@ struct CMapItemLayerTilemap
 	int m_Tele;
 	
 	int m_Speedup;
+
+	int m_Tool;
 } ;
 
 struct CMapItemLayerQuads

@@ -1563,7 +1563,7 @@ void CGameContext::ConListTriggeredEvents(IConsole::IResult *pResult, void *pUse
 
 	for(int i = 0; i < 32; i++)
 	{
-		if(pSelf->m_pController->m_aTriggeredEvents[i].m_aAction[0])
+		if(pSelf->m_pController->m_apTriggeredEvents[i])
 			NumTriggeredEvents++;
 	}
 	str_format(aBuf, sizeof(aBuf), "Registered triggered events: %d", NumTriggeredEvents);
@@ -1571,9 +1571,9 @@ void CGameContext::ConListTriggeredEvents(IConsole::IResult *pResult, void *pUse
 
 	for(int i = 0; i < 32; i++)
 	{
-		if(pSelf->m_pController->m_aTriggeredEvents[i].m_aAction[0])
+		if(pSelf->m_pController->m_apTriggeredEvents[i])
 		{
-			str_format(aBuf, sizeof(aBuf), "%d. %d \"%s\"", i+1, pSelf->m_pController->m_aTriggeredEvents[i].m_Type, pSelf->m_pController->m_aTriggeredEvents[i].m_aAction);
+			str_format(aBuf, sizeof(aBuf), "%d. %d \"%s\"", i+1, pSelf->m_pController->m_apTriggeredEvents[i]->m_Type, pSelf->m_pController->m_apTriggeredEvents[i]->m_aAction);
 			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
 		}
 	}
@@ -1583,8 +1583,8 @@ void CGameContext::ConFlushTriggeredEvents(IConsole::IResult *pResult, void *pUs
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
 
-	for(int i = 0; i < 32; i++)
-		pSelf->m_pController->m_aTriggeredEvents[i].Reset(true);
+	for(int i = 0; i < 256; i++)
+		delete pSelf->m_pController->m_apTriggeredEvents[i];
 
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Triggered events flushed");
 }
@@ -1616,19 +1616,23 @@ void CGameContext::ConCustomTeleporterRegister(IConsole::IResult *pResult, void 
 	CGameContext *pSelf = (CGameContext *)pUserData;
 	int ID = clamp(pResult->GetInteger(0), 1, 16)-1;
 	int ToX = clamp(pResult->GetInteger(1), 1, 255)-1;
-
-	pSelf->m_pController->m_aCustomTeleport[ID].m_Teleport = ToX;
+	int Team = -1;
 	if(pResult->NumArguments() > 2)
-		pSelf->m_pController->m_aCustomTeleport[ID].m_Team = clamp(pResult->GetInteger(2), 0, 1);
-	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Custom teleporter registered");
+		Team = clamp(pResult->GetInteger(2), 0, 1);
+
+	if(pSelf->m_pController->RegisterCustomTeleport(ID, ToX, Team))
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Custom teleporter registered");
+	else
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Couldn't register custom teleporter");
 }
 
 void CGameContext::ConCustomTeleporterFlush(IConsole::IResult *pResult, void *pUserData)
 {
+
 	CGameContext *pSelf = (CGameContext *)pUserData;
 
-	for(int i = 0; i < 16; i++)
-		pSelf->m_pController->m_aCustomTeleport[i].Reset();
+	for(int i = 0; i < 256; i++)
+		delete pSelf->m_pController->m_apCustomTeleport[i];
 
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Custom teleports flushed");
 }
@@ -1639,21 +1643,21 @@ void CGameContext::ConCustomTeleporterList(IConsole::IResult *pResult, void *pUs
 	int NumCTeleports = 0;
 	char aBuf[128];
 
-	for(int i = 0; i < 16; i++)
+	for(int i = 0; i < 256; i++)
 	{
-		if(pSelf->m_pController->m_aCustomTeleport[i].m_Teleport != -1)
+		if(pSelf->m_pController->m_apCustomTeleport[i])
 			NumCTeleports++;
 	}
 	str_format(aBuf, sizeof(aBuf), "Custom teleports: %d", NumCTeleports);
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
-	for(int i = 0; i < 16; i++)
+	for(int i = 0; i < 256; i++)
 	{
-		if(pSelf->m_pController->m_aCustomTeleport[i].m_Teleport != -1)
+		if(pSelf->m_pController->m_apCustomTeleport[i])
 		{
-			if(pSelf->m_pController->m_aCustomTeleport[i].m_Team != -1)
-				str_format(aBuf, sizeof(aBuf), "%d: %d, Team: %d", i+1, pSelf->m_pController->m_aCustomTeleport[i].m_Teleport+1, pSelf->m_pController->m_aCustomTeleport[i].m_Team);
+			if(pSelf->m_pController->m_apCustomTeleport[i]->m_Team != -1)
+				str_format(aBuf, sizeof(aBuf), "%d: %d, Team: %d", i+1, pSelf->m_pController->m_apCustomTeleport[i]->m_Teleport+1, pSelf->m_pController->m_apCustomTeleport[i]->m_Team);
 			else
-				str_format(aBuf, sizeof(aBuf), "%d: %d", i+1, pSelf->m_pController->m_aCustomTeleport[i].m_Teleport+1);
+				str_format(aBuf, sizeof(aBuf), "%d: %d", i+1, pSelf->m_pController->m_apCustomTeleport[i]->m_Teleport+1);
 			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
 		}
 	}
@@ -1662,11 +1666,11 @@ void CGameContext::ConCustomTeleporterList(IConsole::IResult *pResult, void *pUs
 void CGameContext::ConReloadMapDefaults(IConsole::IResult *pResult, void *pUserData)
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
-	for(int i = 0; i < 32; i++) // First we have to delete all events...
+	// First we have to delete all events...
+	for(int i = 0; i < 256; i++)
 	{
-		pSelf->m_pController->m_aTriggeredEvents[i].Reset(true);
-		if(i < 16)
-			pSelf->m_pController->m_aCustomTeleport[i].Reset();
+		delete pSelf->m_pController->m_apTriggeredEvents[i];
+		delete pSelf->m_pController->m_apCustomTeleport[i];
 	}
 	pSelf->m_pController->m_lTimedEvents.clear();
 	pSelf->m_pController->m_aaOnTeamWinEvent[0][0] = '\0';

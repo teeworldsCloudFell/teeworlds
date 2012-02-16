@@ -20,6 +20,7 @@ CCollision::CCollision()
 	m_pLayers = 0;
 	m_pTele = 0;
 	m_pSpeedup = 0;
+	m_pTool = 0;
 }
 
 void CCollision::Init(class CLayers *pLayers)
@@ -27,6 +28,7 @@ void CCollision::Init(class CLayers *pLayers)
 	// reset race specific pointers
 	m_pTele = 0;
 	m_pSpeedup = 0;
+	m_pTool = 0;
 
 	m_pLayers = pLayers;
 	m_Width = m_pLayers->GameLayer()->m_Width;
@@ -36,6 +38,8 @@ void CCollision::Init(class CLayers *pLayers)
 		m_pTele = static_cast<CTeleTile *>(m_pLayers->Map()->GetData(m_pLayers->TeleLayer()->m_Tele));
 	if(m_pLayers->SpeedupLayer())
 		m_pSpeedup = static_cast<CSpeedupTile *>(m_pLayers->Map()->GetData(m_pLayers->SpeedupLayer()->m_Speedup));
+	if(m_pLayers->ToolLayer())
+		m_pTool = static_cast<CToolTile *>(m_pLayers->Map()->GetData(m_pLayers->ToolLayer()->m_Tool));
 
 	for(int i = 0; i < m_Width*m_Height; i++)
 	{
@@ -60,7 +64,7 @@ void CCollision::Init(class CLayers *pLayers)
 		}
 
 		// custom tiles
-		if(Index >= TILE_BUNKEROUT && Index <= TILE_CTELEPORT_END)
+		if(Index >= TILE_BUNKEROUT && Index <= TILE_ZHOLDPOINT_END)
 			m_pTiles[i].m_Index = Index;
 	}
 }
@@ -99,7 +103,7 @@ int CCollision::GetIndex(vec2 PrevPos, vec2 Pos)
 		int Nx = clamp((int)Pos.x/32, 0, m_Width-1);
 		int Ny = clamp((int)Pos.y/32, 0, m_Height-1);
 		
-		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_BUNKEROUT && m_pTiles[Ny*m_Width+Nx].m_Index <= TILE_CTELEPORT_END) ||
+		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_BUNKEROUT && m_pTiles[Ny*m_Width+Nx].m_Index <= TILE_ZHOLDPOINT_END) ||
 			(m_pTele && (m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEIN || m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEOUT)) ||
 			(m_pSpeedup && m_pSpeedup[Ny*m_Width+Nx].m_Force > 0))
 		{
@@ -118,7 +122,7 @@ int CCollision::GetIndex(vec2 PrevPos, vec2 Pos)
 		Tmp = mix(PrevPos, Pos, a);
 		Nx = clamp((int)Tmp.x/32, 0, m_Width-1);
 		Ny = clamp((int)Tmp.y/32, 0, m_Height-1);
-		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_BUNKEROUT && m_pTiles[Ny*m_Width+Nx].m_Index <= TILE_CTELEPORT_END) ||
+		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_BUNKEROUT && m_pTiles[Ny*m_Width+Nx].m_Index <= TILE_ZHOLDPOINT_END) ||
 			(m_pTele && (m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEIN || m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEOUT)) ||
 			(m_pSpeedup && m_pSpeedup[Ny*m_Width+Nx].m_Force > 0))
 		{
@@ -184,7 +188,53 @@ void CCollision::GetSpeedup(int Index, vec2 *Dir, int *Force)
 	*Force = m_pSpeedup[Index].m_Force;
 	*Dir = vec2(cos(Angle), sin(Angle));
 }
-	
+
+int CCollision::GetTool(vec2 PrevPos, vec2 Pos, int *Num, int *Team)
+{
+	if(!m_pTool)
+		return -1;
+
+	float Distance = distance(PrevPos, Pos);
+
+	if(!Distance)
+	{
+		int nx = clamp((int)Pos.x/32, 0, m_Width-1);
+		int ny = clamp((int)Pos.y/32, 0, m_Height-1);
+
+		if(m_pTool[ny*m_Width+nx].m_Type >= TILE_CTELE && m_pTiles[ny*m_Width+nx].m_Index <= TILE_TRIGGER)
+		{
+			if(Num)
+				*Num = m_pTool[ny*m_Width+nx].m_Number;
+			if(Team)
+				*Team = m_pTool[ny*m_Width+nx].m_Team-2;
+			return m_pTool[ny*m_Width+nx].m_Type;
+		}
+	}
+
+	float a = 0.0f;
+	vec2 Tmp = vec2(0, 0);
+	int nx = 0;
+	int ny = 0;
+
+	for(float f = 0; f < Distance; f++)
+	{
+		a = f/Distance;
+		Tmp = mix(PrevPos, Pos, a);
+		nx = clamp((int)Tmp.x/32, 0, m_Width-1);
+		ny = clamp((int)Tmp.y/32, 0, m_Height-1);
+		if(m_pTool[ny*m_Width+nx].m_Type >= TILE_CTELE && m_pTiles[ny*m_Width+nx].m_Index <= TILE_TRIGGER)
+		{
+			if(Num)
+				*Num = m_pTool[ny*m_Width+nx].m_Number;
+			if(Team)
+				*Team = m_pTool[ny*m_Width+nx].m_Team-2;
+			return m_pTool[ny*m_Width+nx].m_Type;
+		}
+	}
+
+	return -1;
+}
+
 // TODO: rewrite this smarter!
 int CCollision::IntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision)
 {

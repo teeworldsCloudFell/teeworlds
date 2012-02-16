@@ -44,8 +44,10 @@ public:
 	int IsTeleportCheckpoint(int Index);
 	int IsSpeedup(int Index);
 	void GetSpeedup(int Index, vec2 *Dir, int *Force);
+	int GetTool(vec2 PrevPos, vec2 Pos, int *Num, int *Team);
 	class CTeleTile *m_pTele;
 	class CSpeedupTile *m_pSpeedup;
+	class CToolTile *m_pTool;
 
 	class CLayers *Layers() { return m_pLayers; }
 };
