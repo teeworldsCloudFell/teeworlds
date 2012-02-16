@@ -962,7 +962,7 @@ void CEditor::DoToolbar(CUIRect ToolBar)
 		CLayerTiles *pT = (CLayerTiles *)GetSelectedLayerType(0, LAYERTYPE_TILES);
 
 		// no border for tele layer
-		if(pT && (pT->m_Tele || pT->m_Speedup))
+		if(pT && (pT->m_Tele || pT->m_Speedup || pT->m_Tool))
 			pT = 0;
 			
 		if(DoButton_Editor(&s_BorderBut, "Border", pT?0:-1, &Button, 0, "Adds border tiles"))
@@ -990,6 +990,15 @@ void CEditor::DoToolbar(CUIRect ToolBar)
 		{
 			static int s_SpeedupPopupId = 0;
 			UiInvokePopupMenu(&s_SpeedupPopupId, 0, UI()->MouseX(), UI()->MouseY(), 120, 43, PopupSpeedup);
+		}
+
+		TB_Bottom.VSplitLeft(5.0f, &Button, &TB_Bottom);
+		TB_Bottom.VSplitLeft(60.0f, &Button, &TB_Bottom);
+		static int s_ToolButton = 0;
+		if(DoButton_Ex(&s_ToolButton, "Tool", (pS && pS->m_Tool)?0:-1, &Button, 0, "Tool", CUI::CORNER_ALL))
+		{
+			static int s_ToolPopupId = 0;
+			UiInvokePopupMenu(&s_ToolPopupId, 0, UI()->MouseX(), UI()->MouseY(), 120, 43, PopupTool);
 		}
 	}
 
@@ -1664,6 +1673,8 @@ void CEditor::DoMapEditor(CUIRect View, CUIRect ToolBar)
 				m_Map.m_pTeleLayer->Render();
 			if(m_Map.m_pSpeedupLayer && m_Map.m_pSpeedupLayer->m_Visible)
 				m_Map.m_pSpeedupLayer->Render();
+			if(m_Map.m_pToolLayer && m_Map.m_pToolLayer->m_Visible)
+				m_Map.m_pToolLayer->Render();
  		}
 
 		CLayerTiles *pT = static_cast<CLayerTiles *>(GetSelectedLayerType(0, LAYERTYPE_TILES));
@@ -2416,7 +2427,7 @@ void CEditor::RenderLayers(CUIRect ToolBox, CUIRect ToolBar, CUIRect View)
 				if(int Result = DoButton_Ex(m_Map.m_lGroups[g]->m_lLayers[i], aBuf, g==m_SelectedGroup&&i==m_SelectedLayer, &Button,
 					BUTTON_CONTEXT, "Select layer.", 0, FontSize))
 				{
-					if(m_Map.m_lGroups[g]->m_lLayers[i] == m_Map.m_pTeleLayer || m_Map.m_lGroups[g]->m_lLayers[i] == m_Map.m_pSpeedupLayer)
+					if(m_Map.m_lGroups[g]->m_lLayers[i] == m_Map.m_pTeleLayer || m_Map.m_lGroups[g]->m_lLayers[i] == m_Map.m_pSpeedupLayer || m_Map.m_lGroups[g]->m_lLayers[i] == m_Map.m_pToolLayer)
 						m_Brush.Clear();
 					m_SelectedLayer = i;
 					m_SelectedGroup = g;
@@ -4103,6 +4114,13 @@ void CEditorMap::MakeSpeedupLayer(CLayer *pLayer)
 	m_pSpeedupLayer->m_TexID = m_pEditor->ms_EntitiesTexture;
 }
 
+void CEditorMap::MakeToolLayer(CLayer *pLayer)
+{
+	m_pToolLayer = (CLayerTool *)pLayer;
+	m_pToolLayer->m_pEditor = m_pEditor;
+	m_pToolLayer->m_TexID = m_pEditor->ms_EntitiesTexture;
+}
+
 void CEditorMap::MakeGameGroup(CLayerGroup *pGroup)
 {
 	m_pGameGroup = pGroup;
@@ -4125,6 +4143,7 @@ void CEditorMap::Clean()
 	m_pGameLayer = 0x0;
 	m_pTeleLayer = 0x0;
 	m_pSpeedupLayer = 0x0;
+	m_pToolLayer = 0x0;
 	m_pGameGroup = 0x0;
 
 	m_Modified = false;
@@ -4159,6 +4178,7 @@ void CEditorMap::CreateDefault(int EntitiesTexture)
 	m_pGameGroup->AddLayer(m_pGameLayer);
 	m_pTeleLayer = 0x0;
 	m_pSpeedupLayer = 0x0;
+	m_pToolLayer = 0x0;
 }
 
 void CEditor::Init()

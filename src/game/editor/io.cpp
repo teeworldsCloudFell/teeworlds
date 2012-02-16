@@ -349,6 +349,8 @@ int CEditorMap::Save(class IStorage *pStorage, const char *pFileName)
 					Item.m_Flags = 2;
 				else if(pLayer->m_Speedup)
 					Item.m_Flags = 4;
+				else if(pLayer->m_Tool)
+					Item.m_Flags = 8;
 				else
 					Item.m_Flags = pLayer->m_Game ? TILESLAYERFLAG_GAME : 0;
 				Item.m_Image = pLayer->m_Image;
@@ -366,6 +368,14 @@ int CEditorMap::Save(class IStorage *pStorage, const char *pFileName)
 					mem_zero(Tiles, pLayer->m_Width*pLayer->m_Height*sizeof(CTile));
 					Item.m_Data = df.AddData(pLayer->m_Width*pLayer->m_Height*sizeof(CTile), Tiles);
 					Item.m_Speedup = df.AddData(pLayer->m_Width*pLayer->m_Height*sizeof(CSpeedupTile), ((CLayerSpeedup *)pLayer)->m_pSpeedupTile);
+					delete[] Tiles;
+				}
+				else if(pLayer->m_Tool)
+				{
+					CTile *Tiles = new CTile[pLayer->m_Width*pLayer->m_Height];
+					mem_zero(Tiles, pLayer->m_Width*pLayer->m_Height*sizeof(CTile));
+					Item.m_Data = df.AddData(pLayer->m_Width*pLayer->m_Height*sizeof(CTile), Tiles);
+					Item.m_Tool = df.AddData(pLayer->m_Width*pLayer->m_Height*sizeof(CToolTile), ((CLayerTool *)pLayer)->m_pToolTile);
 					delete[] Tiles;
 				}
 				else
@@ -525,7 +535,6 @@ int CEditorMap::Load(class IStorage *pStorage, const char *pFileName, int Storag
 				}
 			}
 		}
-
 		// load images
 		{
 			int Start, Num;
@@ -654,6 +663,11 @@ int CEditorMap::Load(class IStorage *pStorage, const char *pFileName, int Storag
 							pTiles = new CLayerSpeedup(pTilemapItem->m_Width, pTilemapItem->m_Height);
 							MakeSpeedupLayer(pTiles);
 						}
+						else if(pTilemapItem->m_Flags&8)
+						{
+							pTiles = new CLayerTool(pTilemapItem->m_Width, pTilemapItem->m_Height);
+							MakeToolLayer(pTiles);
+						}
 						else
 						{
 							pTiles = new CLayerTiles(pTilemapItem->m_Width, pTilemapItem->m_Height);
@@ -717,6 +731,20 @@ int CEditorMap::Load(class IStorage *pStorage, const char *pFileName, int Storag
 							}
 							
 							DataFile.UnloadData(pTilemapItem->m_Speedup);
+						}
+						else if(pTiles->m_Tool)
+						{
+							void *pToolData = DataFile.GetData(pTilemapItem->m_Tool);
+							mem_copy(((CLayerTool*)pTiles)->m_pToolTile, pToolData, pTiles->m_Width*pTiles->m_Height*sizeof(CToolTile));
+
+							for(int i = 0; i < pTiles->m_Width*pTiles->m_Height; i++)
+							{
+								if(((CLayerTool*)pTiles)->m_pToolTile[i].m_Type >= 19 && ((CLayerTool*)pTiles)->m_pToolTile[i].m_Type <= 24)
+									((CLayerTiles*)pTiles)->m_pTiles[i].m_Index = ((CLayerTool*)pTiles)->m_pToolTile[i].m_Type;
+								else
+									((CLayerTiles*)pTiles)->m_pTiles[i].m_Index = 0;
+							}
+							DataFile.UnloadData(pTilemapItem->m_Tool);
 						}
 					}
 					else if(pLayerItem->m_Type == LAYERTYPE_QUADS)

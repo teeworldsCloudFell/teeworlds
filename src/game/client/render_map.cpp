@@ -427,3 +427,68 @@ void CRenderTools::RenderSpeedupmap(CSpeedupTile *pSpeedup, int w, int h, float 
 		
 	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
+
+void CRenderTools::RenderToolmap(CToolTile *pTool, int w, int h, float Scale, vec4 Color, int RenderFlags)
+{
+	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
+	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
+
+	int StartY = (int)(ScreenY0/Scale)-1;
+	int StartX = (int)(ScreenX0/Scale)-1;
+	int EndY = (int)(ScreenY1/Scale)+1;
+	int EndX = (int)(ScreenX1/Scale)+1;
+
+	for(int y = StartY; y < EndY; y++)
+		for(int x = StartX; x < EndX; x++)
+		{
+			int mx = x;
+			int my = y;
+
+			if(RenderFlags&TILERENDERFLAG_EXTEND)
+			{
+				if(mx<0)
+					mx = 0;
+				if(mx>=w)
+					mx = w-1;
+				if(my<0)
+					my = 0;
+				if(my>=h)
+					my = h-1;
+			}
+			else
+			{
+				if(mx<0)
+					continue; // mx = 0;
+				if(mx>=w)
+					continue; // mx = w-1;
+				if(my<0)
+					continue; // my = 0;
+				if(my>=h)
+					continue; // my = h-1;
+			}
+
+			int c = mx + my*w;
+
+			unsigned char Index = pTool[c].m_Number;
+			if(Index)
+			{
+				char aBuf[16];
+				str_format(aBuf, sizeof(aBuf), "%d", Index);
+				UI()->TextRender()->Text(0, mx*Scale-2, my*Scale-4, Scale-5, aBuf, -1);
+			}
+			int Team = pTool[c].m_Team;
+			if(Team > 1 && Index)
+			{
+				Graphics()->TextureSet(-1);
+				Graphics()->QuadsBegin();
+				if(Team-2 == TEAM_RED)
+					Graphics()->SetColor(255.0f, 0.0f, 0.0f, 255.0f);
+				else
+					Graphics()->SetColor(0.0f, 0.0f, 255.0f, 255.0f);
+				DrawSprite(mx*Scale+23, my*Scale+23, Scale-6);
+				Graphics()->QuadsEnd();
+			}
+		}
+
+		Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
+}

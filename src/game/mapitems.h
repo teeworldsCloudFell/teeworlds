@@ -123,6 +123,13 @@ public:
 	short m_Angle;
 };
 
+struct CToolTile
+{
+	unsigned char m_Number;
+	unsigned char m_Type;
+	short m_Team;
+};
+
 struct CMapItemImage
 {
 	int m_Version;
@@ -187,6 +194,8 @@ struct CMapItemLayerTilemap
 	int m_Tele;
 	
 	int m_Speedup;
+
+	int m_Tool;
 } ;
 
 struct CMapItemLayerQuads

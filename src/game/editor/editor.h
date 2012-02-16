@@ -304,7 +304,7 @@ public:
 
 	struct CSetting
 	{
-		char m_aCommand[64];
+		char m_aCommand[512];
 
 		bool operator==(const CSetting &Other) { return !str_comp(m_aCommand, Other.m_aCommand); }
 	};
@@ -313,6 +313,7 @@ public:
 	class CLayerGame *m_pGameLayer;
 	class CLayerTele *m_pTeleLayer;
 	class CLayerSpeedup *m_pSpeedupLayer;
+	class CLayerTool *m_pToolLayer;
 	CLayerGroup *m_pGameGroup;
 
 	CEnvelope *NewEnvelope(int Channels)
@@ -376,6 +377,7 @@ public:
 	
 	void MakeTeleLayer(CLayer *pLayer);
 	void MakeSpeedupLayer(CLayer *pLayer);
+	void MakeToolLayer(CLayer *pLayer);
 };
 
 
@@ -446,6 +448,7 @@ public:
 	int m_Game;
 	int m_Tele;
 	int m_Speedup;
+	int m_Tool;
 	int m_Image;
 	int m_Width;
 	int m_Height;
@@ -522,6 +525,19 @@ public:
 	virtual void BrushFlipX();
 	virtual void BrushFlipY();
 	virtual void BrushRotate(float Amount);
+	virtual void FillSelection(bool Empty, CLayer *pBrush, CUIRect Rect);
+};
+
+class CLayerTool : public CLayerTiles
+{
+public:
+	CLayerTool(int w, int h);
+	~CLayerTool();
+
+	CToolTile *m_pToolTile;
+
+	virtual void Resize(int NewW, int NewH);
+	virtual void BrushDraw(CLayer *pBrush, float wx, float wy);
 	virtual void FillSelection(bool Empty, CLayer *pBrush, CUIRect Rect);
 };
 
@@ -627,6 +643,9 @@ public:
 		
 		m_SpeedupForce = 50;
 		m_SpeedupAngle = 0;
+
+		m_ToolNum = 1;
+		m_ToolTeam = 1;
 	}
 
 	virtual void Init();
@@ -766,7 +785,7 @@ public:
 
 	static void EnvelopeEval(float TimeOffset, int Env, float *pChannels, void *pUser);
 	float m_CommandBox;
-	char m_aSettingsCommand[64];
+	char m_aSettingsCommand[512];
 
 	void DoMapBorder();
 	int DoButton_Editor_Common(const void *pID, const char *pText, int Checked, const CUIRect *pRect, int Flags, const char *pToolTip);
@@ -807,6 +826,7 @@ public:
 	static int PopupSelectConfigAutoMap(CEditor *pEditor, CUIRect View);
 	static int PopupTele(CEditor *pEditor, CUIRect View);
 	static int PopupSpeedup(CEditor *pEditor, CUIRect View);
+	static int PopupTool(CEditor *pEditor, CUIRect View);
 
 	static void CallbackOpenMap(const char *pFileName, int StorageType, void *pUser);
 	static void CallbackAppendMap(const char *pFileName, int StorageType, void *pUser);
@@ -870,6 +890,9 @@ public:
 
 	unsigned char m_SpeedupForce;
 	short m_SpeedupAngle;
+
+	unsigned char m_ToolNum;
+	short m_ToolTeam;
 };
 
 // make sure to inline this function
