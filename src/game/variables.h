@@ -96,6 +96,8 @@ MACRO_CONFIG_INT(SvXonxFeature, sv_xonx_feature, 1, 0, 1, CFGFLAG_SERVER, "Enabl
 MACRO_CONFIG_INT(SvRestartFeature, sv_restart_feature, 1, 0, 1, CFGFLAG_SERVER, "Enable restart Chat-Feature")
 MACRO_CONFIG_INT(SvStopgoFeature, sv_stopgo_feature, 1, 0, 1, CFGFLAG_SERVER, "Enable stop/go Chat-Feature")
 MACRO_CONFIG_INT(SvLogDetects, sv_log_detects, 1, 0, 1, CFGFLAG_SERVER, "Write detected players into: detected_players.txt")
+MACRO_CONFIG_INT(SvDetectsNeeded, sv_detects_needed, 5, 0, 100, CFGFLAG_SERVER, "Detects needed in sv_reset_detects_seconds seconds to mark player as bot")
+MACRO_CONFIG_INT(SvResetDetectsSeconds, sv_reset_detects_seconds, 120, 0, 6000, CFGFLAG_SERVER, "Seconds until detects get resetted to 0")
 /* inQ */
 
 // debug

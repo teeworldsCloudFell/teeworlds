@@ -445,7 +445,7 @@ void CGameContext::OnDetect(int ClientID)
 			}
 		}
 		Server()->GetClientAddr(ClientID, aIP, sizeof(aIP));
-		str_format(aBuf, sizeof(aBuf), "Name: \"%s\" IP: \"%s\"", Server()->ClientName(ClientID), aIP);
+		str_format(aBuf, sizeof(aBuf), "Name: \"%s\" Clan: \"%s\" IP: \"%s\"", Server()->ClientName(ClientID), Server()->ClientClan(ClientID), aIP);
 		io_write(File, aBuf, str_length(aBuf));
 		io_write_newline(File);
 		io_close(File);
@@ -1902,6 +1902,17 @@ void CGameContext::ConDetectedPlayers(IConsole::IResult *pResult, void *pUserDat
 	}
 }
 
+void CGameContext::ConResetDetectedPlayers(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(pSelf->m_apPlayers[i])
+			pSelf->m_apPlayers[i]->m_BotDetected = false;
+	}
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Reseted detected players");
+}
 /* inQ */
 void CGameContext::OnConsoleInit()
 {
@@ -1938,6 +1949,7 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("set_name", "ir", CFGFLAG_SERVER, ConSetName, this, "");
 	Console()->Register("mute", "ii", CFGFLAG_SERVER, ConMute, this, "");
 	Console()->Register("detected", "", CFGFLAG_SERVER, ConDetectedPlayers, this, "Shows currently detected players");
+	Console()->Register("reset_detected", "", CFGFLAG_SERVER, ConResetDetectedPlayers, this, "Reset current detected players");
 	/* inQ */
 }
 

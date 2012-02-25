@@ -72,6 +72,7 @@ class CGameContext : public IGameServer
 	static void ConSetName(IConsole::IResult *pResult, void *pUserData);
 	static void ConMute(IConsole::IResult *pResult, void *pUserData);
 	static void ConDetectedPlayers(IConsole::IResult *pResult, void *pUserData);
+	static void ConResetDetectedPlayers(IConsole::IResult *pResult, void *pUserData);
 	/* inQ */
 
 	CGameContext(int Resetting);

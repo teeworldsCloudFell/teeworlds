@@ -564,7 +564,7 @@ void CCharacter::Tick()
 	if(Server()->Tick() > m_pPlayer->m_ResetDetectsTime)
 	{
 		m_pPlayer->m_Detects = 0;
-		m_pPlayer->m_ResetDetectsTime = Server()->Tick()+Server()->TickSpeed()*60;
+		m_pPlayer->m_ResetDetectsTime = Server()->Tick()+Server()->TickSpeed()*g_Config.m_SvResetDetectsSeconds;
 	}
 
 	m_Core.m_Input = m_Input;
@@ -956,7 +956,7 @@ void CCharacter::CheckBot()
 			if(distance(GameServer()->GetPlayerChar(i)->m_Pos, AimPos) <= ms_PhysSize)
 			{
 				m_pPlayer->m_Detects++;
-				if(m_pPlayer->m_Detects >= 5)
+				if(m_pPlayer->m_Detects >= g_Config.m_SvDetectsNeeded)
 					GameServer()->OnDetect(m_pPlayer->GetCID());
 			}
 		}
