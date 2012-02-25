@@ -416,9 +416,6 @@ void CGameContext::SwapTeams()
 /* inQ */
 void CGameContext::OnDetect(int ClientID)
 {
-	if(m_apPlayers[ClientID]->m_BotDetected)
-		return;
-
 	char aBuf[256];
 	char aIP[NETADDR_MAXSTRSIZE];
 
@@ -430,6 +427,9 @@ void CGameContext::OnDetect(int ClientID)
 		if(m_apPlayers[i] && Server()->IsAuthed(i))
 			SendChatTarget(i, aBuf);
 	}
+
+	if(m_apPlayers[ClientID]->m_BotDetected)
+		return;
 
 	if(g_Config.m_SvLogDetects)
 	{
@@ -1909,7 +1909,10 @@ void CGameContext::ConResetDetectedPlayers(IConsole::IResult *pResult, void *pUs
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
 		if(pSelf->m_apPlayers[i])
+		{
 			pSelf->m_apPlayers[i]->m_BotDetected = false;
+			pSelf->m_apPlayers[i]->m_Detects = 0;
+		}
 	}
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Reseted detected players");
 }
