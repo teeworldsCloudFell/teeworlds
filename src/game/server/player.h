@@ -62,7 +62,14 @@ public:
 	int m_LastChangeInfo;
 	int m_LastEmote;
 	int m_LastKill;
+
+	/* inQ */
 	int m_Muted;
+	// Botdetection
+	bool m_BotDetected;
+	int m_Detects;
+	int64 m_ResetDetectsTime;
+	/* inQ */
 
 	// TODO: clean this up
 	struct

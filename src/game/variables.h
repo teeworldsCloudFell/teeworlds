@@ -95,6 +95,7 @@ MACRO_CONFIG_INT(SvAntibot, sv_antibot, 1, 0, 1, CFGFLAG_SERVER, "Ban players wi
 MACRO_CONFIG_INT(SvXonxFeature, sv_xonx_feature, 1, 0, 1, CFGFLAG_SERVER, "Enable xonx Chat-Feature")
 MACRO_CONFIG_INT(SvRestartFeature, sv_restart_feature, 1, 0, 1, CFGFLAG_SERVER, "Enable restart Chat-Feature")
 MACRO_CONFIG_INT(SvStopgoFeature, sv_stopgo_feature, 1, 0, 1, CFGFLAG_SERVER, "Enable stop/go Chat-Feature")
+MACRO_CONFIG_INT(SvLogDetects, sv_log_detects, 1, 0, 1, CFGFLAG_SERVER, "Write detected players into: detected_players.txt")
 /* inQ */
 
 // debug

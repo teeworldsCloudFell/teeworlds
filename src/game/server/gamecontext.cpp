@@ -413,6 +413,46 @@ void CGameContext::SwapTeams()
 	(void)m_pController->CheckTeamBalance();
 }
 
+/* inQ */
+void CGameContext::OnDetect(int ClientID)
+{
+	if(m_apPlayers[ClientID]->m_BotDetected)
+		return;
+
+	char aBuf[256];
+	char aIP[NETADDR_MAXSTRSIZE];
+
+	m_apPlayers[ClientID]->m_BotDetected = true;
+	str_format(aBuf, sizeof(aBuf), "%d:'%s' has been detected!", ClientID, Server()->ClientName(ClientID));
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(m_apPlayers[i] && Server()->IsAuthed(i))
+			SendChatTarget(i, aBuf);
+	}
+
+	if(g_Config.m_SvLogDetects)
+	{
+		IOHANDLE File;
+		File = io_open("detected_players.txt", IOFLAG_APPEND);
+		if(!File)
+		{
+			File = io_open("detected_players.txt", IOFLAG_WRITE);
+			if(!File)
+			{
+				dbg_msg("server", "Failed to open detected_players.txt for writing");
+				return;
+			}
+		}
+		Server()->GetClientAddr(ClientID, aIP, sizeof(aIP));
+		str_format(aBuf, sizeof(aBuf), "Name: \"%s\" IP: \"%s\"", Server()->ClientName(ClientID), aIP);
+		io_write(File, aBuf, str_length(aBuf));
+		io_write_newline(File);
+		io_close(File);
+	}
+}
+/* inQ */
+
 void CGameContext::OnTick()
 {
 	// check tuning
@@ -1845,6 +1885,23 @@ void CGameContext::ConSetName(IConsole::IResult *pResult, void *pUserData)
 		return; }
 	pSelf->Server()->SetClientName(pResult->GetInteger(0), pResult->GetString(1));
 }
+
+void CGameContext::ConDetectedPlayers(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	char aBuf[128];
+
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Detected players:");
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(pSelf->m_apPlayers[i] && pSelf->m_apPlayers[i]->m_BotDetected)
+		{
+			str_format(aBuf, sizeof(aBuf), "%d:'%s' has been detected", i, pSelf->Server()->ClientName(i));
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+		}
+	}
+}
+
 /* inQ */
 void CGameContext::OnConsoleInit()
 {
@@ -1880,6 +1937,7 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("say_to", "ir", CFGFLAG_SERVER, ConSayTo, this, "");
 	Console()->Register("set_name", "ir", CFGFLAG_SERVER, ConSetName, this, "");
 	Console()->Register("mute", "ii", CFGFLAG_SERVER, ConMute, this, "");
+	Console()->Register("detected", "", CFGFLAG_SERVER, ConDetectedPlayers, this, "Shows currently detected players");
 	/* inQ */
 }
 

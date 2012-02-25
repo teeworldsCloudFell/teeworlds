@@ -118,7 +118,10 @@ private:
 	void SpreeAdd();
 	void SpreeEnd(int Killer);
 	bool OnSpree();
+	// Botdetection
+	void CheckBot();
 	/* inQ */
+
 	// ninja
 	struct
 	{

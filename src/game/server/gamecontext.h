@@ -71,6 +71,7 @@ class CGameContext : public IGameServer
 	static void ConSayTo(IConsole::IResult *pResult, void *pUserData);
 	static void ConSetName(IConsole::IResult *pResult, void *pUserData);
 	static void ConMute(IConsole::IResult *pResult, void *pUserData);
+	static void ConDetectedPlayers(IConsole::IResult *pResult, void *pUserData);
 	/* inQ */
 
 	CGameContext(int Resetting);
@@ -105,6 +106,7 @@ public:
 	void SendVoteSet(int ClientID);
 	void SendVoteStatus(int ClientID, int Total, int Yes, int No);
 	void AbortVoteKickOnDisconnect(int ClientID);
+	void OnDetect(int ClientID);
 
 	int m_VoteCreator;
 	int64 m_VoteCloseTime;

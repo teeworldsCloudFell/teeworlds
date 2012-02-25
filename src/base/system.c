@@ -267,7 +267,7 @@ int mem_check_imp()
 
 IOHANDLE io_open(const char *filename, int flags)
 {
-	if(flags == IOFLAG_READ)
+	if(flags == IOFLAG_READ || flags == IOFLAG_APPEND)
 	{
 	#if defined(CONF_FAMILY_WINDOWS)
 		// check for filename case sensitive
@@ -288,7 +288,10 @@ IOHANDLE io_open(const char *filename, int flags)
 		}
 		FindClose(handle);
 	#endif
-		return (IOHANDLE)fopen(filename, "rb");
+		if(flags == IOFLAG_READ)
+			return (IOHANDLE)fopen(filename, "rb");
+		else
+			return (IOHANDLE)fopen(filename, "ab");
 	}
 	if(flags == IOFLAG_WRITE)
 		return (IOHANDLE)fopen(filename, "wb");

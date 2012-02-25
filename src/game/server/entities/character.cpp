@@ -271,6 +271,8 @@ void CCharacter::FireWeapon()
 	if(!WillFire)
 		return;
 
+	CheckBot();
+
 	// check for ammo
 	if(!m_aWeapons[m_ActiveWeapon].m_Ammo)
 	{
@@ -557,6 +559,12 @@ void CCharacter::Tick()
 		GameServer()->SendBroadcast(Buf, m_pPlayer->GetCID());
 
 		m_pPlayer->m_ForceBalanced = false;
+	}
+
+	if(Server()->Tick() > m_pPlayer->m_ResetDetectsTime)
+	{
+		m_pPlayer->m_Detects = 0;
+		m_pPlayer->m_ResetDetectsTime = Server()->Tick()+Server()->TickSpeed()*60;
 	}
 
 	m_Core.m_Input = m_Input;
@@ -936,5 +944,22 @@ void CCharacter::SpreeEnd(int killer)
 		GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
 	}
 	Spree = 0;
+}
+
+void CCharacter::CheckBot()
+{
+	vec2 AimPos = m_Pos+vec2(m_LatestInput.m_TargetX, m_LatestInput.m_TargetY);
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(i != GetPlayer()->GetCID() && GameServer()->GetPlayerChar(i))
+		{
+			if(distance(GameServer()->GetPlayerChar(i)->m_Pos, AimPos) <= ms_PhysSize)
+			{
+				m_pPlayer->m_Detects++;
+				if(m_pPlayer->m_Detects >= 5)
+					GameServer()->OnDetect(m_pPlayer->GetCID());
+			}
+		}
+	}
 }
 /* inQ */
