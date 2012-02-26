@@ -419,7 +419,6 @@ void CGameContext::OnDetect(int ClientID)
 	char aBuf[256];
 	char aIP[NETADDR_MAXSTRSIZE];
 
-	m_apPlayers[ClientID]->m_BotDetected = true;
 	str_format(aBuf, sizeof(aBuf), "%d:'%s' has been detected!", ClientID, Server()->ClientName(ClientID));
 
 	for(int i = 0; i < MAX_CLIENTS; i++)
@@ -430,6 +429,8 @@ void CGameContext::OnDetect(int ClientID)
 
 	if(m_apPlayers[ClientID]->m_BotDetected)
 		return;
+
+	m_apPlayers[ClientID]->m_BotDetected = true;
 
 	if(g_Config.m_SvLogDetects)
 	{
