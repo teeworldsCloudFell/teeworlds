@@ -419,7 +419,10 @@ void CGameContext::OnDetect(int ClientID)
 	char aBuf[256];
 	char aIP[NETADDR_MAXSTRSIZE];
 
-	str_format(aBuf, sizeof(aBuf), "%d:'%s' has been detected!", ClientID, Server()->ClientName(ClientID));
+	if(m_apPlayers[ClientID]->m_Detects >= g_Config.m_SvDetectsNeeded)
+		str_format(aBuf, sizeof(aBuf), "%d:'%s' has been detected!", ClientID, Server()->ClientName(ClientID));
+	else
+		str_format(aBuf, sizeof(aBuf), "%d:'%s' detects: %d/%d", ClientID, Server()->ClientName(ClientID), m_apPlayers[ClientID]->m_Detects, g_Config.m_SvDetectsNeeded);
 
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
@@ -427,7 +430,7 @@ void CGameContext::OnDetect(int ClientID)
 			SendChatTarget(i, aBuf);
 	}
 
-	if(m_apPlayers[ClientID]->m_BotDetected)
+	if(m_apPlayers[ClientID]->m_Detects < g_Config.m_SvDetectsNeeded)
 		return;
 
 	m_apPlayers[ClientID]->m_BotDetected = true;

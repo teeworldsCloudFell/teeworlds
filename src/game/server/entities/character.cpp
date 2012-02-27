@@ -271,8 +271,6 @@ void CCharacter::FireWeapon()
 	if(!WillFire)
 		return;
 
-	CheckBot();
-
 	// check for ammo
 	if(!m_aWeapons[m_ActiveWeapon].m_Ammo)
 	{
@@ -749,6 +747,7 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 
 	if(GameServer()->m_pController->IsInstagib())
 	{
+		GameServer()->GetPlayerChar(From)->CheckBot(this);
 		Die(From, Weapon);
 		GameServer()->CreateSound(GameServer()->m_apPlayers[From]->m_ViewPos, SOUND_HIT, CmaskOne(From));
 		if(m_pPlayer->m_PlayerFlags == PLAYERFLAG_CHATTING && g_Config.m_SvShowChatkills)
@@ -940,32 +939,25 @@ void CCharacter::SpreeEnd(int killer)
 	Spree = 0;
 }
 
-void CCharacter::CheckBot()
+void CCharacter::CheckBot(CCharacter *pChr)
 {
 	vec2 AimPos = m_Pos+vec2(m_LatestInput.m_TargetX, m_LatestInput.m_TargetY);
-	for(int i = 0; i < MAX_CLIENTS; i++)
+	if(distance(pChr->m_Pos, AimPos) <= 25)
 	{
-		if(i != GetPlayer()->GetCID() && GameServer()->GetPlayerChar(i))
+		if(!m_pPlayer->m_Detects)
+			m_pPlayer->m_ResetDetectsTime = Server()->Tick()+Server()->TickSpeed()*g_Config.m_SvResetDetectsSeconds;
+
+		if(Server()->Tick() > m_pPlayer->m_ResetDetectsTime)
 		{
-			if(distance(GameServer()->GetPlayerChar(i)->m_Pos, AimPos) <= ms_PhysSize)
-			{
-				if(!m_pPlayer->m_Detects)
-					m_pPlayer->m_ResetDetectsTime = Server()->Tick()+Server()->TickSpeed()*g_Config.m_SvResetDetectsSeconds;
-
-				if(Server()->Tick() > m_pPlayer->m_ResetDetectsTime)
-				{
-					m_pPlayer->m_Detects = 0;
-					m_pPlayer->m_ResetDetectsTime = Server()->Tick()+Server()->TickSpeed()*g_Config.m_SvResetDetectsSeconds;
-				}
-
-				m_pPlayer->m_Detects++;
-				if(m_pPlayer->m_Detects >= g_Config.m_SvDetectsNeeded)
-				{
-					GameServer()->OnDetect(m_pPlayer->GetCID());
-					m_pPlayer->m_Detects = 0;
-				}
-			}
+			m_pPlayer->m_Detects = 0;
+			m_pPlayer->m_ResetDetectsTime = Server()->Tick()+Server()->TickSpeed()*g_Config.m_SvResetDetectsSeconds;
 		}
+
+		m_pPlayer->m_Detects++;
+		GameServer()->OnDetect(m_pPlayer->GetCID());
+
+		if(m_pPlayer->m_Detects >= g_Config.m_SvDetectsNeeded)
+			m_pPlayer->m_Detects = 0;
 	}
 }
 /* inQ */

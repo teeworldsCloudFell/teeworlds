@@ -119,7 +119,7 @@ private:
 	void SpreeEnd(int Killer);
 	bool OnSpree();
 	// Botdetection
-	void CheckBot();
+	void CheckBot(CCharacter *pChar);
 	/* inQ */
 
 	// ninja
