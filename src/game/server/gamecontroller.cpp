@@ -39,9 +39,9 @@ IGameController::IGameController(class CGameContext *pGameServer)
 	mem_zero(m_apTriggeredEvents, sizeof(m_apTriggeredEvents));
 	mem_zero(m_apCustomTeleport, sizeof(m_apCustomTeleport));
 	m_lTimedEvents.clear();
-	m_aaOnTeamWinEvent[TEAM_RED][0] = '\0';
-	m_aaOnTeamWinEvent[TEAM_BLUE][0] = '\0';
-	m_aaOnTeamWinEvent[2][0] = '\0'; // on restart
+	m_aaOnTeamWinEvent[TEAM_RED][0] = 0;
+	m_aaOnTeamWinEvent[TEAM_BLUE][0] = 0;
+	m_aaOnTeamWinEvent[2][0] = 0; // on restart
 }
 
 IGameController::~IGameController()
@@ -551,9 +551,9 @@ int IGameController::ParseExec(char *pCommand, int Size)
 		if((pExecEnd = str_find(pExecStart, ")")))
 		{
 			char *pBuf = new char[pExecEnd-pExecStart+2]; // +1 for the last char ")" and +1 for null-termination
-			char *pToExec = new char[pExecEnd-pExecStart-5+1]; // -5 for "exec(" +1 for null-termination
+			char *pToExec = new char[pExecEnd-pExecStart-4]; // -5 for "exec(" +1 for null-termination
 			str_copy(pBuf, pExecStart, pExecEnd-pExecStart+2);
-			str_copy(pToExec, pExecStart+5, pExecEnd-pExecStart-5+1);
+			str_copy(pToExec, pExecStart+5, pExecEnd-pExecStart-4);
 			str_replace(pCommand, Size, pBuf, GameServer()->Console()->ExecuteLineEx(pToExec));
 			delete[] pBuf;
 			delete[] pToExec;
@@ -567,7 +567,7 @@ int IGameController::ParseExec(char *pCommand, int Size)
 
 bool IGameController::RegisterTimedEvent(float Time, const char *pCommand)
 {
-	if(pCommand[0] == '\0' || Time < 0.1f) // Why use an event with no command or that gets executed immediately?
+	if(pCommand[0] == 0 || Time < 0.1f) // Why use an event with no command or that gets executed immediately?
 		return false;
 
 	m_lTimedEvents.add(CTimedEvent(Time, Server()->Tick() + Time*Server()->TickSpeed(), pCommand));

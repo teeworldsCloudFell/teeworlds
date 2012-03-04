@@ -1584,7 +1584,10 @@ void CGameContext::ConFlushTriggeredEvents(IConsole::IResult *pResult, void *pUs
 	CGameContext *pSelf = (CGameContext *)pUserData;
 
 	for(int i = 0; i < 256; i++)
+	{
 		delete pSelf->m_pController->m_apTriggeredEvents[i];
+		pSelf->m_pController->m_apTriggeredEvents[i] = 0;
+	}
 
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Triggered events flushed");
 }
@@ -1605,9 +1608,9 @@ void CGameContext::ConFlushOnTeamWinEvent(IConsole::IResult *pResult, void *pUse
 {
 	CGameContext *pSelf = (CGameContext *)pUserData;
 
-	pSelf->m_pController->m_aaOnTeamWinEvent[0][0] = '\0';
-	pSelf->m_pController->m_aaOnTeamWinEvent[1][0] = '\0';
-	pSelf->m_pController->m_aaOnTeamWinEvent[2][0] = '\0';
+	pSelf->m_pController->m_aaOnTeamWinEvent[0][0] = 0;
+	pSelf->m_pController->m_aaOnTeamWinEvent[1][0] = 0;
+	pSelf->m_pController->m_aaOnTeamWinEvent[2][0] = 0;
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "On-teamwin events flushed");
 }
 
@@ -1632,7 +1635,10 @@ void CGameContext::ConCustomTeleporterFlush(IConsole::IResult *pResult, void *pU
 	CGameContext *pSelf = (CGameContext *)pUserData;
 
 	for(int i = 0; i < 256; i++)
+	{
 		delete pSelf->m_pController->m_apCustomTeleport[i];
+		pSelf->m_pController->m_apCustomTeleport[i] = 0;
+	}
 
 	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Custom teleports flushed");
 }
@@ -1671,11 +1677,13 @@ void CGameContext::ConReloadMapDefaults(IConsole::IResult *pResult, void *pUserD
 	{
 		delete pSelf->m_pController->m_apTriggeredEvents[i];
 		delete pSelf->m_pController->m_apCustomTeleport[i];
+		pSelf->m_pController->m_apTriggeredEvents[i] = 0;
+		pSelf->m_pController->m_apCustomTeleport[i] = 0;
 	}
 	pSelf->m_pController->m_lTimedEvents.clear();
-	pSelf->m_pController->m_aaOnTeamWinEvent[0][0] = '\0';
-	pSelf->m_pController->m_aaOnTeamWinEvent[1][0] = '\0';
-	pSelf->m_pController->m_aaOnTeamWinEvent[2][0] = '\0';
+	pSelf->m_pController->m_aaOnTeamWinEvent[0][0] = 0;
+	pSelf->m_pController->m_aaOnTeamWinEvent[1][0] = 0;
+	pSelf->m_pController->m_aaOnTeamWinEvent[2][0] = 0;
 
 	// Now we can load them again.
 	pSelf->LoadMapSettings();

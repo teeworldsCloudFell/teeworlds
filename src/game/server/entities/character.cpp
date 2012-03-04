@@ -88,6 +88,9 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 	m_BurnedFrom = pPlayer->GetCID();
 
 	m_LastRegenTick = Server()->Tick();
+
+	GameServer()->m_pController->OnCharacterSpawn(this);
+
 	if(g_Config.m_SvZombieHp && pPlayer->GetTeam() == TEAM_RED)
 	{
 		m_Health = g_Config.m_SvZombieHp;
@@ -98,8 +101,6 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 			GameServer()->SendBroadcast(aBuf, m_pPlayer->GetCID());
 		}
 	}
-
-	GameServer()->m_pController->OnCharacterSpawn(this);
 
 	return true;
 }

@@ -325,7 +325,7 @@ void CPlayer::TryRespawn()
 			if(!GameServer()->m_pController->CanSpawn(TEAM_BLUE, &SpawnPos))
 				return;
 		}
-		if((int)m_LastCheckpoint.x != 0 && (int)m_LastCheckpoint.y != 0)
+		if(m_LastCheckpoint != vec2(0, 0))
 			SpawnPos = m_LastCheckpoint;
 	}
 	else if(m_Team == TEAM_BLUE)
