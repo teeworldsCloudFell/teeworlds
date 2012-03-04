@@ -747,7 +747,8 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 
 	if(GameServer()->m_pController->IsInstagib())
 	{
-		GameServer()->GetPlayerChar(From)->CheckBot(this);
+		if(GameServer()->GetPlayerChar(From))
+			GameServer()->GetPlayerChar(From)->CheckBot(this);
 		Die(From, Weapon);
 		GameServer()->CreateSound(GameServer()->m_apPlayers[From]->m_ViewPos, SOUND_HIT, CmaskOne(From));
 		if(m_pPlayer->m_PlayerFlags == PLAYERFLAG_CHATTING && g_Config.m_SvShowChatkills)
