@@ -387,7 +387,7 @@ void CCharacter::FireWeapon()
 				ProjStartPos,
 				Direction,
 				(int)(Server()->TickSpeed()*GameServer()->Tuning()->m_GunLifetime),
-				1, 0, 20, -1, WEAPON_GUN);
+				1, 0, 22, -1, WEAPON_GUN);
 
 			// pack the Projectile and send it to the client Directly
 			CNetObj_Projectile p;
@@ -422,7 +422,7 @@ void CCharacter::FireWeapon()
 					ProjStartPos,
 					vec2(cosf(a), sinf(a))*Speed,
 					(int)(Server()->TickSpeed()*GameServer()->Tuning()->m_ShotgunLifetime),
-					1, 0, 15, -1, WEAPON_SHOTGUN);
+					1, 0, 17, -1, WEAPON_SHOTGUN);
 
 				// pack the Projectile and send it to the client Directly
 				CNetObj_Projectile p;
@@ -1092,7 +1092,7 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 		}
 		else if(GameServer()->m_apPlayers[From] && GameServer()->m_apPlayers[From]->GetCharacter() && GameServer()->m_apPlayers[From]->GetCharacter()->m_Item == HITEM_GRENADE)
 		{
-			m_Item ? AddVel = Force*2 : AddVel = Force*3.0f;
+			m_Item ? AddVel = Force*2.0f : AddVel = Force*3.0f;
 			m_Item ? m_BurnTick = Server()->TickSpeed()*2.0f : m_BurnTick = Server()->TickSpeed()*3.0f;
 		}
 		m_BurnedFrom = From;

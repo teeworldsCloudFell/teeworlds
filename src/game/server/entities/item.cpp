@@ -34,9 +34,9 @@ int CItem::GetLevel()
 	case HITEM_SHOTGUN:
 		return 2;
 	case HITEM_GRENADE:
-		return 1;
-	case HITEM_RIFLE:
 		return 2;
+	case HITEM_RIFLE:
+		return 1;
 	case ZITEM_HAMMER:
 		return 2;
 	}
@@ -109,7 +109,7 @@ void CItem::Tick()
 			pChr->m_Item = m_Item;
 			GameServer()->CreateSound(m_Pos, SOUND_WEAPON_SWITCH);
 			pChr->SetEmote(EMOTE_ANGRY, Server()->Tick() + 1200 * Server()->TickSpeed() / 1000);
-			GameServer()->SendBroadcast("Special item hammer: You have less knockback and freeze time.", pChr->GetPlayer()->GetCID());
+			GameServer()->SendBroadcast("Special item hammer: You have less knockback, burntime and freeze time.", pChr->GetPlayer()->GetCID());
 		}
 	}
 }
