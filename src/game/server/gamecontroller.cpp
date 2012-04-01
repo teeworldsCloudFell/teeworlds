@@ -685,7 +685,7 @@ void IGameController::Snap(int SnappingClient)
 	pGameInfoObj->m_WarmupTimer = m_ZombWarmup;
 
 	pGameInfoObj->m_ScoreLimit = g_Config.m_SvScorelimit;
-	pGameInfoObj->m_TimeLimit = g_Config.m_SvTimelimit;
+	pGameInfoObj->m_TimeLimit = g_Config.m_SvTimelimit*60;
 
 	pGameInfoObj->m_RoundNum = (str_length(g_Config.m_SvMaprotation) && g_Config.m_SvRoundsPerMap) ? g_Config.m_SvRoundsPerMap : 0;
 	pGameInfoObj->m_RoundCurrent = m_RoundCount+1;

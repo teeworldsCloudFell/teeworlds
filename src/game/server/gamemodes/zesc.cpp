@@ -121,7 +121,7 @@ int CGameControllerZESC::OnCharacterDeath(class CCharacter *pVictim, class CPlay
 void CGameControllerZESC::DoTeamScoreWincheck()
 {
 	// check timelimit
-	if((g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !m_SuddenDeath)
+	if((g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()) && !m_SuddenDeath)
 	{
 		//GameServer()->SendBroadcast("Humans win!", -1);
 		EndRound();
@@ -237,7 +237,6 @@ void CGameControllerZESC::Tick()
 			if(apCloseCCharacters[i]->GetPlayer()->GetTeam() == TEAM_BLUE) // Humans Win :D
 			{
 				//GameServer()->SendBroadcast("Humans win!", -1);
-				m_aTeamscore[TEAM_BLUE] = 100;
 				apCloseCCharacters[i]->GetPlayer()->m_Score += 10;
 				EndRound();
 			}
@@ -448,7 +447,7 @@ void CGameControllerZESC::OnEndRound()
 {
 	if(!ZombStarted())
 		return;
-	if(!NumHumans() || !NumZombs() || (NumHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !m_SuddenDeath))
+	if(!NumHumans() || !NumZombs() || (NumHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()) && !m_SuddenDeath))
 	{
 		m_aTeamscore[TEAM_RED] = 0;
 		m_aTeamscore[TEAM_BLUE] = 0;
@@ -456,7 +455,7 @@ void CGameControllerZESC::OnEndRound()
 		{
 			m_aTeamscore[TEAM_RED] = 100;
 		}
-		if(!NumZombs() || (NumHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()*60) && !m_SuddenDeath))
+		if(!NumZombs() || (NumHumans() && (g_Config.m_SvTimelimit > 0 && (Server()->Tick()-m_RoundStartTick) >= g_Config.m_SvTimelimit*Server()->TickSpeed()) && !m_SuddenDeath))
 		{
 			m_aTeamscore[TEAM_BLUE] = 100;
 			for(int i = 0; i < MAX_CLIENTS; i++)
