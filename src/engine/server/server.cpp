@@ -1292,7 +1292,6 @@ int CServer::Run()
 
 	m_NetServer.SetCallbacks(NewClientCallback, DelClientCallback, this);
 
-	m_ServerBan.Init(Console(), Storage(), this);
 	m_Econ.Init(Console(), &m_ServerBan);
 
 	char aBuf[256];
@@ -1707,6 +1706,8 @@ int main(int argc, const char **argv) // ignore_convention
 	// register all console commands
 	pServer->RegisterCommands();
 	pGameServer->OnConsoleInit();
+
+	pServer->m_ServerBan.Init(pConsole, pStorage, pServer);
 
 	// execute autoexec file
 	pConsole->ExecuteFile("autoexec.cfg");
