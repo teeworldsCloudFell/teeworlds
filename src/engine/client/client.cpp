@@ -1704,6 +1704,7 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 			SayChat("The faster you answer the question the more points you get.");
 			SayChat("Good Luck!");
 			m_TriviaStartTick = time_get()+time_freq()*15;
+			m_KillTick = 0;
 		}
 		else if(!str_comp(pMsg->m_pMessage, "!triviastop"))
 		{
