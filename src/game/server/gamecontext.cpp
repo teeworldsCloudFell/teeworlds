@@ -720,6 +720,7 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 			}
 			str_format(aBuf, sizeof(aBuf), "Trunk inQontroL Mod %s by BotoX", INQ_VERSION);
 			SendChatTarget(ClientID, aBuf);
+			SendChatTarget(ClientID, "Botdetection by BotoX included.");
 			SendChatTarget(ClientID, "Say \"cmdlist\" for list of command available.");
 			return;
 		}
