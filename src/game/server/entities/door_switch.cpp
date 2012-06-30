@@ -1,7 +1,6 @@
 #include <engine/shared/config.h>
 #include <game/generated/protocol.h>
 #include <game/server/gamecontext.h>
-#include <game/server/gamemodes/crap.h>
 #include "character.h"
 #include "door_switch.h"
 
@@ -25,7 +24,7 @@ void CDoorSwitch::Tick()
 	if(!pChar || !pChar->GetPlayer())
 		return;
 
-	GameServer()->CrapController()->SwitchDoor(m_pDoor, pChar->GetPlayer(), m_Pos, !m_Lights);
+	GameServer()->m_pController->SwitchDoor(m_pDoor, pChar->GetPlayer(), m_Pos, !m_Lights);
 }
 
 void CDoorSwitch::Snap(int SnappingClient)

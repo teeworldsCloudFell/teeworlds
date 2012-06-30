@@ -9,7 +9,9 @@
 #include <game/version.h>
 #include <game/collision.h>
 #include <game/gamecore.h>
-#include "gamemodes/crap.h"
+#include "gamemodes/dm.h"
+#include "gamemodes/tdm.h"
+#include "gamemodes/ctf.h"
 
 enum
 {
@@ -1462,14 +1464,44 @@ void CGameContext::OnInit(/*class IKernel *pKernel*/)
 	//world = new GAMEWORLD;
 	//players = new CPlayer[MAX_CLIENTS];
 
-	// we are only playing crap!
-	m_pController = new CGameControllerCRAP(this);
+	// select gametype
+	if(str_comp(g_Config.m_SvGametype, "ctf") == 0)
+	{
+		m_pController = new CGameControllerCTF(this);
+		m_pController->MakeInstagib("waterCTF", false);
+	}
+	else if(str_comp(g_Config.m_SvGametype, "tdm") == 0)
+	{
+		m_pController = new CGameControllerTDM(this);
+		m_pController->MakeInstagib("waterTDM", false);
+	}
+	else if(str_comp(g_Config.m_SvGametype, "idm") == 0)
+	{
+		m_pController = new CGameControllerDM(this);
+		m_pController->MakeInstagib("wateriDM", true);
+	}
+	else if(str_comp(g_Config.m_SvGametype, "ictf") == 0)
+	{
+		m_pController = new CGameControllerCTF(this);
+		m_pController->MakeInstagib("wateriCTF", true);
+	}
+	else if(str_comp(g_Config.m_SvGametype, "itdm") == 0)
+	{
+		m_pController = new CGameControllerTDM(this);
+		m_pController->MakeInstagib("wateriTDM", true);
+	}
+	else
+	{
+		m_pController = new CGameControllerDM(this);
+		m_pController->MakeInstagib("waterDM", false);
+	}
+
 
 	// init teleporter
-	CrapController()->InitTeleporter();
+	m_pController->InitTeleporter();
 
 	// create doors
-	CrapController()->InitDoors();
+	m_pController->InitDoors();
 
 	// setup core world
 	//for(int i = 0; i < MAX_CLIENTS; i++)

@@ -1,5 +1,5 @@
+#include <game/server/gamecontext.h>
 #include "door.h"
-#include <game/server/gamemodes/crap.h>
 #include "entities/door_laser.h"
 #include "entities/door_switch.h"
 
@@ -26,25 +26,25 @@ void CDoor::Init()
 	// turn on the laser
 	for(int i = 0; i < m_lNodes.size(); i++)
 		new CDoorLaser(&GameServer()->m_World, m_lNodes[0].m_Pos, m_lNodes[i].m_Pos, this);
-	
+
 	// init switch
 	bool Lights = true;
-	if(GameServer()->CrapController()->m_Switches[m_SwitchNum-1])
+	if(GameServer()->m_pController->m_Switches[m_SwitchNum-1])
 		Lights = false;
 
 	for(int i = 0; i < m_lSwitch.size(); i++)
 		new CDoorSwitch(&GameServer()->m_World, m_lSwitch[i].m_Pos, this, Lights);
 
-	GameServer()->CrapController()->m_Switches[m_SwitchNum-1] = true;
+	GameServer()->m_pController->m_Switches[m_SwitchNum-1] = true;
 }
 
 bool CDoor::Switch(vec2 Pos, bool Silent)
 {	
 	// switch the door
 	m_TurnedOn ^= 1;
-	
+
 	if(!Silent)
 		GameServer()->CreateSound(Pos, SOUND_WEAPON_NOAMMO);
-		
+
 	return true;
 }

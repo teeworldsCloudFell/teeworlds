@@ -1,8 +1,8 @@
 #ifndef GAME_SERVER_DOOR_H
 #define GAME_SERVER_DOOR_H
 
+#include <base/vmath.h>
 #include <base/tl/array.h>
-#include "gamecontext.h"
 
 class CDoor
 {
@@ -29,7 +29,6 @@ public:
 	CDoor(CGameContext *pGameServer, int Team, int SwitchNum, array<CDoorNode> lNodes, array<CDoor::CDoorNode> lSwitch);
 	
 	class CGameContext *GameServer() { return m_pGameServer; }
-	class IServer *Server() { return m_pGameServer->Server(); }
 	
 	void Reset();
 	void Init();

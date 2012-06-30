@@ -92,6 +92,8 @@ MACRO_CONFIG_INT(SvInfiniteAmmo, sv_infinite_ammo, 0, 0, 1, CFGFLAG_SERVER, "Ena
 MACRO_CONFIG_INT(SvTeleport, sv_teleport, 1, 0, 1, CFGFLAG_SERVER, "Enable or disable teleportation")
 MACRO_CONFIG_INT(SvTeleportGrenade, sv_teleport_grenade, 0, 0, 1, CFGFLAG_SERVER, "Enable or disable teleport of grenade")
 MACRO_CONFIG_INT(SvDoorSwitchTime, sv_door_switch_time, 12, 0, 100, CFGFLAG_SERVER, "")
+MACRO_CONFIG_INT(SvLaserjumps, sv_laserjumps, 0, 0, 1, CFGFLAG_SERVER, "Laserjumps (Instagib Only)")
+MACRO_CONFIG_INT(SvShowChatkills, sv_show_chatkills, 0, 0, 1, CFGFLAG_SERVER, "Show Chatkills in Chat")
 
 // debug
 #ifdef CONF_DEBUG // this one can crash the server if not used correctly

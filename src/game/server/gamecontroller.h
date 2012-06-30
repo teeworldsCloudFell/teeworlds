@@ -4,6 +4,8 @@
 #define GAME_SERVER_GAMECONTROLLER_H
 
 #include <base/vmath.h>
+#include <base/tl/array.h>
+#include "door.h"
 
 /*
 	Class: Game Controller
@@ -65,6 +67,13 @@ public:
 
 	bool IsTeamplay() const;
 	bool IsGameOver() const { return m_GameOverTick != -1; }
+
+	vec2 *m_pTeleporter;
+	void InitTeleporter();
+	bool m_Switches[255];
+	array<CDoor> m_lDoors;
+	void InitDoors();
+	void SwitchDoor(CDoor *pDoor, CPlayer *pPlayer, vec2 Pos, bool Silent);
 
 	IGameController(class CGameContext *pGameServer);
 	virtual ~IGameController();
@@ -140,6 +149,10 @@ public:
 	bool CheckTeamBalance();
 	bool CanChangeTeam(CPlayer *pPplayer, int JoinTeam);
 	int ClampTeam(int Team);
+
+	bool m_Instagib;
+	void MakeInstagib(const char *pGametype, bool Option);
+	bool IsInstagib();
 
 	virtual void PostReset();
 };

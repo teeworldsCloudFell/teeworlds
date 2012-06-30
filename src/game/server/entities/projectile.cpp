@@ -3,7 +3,6 @@
 #include <engine/shared/config.h>
 #include <game/generated/protocol.h>
 #include <game/server/gamecontext.h>
-#include <game/server/gamemodes/crap.h>
 #include "projectile.h"
 
 CProjectile::CProjectile(CGameWorld *pGameWorld, int Type, int Owner, vec2 Pos, vec2 Dir, int Span,
@@ -86,7 +85,7 @@ void CProjectile::Tick()
 	int z = GameServer()->Collision()->IsTeleport(GameServer()->Collision()->GetIndex(PrevPos, CurPos));
   	if(g_Config.m_SvTeleport && z && g_Config.m_SvTeleportGrenade && m_Weapon == WEAPON_GRENADE)
   	{
-		m_Pos = GameServer()->CrapController()->m_pTeleporter[z-1];
+		m_Pos = GameServer()->m_pController->m_pTeleporter[z-1];
   		m_StartTick = Server()->Tick();
 	}
 }

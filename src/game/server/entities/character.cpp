@@ -5,8 +5,6 @@
 #include <game/server/gamecontext.h>
 #include <game/mapitems.h>
 
-#include "../gamemodes/crap.h"
-
 #include "character.h"
 #include "laser.h"
 #include "projectile.h"
@@ -58,8 +56,16 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 {
 	m_EmoteStop = -1;
 	m_LastAction = -1;
-	m_ActiveWeapon = WEAPON_GUN;
-	m_LastWeapon = WEAPON_HAMMER;
+	if(GameServer()->m_pController->IsInstagib())
+	{
+		m_ActiveWeapon = WEAPON_RIFLE;
+		m_LastWeapon = WEAPON_RIFLE;
+	}
+	else
+	{
+		m_ActiveWeapon = WEAPON_GUN;
+		m_LastWeapon = WEAPON_HAMMER;
+	}
 	m_QueuedWeapon = -1;
 
 	m_pPlayer = pPlayer;
@@ -638,7 +644,7 @@ void CCharacter::Tick()
 				
 		m_Core.m_HookedPlayer = -1;
 		m_Core.m_HookState = HOOK_RETRACTED;
-		m_Core.m_Pos = GameServer()->CrapController()->m_pTeleporter[z-1];
+		m_Core.m_Pos = GameServer()->m_pController->m_pTeleporter[z-1];
 		m_Core.m_HookPos = m_Core.m_Pos;
 		if(g_Config.m_SvStrip)
 		{
@@ -817,6 +823,18 @@ void CCharacter::Die(int Killer, int Weapon)
 		m_pPlayer->GetCID(), Server()->ClientName(m_pPlayer->GetCID()), Weapon, ModeSpecial);
 	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
 
+	if(GameServer()->m_pController->IsInstagib())
+	{
+		if(OnSpree())
+		{
+			GameServer()->CreateSound(m_Pos, SOUND_GRENADE_EXPLODE);
+			GameServer()->CreateExplosion(m_Pos, m_pPlayer->GetCID(), WEAPON_RIFLE, true);
+		}
+		if(GameServer()->m_apPlayers[Killer]->GetCharacter())
+			GameServer()->m_apPlayers[Killer]->GetCharacter()->SpreeAdd();
+		SpreeEnd(Killer);
+	}
+
 	// send the kill message
 	CNetMsg_Sv_KillMsg Msg;
 	Msg.m_Killer = Killer;
@@ -843,6 +861,22 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 
 	if(GameServer()->m_pController->IsFriendlyFire(m_pPlayer->GetCID(), From) && !g_Config.m_SvTeamdamage)
 		return false;
+
+	if(GameServer()->m_pController->IsInstagib() && (From == m_pPlayer->GetCID() || Weapon == WEAPON_GAME))
+		return false;
+
+	if(GameServer()->m_pController->IsInstagib())
+	{
+		Die(From, Weapon);
+		GameServer()->CreateSound(GameServer()->m_apPlayers[From]->m_ViewPos, SOUND_HIT, CmaskOne(From));
+		if(m_pPlayer->m_PlayerFlags == PLAYERFLAG_CHATTING && g_Config.m_SvShowChatkills)
+		{
+			char aBuf[256];
+			str_format(aBuf, sizeof(aBuf), "%s made a chatkill!", Server()->ClientName(From));
+			GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+		}
+		return true;
+	}
 
 	// m_pPlayer only inflicts half damage on self
 	if(From == m_pPlayer->GetCID())
@@ -988,4 +1022,38 @@ void CCharacter::Snap(int SnappingClient)
 	}
 
 	pCharacter->m_PlayerFlags = GetPlayer()->m_PlayerFlags;
+}
+
+char aaSpreeNote[4][32] = { "is on a killing spree", "is on a rampage", "is dominating", "is unstoppable" };
+
+bool CCharacter::OnSpree()
+{
+	if(Spree >= 5)
+		return true;
+	return false;
+}
+
+void CCharacter::SpreeAdd()
+{
+	Spree++;
+	if(Spree % 5 == 0)
+	{
+		int p = (int)Spree/5-1;
+		if(p > 3)
+			p = 3;
+		char aBuf[512];
+		str_format(aBuf, sizeof(aBuf), "%s %s with %d kills!", Server()->ClientName(m_pPlayer->GetCID()), aaSpreeNote[p], Spree);
+		GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+	}
+}
+
+void CCharacter::SpreeEnd(int killer)
+{
+	if(Spree >= 5)
+	{
+		char aBuf[512];
+		str_format(aBuf, sizeof(aBuf), "%s %d-kills killing spree was ended by %s", Server()->ClientName(m_pPlayer->GetCID()), Spree, Server()->ClientName(killer));
+		GameServer()->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
+	}
+	Spree = 0;
 }

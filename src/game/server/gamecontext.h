@@ -74,7 +74,6 @@ public:
 	class IConsole *Console() { return m_pConsole; }
 	CCollision *Collision() { return &m_Collision; }
 	CTuningParams *Tuning() { return &m_Tuning; }
-	class CGameControllerCRAP *CrapController() { return (CGameControllerCRAP*)m_pController; }
 
 	CGameContext();
 	~CGameContext();

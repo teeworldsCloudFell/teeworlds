@@ -1,6 +1,5 @@
 #include <game/generated/protocol.h>
 #include <game/server/gamecontext.h>
-#include <game/server/gamemodes/crap.h>
 #include "door_laser.h"
 
 CDoorLaser::CDoorLaser(CGameWorld *pGameWorld, vec2 From, vec2 To, CDoor *pDoor)
