@@ -119,7 +119,7 @@ struct CSwitchTile
 {
 	unsigned char m_Number;
 	unsigned char m_Type;
-	int m_Team;
+	short m_Team;
 };
 
 struct CMapItemInfo
