@@ -677,7 +677,6 @@ void CCharacter::Tick()
 
 	// handle speedup tiles
 	int CurrentSpeedup = GameServer()->Collision()->IsSpeedup(TileIndex);
-	bool SpeedupTouch = false;
 	if(m_LastSpeedup != CurrentSpeedup && CurrentSpeedup > -1)
 	{
 		vec2 Direction;
@@ -685,8 +684,6 @@ void CCharacter::Tick()
 		GameServer()->Collision()->GetSpeedup(TileIndex, &Direction, &Force);
 		
 		m_Core.m_Vel += Direction*Force;
-		
-		SpeedupTouch = true;
 	}
 	
 	m_LastSpeedup = CurrentSpeedup;

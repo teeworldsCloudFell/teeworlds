@@ -223,7 +223,6 @@ CCharacter *CGameWorld::LaserIntersectCharacter(vec2 Pos0, vec2 Pos1, float Radi
 {
 	// Find other players
 	float ClosestLen = distance(Pos0, Pos1) * 100.0f;
-	vec2 LineDir = normalize(Pos1-Pos0);
 	CCharacter *pClosest = 0;
 
 	CCharacter *p = (CCharacter *)FindFirst(ENTTYPE_CHARACTER);
