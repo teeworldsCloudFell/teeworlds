@@ -5,7 +5,7 @@
 #include <engine/shared/config.h>
 #include "laser.h"
 
-CLaser::CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEnergy, int Owner)
+CLaser::CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEnergy, int Owner, bool InWater)
 : CEntity(pGameWorld, CGameWorld::ENTTYPE_LASER)
 {
 	m_Pos = Pos;
@@ -14,6 +14,7 @@ CLaser::CLaser(CGameWorld *pGameWorld, vec2 Pos, vec2 Direction, float StartEner
 	m_Dir = Direction;
 	m_Bounces = 0;
 	m_EvalTick = 0;
+	m_InWater = InWater;
 	GameWorld()->InsertEntity(this);
 	DoBounce();
 }
@@ -46,7 +47,18 @@ void CLaser::DoBounce()
 
 	vec2 To = m_Pos + m_Dir * m_Energy;
 
-	if(GameServer()->Collision()->IntersectLine(m_Pos, To, 0x0, &To))
+	int Res;
+	if(g_Config.m_SvWaterReflect)
+	{
+		if(m_InWater)
+			Res = GameServer()->Collision()->IntersectLineAir(m_Pos, To, 0x0, &To);
+		else
+			Res = GameServer()->Collision()->IntersectLineWater(m_Pos, To, 0x0, &To);
+	}
+	else
+		Res = GameServer()->Collision()->IntersectLine(m_Pos, To, 0x0, &To);
+
+	if(Res)
 	{
 		if(!HitCharacter(m_Pos, To))
 		{
@@ -57,7 +69,11 @@ void CLaser::DoBounce()
 			vec2 TempPos = m_Pos;
 			vec2 TempDir = m_Dir * 4.0f;
 
-			GameServer()->Collision()->MovePoint(&TempPos, &TempDir, 1.0f, 0);
+			if(g_Config.m_SvWaterReflect)
+				GameServer()->Collision()->MovePoint_(&TempPos, &TempDir, 1.0f, 0, m_InWater);
+			else
+				GameServer()->Collision()->MovePoint(&TempPos, &TempDir, 1.0f, 0);
+
 			m_Pos = TempPos;
 			m_Dir = normalize(TempDir);
 

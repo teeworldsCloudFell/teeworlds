@@ -106,11 +106,13 @@ void IGameController::InitDoors()
 	{
 		for(int j = 0; j < Height; j++)
 		{
-			if(GameServer()->Collision()->IsDoor(i*32+16, j*32+16))
+			int x = i*32+16;
+			int y = j*32+16;
+			if(GameServer()->Collision()->IsDoor(x, y))
 			{
-				lPos[Index].m_Pos = vec2(i*32+16, j*32+16);
-				lPos[Index].m_Type = GameServer()->Collision()->IsDoor(i*32+16, j*32+16);
-				lPos[Index].m_Team = GameServer()->Collision()->GetSwitchTeam(i*32+16, j*32+16);
+				lPos[Index].m_Pos = vec2(x, y);
+				lPos[Index].m_Type = GameServer()->Collision()->IsDoor(x, y);
+				lPos[Index].m_Team = GameServer()->Collision()->GetSwitchTeam(x, y);
 				/*if(GameServer()->Collision()->GetSwitchNum(lPos[Index].m_Pos))
 				dbg_msg("Doornode found", "SwitchNum: %d, Tile: %d, Team: %d", GameServer()->Collision()->GetSwitchNum(lPos[Index].m_Pos), lPos[Index].m_Type-22, lPos[Index].m_Team);*/
 				Index++;
@@ -214,6 +216,8 @@ void IGameController::InitDoors()
 		}
 	}
 
+	m_lDoors.optimize();
+
 	// init the doors
 	for(int i = 0; i < m_lDoors.size(); i++)
 		m_lDoors[i].Init();
@@ -231,6 +235,7 @@ void IGameController::SwitchDoor(CDoor *pDoor, CPlayer *pPlayer, vec2 Pos, bool 
 		else if(!Silent)
 		{
 			GameServer()->SendChatTarget(pPlayer->GetCID(), "This is your enemies door, you can't operate it!");
+			GameServer()->CreateSound(Pos, SOUND_HOOK_NOATTACH);
 			pDoor->m_SwitchTick = Server()->Tick();
 		}
 	}
@@ -381,6 +386,9 @@ void IGameController::EndRound()
 void IGameController::ResetGame()
 {
 	GameServer()->m_World.m_ResetRequested = true;
+	// reset the doors
+	for(int i = 0; i < m_lDoors.size(); i++)
+		m_lDoors[i].Reset();
 }
 
 const char *IGameController::GetTeamName(int Team)
@@ -415,6 +423,7 @@ void IGameController::StartRound()
 	m_aTeamscore[TEAM_BLUE] = 0;
 	m_ForceBalanced = false;
 	Server()->DemoRecorder_HandleAutoStart();
+
 	char aBuf[256];
 	str_format(aBuf, sizeof(aBuf), "start round type='%s' teamplay='%d'", m_pGameType, m_GameFlags&GAMEFLAG_TEAMS);
 	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);

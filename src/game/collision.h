@@ -31,9 +31,14 @@ public:
 	int GetWidth() { return m_Width; }
 	int GetHeight() { return m_Height; }
 	int IntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision);
+	int IntersectLineAir(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision);
+	int IntersectLineWater(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision);
+	void SetTile(int x, int y, int Index);
 	bool DoorBlock(vec2 Pos0, vec2 Pos1);
 	void MovePoint(vec2 *pInoutPos, vec2 *pInoutVel, float Elasticity, int *pBounces);
 	void MoveBox(vec2 *pInoutPos, vec2 *pInoutVel, vec2 Size, float Elasticity);
+	void MovePoint_(vec2 *pInoutPos, vec2 *pInoutVel, float Elasticity, int *pBounces, bool InWater);
+	bool CheckPoint_(int x, int y, int InWater);
 	bool TestBox(vec2 Pos, vec2 Size);
 	
 	// race

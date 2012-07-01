@@ -72,6 +72,7 @@ private:
 	class CPlayer *m_pPlayer;
 
 	bool m_Alive;
+	bool m_InWater;
 
 	// weapon info
 	CEntity *m_apHitObjects[10];

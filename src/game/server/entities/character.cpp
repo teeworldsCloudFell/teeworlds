@@ -410,7 +410,7 @@ void CCharacter::FireWeapon()
 
 		case WEAPON_RIFLE:
 		{
-			new CLaser(GameWorld(), m_Pos, Direction, GameServer()->Tuning()->m_LaserReach, m_pPlayer->GetCID());
+			new CLaser(GameWorld(), m_Pos, Direction, GameServer()->Tuning()->m_LaserReach, m_pPlayer->GetCID(), m_InWater);
 			GameServer()->CreateSound(m_Pos, SOUND_RIFLE_FIRE);
 		} break;
 
@@ -617,7 +617,64 @@ void CCharacter::Tick()
 			m_Core.m_Vel.y = 0;
 		}
 	}
-	
+	else if(TileIndex != -1 && (GameServer()->Collision()->GetTileIndex(TileIndex) >= TILE_WATER || GameServer()->Collision()->GetTileIndex(TileIndex) <= TILE_WATER_RIGHT))
+	{
+		if(!m_InWater)
+			GameServer()->CreateSound(m_Pos, SOUND_PLAYER_SPAWN);
+
+		m_Core.m_Vel.y += g_Config.m_SvWaterGravity/100.0f;
+
+		if(m_Core.m_Vel.x > g_Config.m_SvWaterMaxX/100.0f || m_Core.m_Vel.x < -g_Config.m_SvWaterMaxX/100.0f)
+			m_Core.m_Vel.x *= g_Config.m_SvWaterFriction/100.0f;
+
+		if(m_Core.m_Vel.y > g_Config.m_SvWaterMaxY/100.0f || m_Core.m_Vel.y < -g_Config.m_SvWaterMaxY/100.0f)
+			m_Core.m_Vel.y *= g_Config.m_SvWaterFriction/100.0f;
+
+		if(m_Core.m_Jumped&3)
+			m_Core.m_Jumped &= ~2;
+
+		if(GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_WATER_UP)
+			m_Core.m_Vel.y -= g_Config.m_SvWaterGain/100.0f;
+		if(GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_WATER_DOWN)
+			m_Core.m_Vel.y += g_Config.m_SvWaterGain/100.0f;
+		if(GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_WATER_LEFT)
+			m_Core.m_Vel.x -= g_Config.m_SvWaterGain/100.0f;
+		if(GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_WATER_RIGHT)
+			m_Core.m_Vel.x += g_Config.m_SvWaterGain/100.0f;
+
+		m_InWater = true;
+	}
+	else
+	{
+		if(m_InWater)
+			GameServer()->CreateSound(m_Pos, SOUND_PLAYER_SPAWN);
+		m_InWater = false;
+	}
+
+	if(g_Config.m_SvWaterOxygen)
+	{
+		if(m_InWater)
+		{
+			if(!(Server()->Tick()%(int)(g_Config.m_SvWaterOxygenDrain / 1000.0f * 50)))
+			{
+				if(m_Armor)
+					m_Armor--;
+				else
+				{
+					TakeDamage(vec2(0,0), 1, m_pPlayer->GetCID(), WEAPON_WORLD);
+					GameServer()->SendEmoticon(m_pPlayer->GetCID(), g_Config.m_SvWaterOxygenEmoteid);
+				}
+			}
+		}
+		else
+		{
+			if(!(Server()->Tick()%(int)(g_Config.m_SvWaterOxygenRegen / 1000.0f * 50)))
+				if(m_Armor < 10)
+					m_Armor++;
+		}
+	}
+
+
 	// handle speedup tiles
 	int CurrentSpeedup = GameServer()->Collision()->IsSpeedup(TileIndex);
 	bool SpeedupTouch = false;
@@ -862,10 +919,10 @@ bool CCharacter::TakeDamage(vec2 Force, int Dmg, int From, int Weapon)
 	if(GameServer()->m_pController->IsFriendlyFire(m_pPlayer->GetCID(), From) && !g_Config.m_SvTeamdamage)
 		return false;
 
-	if(GameServer()->m_pController->IsInstagib() && (From == m_pPlayer->GetCID() || Weapon == WEAPON_GAME))
+	if(GameServer()->m_pController->IsInstagib() && (From == m_pPlayer->GetCID() || Weapon == WEAPON_GAME) && Weapon != WEAPON_WORLD)
 		return false;
 
-	if(GameServer()->m_pController->IsInstagib())
+	if(GameServer()->m_pController->IsInstagib() && From != m_pPlayer->GetCID())
 	{
 		Die(From, Weapon);
 		GameServer()->CreateSound(GameServer()->m_apPlayers[From]->m_ViewPos, SOUND_HIT, CmaskOne(From));

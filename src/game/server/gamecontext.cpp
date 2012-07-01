@@ -538,6 +538,9 @@ void CGameContext::OnClientEnter(int ClientID)
 	str_format(aBuf, sizeof(aBuf), "'%s' entered and joined the %s", Server()->ClientName(ClientID), m_pController->GetTeamName(m_apPlayers[ClientID]->GetTeam()));
 	SendChat(-1, CGameContext::CHAT_ALL, aBuf);
 
+	SendChatTarget(ClientID, "Welcome to WaterMOD");
+	SendChatTarget(ClientID, "for help, say \"!help\"");
+
 	str_format(aBuf, sizeof(aBuf), "team_join player='%d:%s' team=%d", ClientID, Server()->ClientName(ClientID), m_apPlayers[ClientID]->GetTeam());
 	Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
 
@@ -617,6 +620,21 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 			return;
 
 		pPlayer->m_LastChat = Server()->Tick();
+
+		if(!str_comp(pMsg->m_pMessage, "/info") || !str_comp(pMsg->m_pMessage, "!info"))
+		{
+			SendChatTarget(ClientID, "WaterMOD by BotoX!");
+			SendChatTarget(ClientID, "Original mod by inherited for 0.5");
+			SendChatTarget(ClientID, "Type !help for more informations");
+		}
+		else if(!str_comp(pMsg->m_pMessage, "/help") || !str_comp(pMsg->m_pMessage, "!help"))
+		{
+			SendChatTarget(ClientID, "WaterMOD by BotoX!");
+			SendChatTarget(ClientID, "Use double jump in water to swim upwards.");
+			SendChatTarget(ClientID, "Blue lasers are doors, if you can see them, the door is closed, you can't go through it.");
+			SendChatTarget(ClientID, "Use the switches to open/close doors.");
+			SendChatTarget(ClientID, "Bigger lasers are from hostile, smaller lasers are your teams' door, only team members can open them.");
+		}
 
 		// check for invalid chars
 		unsigned char *pMessage = (unsigned char *)pMsg->m_pMessage;

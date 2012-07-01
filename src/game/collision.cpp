@@ -64,7 +64,7 @@ void CCollision::Init(class CLayers *pLayers)
 		}
 		
 		// race tiles
-		if(Index >= 22 && Index <= 59)
+		if(Index >= 4 && Index <= 59)
 			m_pTiles[i].m_Index = Index;
 	}
 }
@@ -82,6 +82,24 @@ int CCollision::GetTile(int x, int y)
 
 bool CCollision::IsTileSolid(int x, int y)
 {
+	return GetTile(x, y)&COLFLAG_SOLID;
+}
+
+bool CCollision::CheckPoint_(int x, int y, int InWater)
+{
+	int TileIndex = GetTileIndex(GetIndex(vec2(x, y)));
+
+	if(InWater)
+	{
+		if(!TileIndex)
+			return true;
+	}
+	else
+	{
+		if(TileIndex >= TILE_WATER && TileIndex <= TILE_WATER_RIGHT)
+			return true;
+	}
+
 	return GetTile(x, y)&COLFLAG_SOLID;
 }
 
@@ -103,7 +121,7 @@ int CCollision::GetIndex(vec2 PrevPos, vec2 Pos)
 		int Nx = clamp((int)Pos.x/32, 0, m_Width-1);
 		int Ny = clamp((int)Pos.y/32, 0, m_Height-1);
 		
-		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_STOPL && m_pTiles[Ny*m_Width+Nx].m_Index <= 59) ||
+		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_WATER && m_pTiles[Ny*m_Width+Nx].m_Index <= 59) ||
 			(m_pTele && m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEIN) ||
 			(m_pSpeedup && m_pSpeedup[Ny*m_Width+Nx].m_Force > 0))
 		{
@@ -122,7 +140,7 @@ int CCollision::GetIndex(vec2 PrevPos, vec2 Pos)
 		Tmp = mix(PrevPos, Pos, a);
 		Nx = clamp((int)Tmp.x/32, 0, m_Width-1);
 		Ny = clamp((int)Tmp.y/32, 0, m_Height-1);
-		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_STOPL && m_pTiles[Ny*m_Width+Nx].m_Index <= 59) ||
+		if((m_pTiles[Ny*m_Width+Nx].m_Index >= TILE_WATER && m_pTiles[Ny*m_Width+Nx].m_Index <= 59) ||
 			(m_pTele && m_pTele[Ny*m_Width+Nx].m_Type == TILE_TELEIN) ||
 			(m_pSpeedup && m_pSpeedup[Ny*m_Width+Nx].m_Force > 0))
 		{
@@ -243,6 +261,68 @@ int CCollision::IntersectLine(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *p
 	return 0;
 }
 
+int CCollision::IntersectLineAir(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision)
+{
+	float Distance = distance(Pos0, Pos1);
+	int End(Distance+1);
+	vec2 Last = Pos0;
+
+	for(int i = 0; i < End; i++)
+	{
+		float PointOnLine = i/Distance;
+		vec2 Pos = mix(Pos0, Pos1, PointOnLine);
+		int TileIndex = GetTileIndex(GetIndex(vec2(round(Pos.x), round(Pos.y))));
+		if(CheckPoint(Pos.x, Pos.y) || !TileIndex)
+		{
+			if(pOutCollision)
+				*pOutCollision = Pos;
+			if(pOutBeforeCollision)
+				*pOutBeforeCollision = Last;
+
+			if(!TileIndex)
+				return -1;
+			return GetCollisionAt(Pos.x, Pos.y);
+		}
+		Last = Pos;
+	}
+	if(pOutCollision)
+		*pOutCollision = Pos1;
+	if(pOutBeforeCollision)
+		*pOutBeforeCollision = Pos1;
+	return 0;
+}
+
+int CCollision::IntersectLineWater(vec2 Pos0, vec2 Pos1, vec2 *pOutCollision, vec2 *pOutBeforeCollision)
+{
+	float Distance = distance(Pos0, Pos1);
+	int End(Distance+1);
+	vec2 Last = Pos0;
+
+	for(int i = 0; i < End; i++)
+	{
+		float PointOnLine = i/Distance;
+		vec2 Pos = mix(Pos0, Pos1, PointOnLine);
+		int TileIndex = GetTileIndex(GetIndex(vec2(round(Pos.x), round(Pos.y))));
+		if(CheckPoint(Pos.x, Pos.y) || (TileIndex >= TILE_WATER && TileIndex <= TILE_WATER_RIGHT))
+		{
+			if(pOutCollision)
+				*pOutCollision = Pos;
+			if(pOutBeforeCollision)
+				*pOutBeforeCollision = Last;
+
+			if(TileIndex >= TILE_WATER && TileIndex <= TILE_WATER_RIGHT)
+				return -1;
+			return GetCollisionAt(Pos.x, Pos.y);
+		}
+		Last = Pos;
+	}
+	if(pOutCollision)
+		*pOutCollision = Pos1;
+	if(pOutBeforeCollision)
+		*pOutBeforeCollision = Pos1;
+	return 0;
+}
+
 bool CCollision::DoorBlock(vec2 Pos0, vec2 Pos1)
 {
 	float Distance = distance(Pos0, Pos1);
@@ -280,6 +360,44 @@ void CCollision::MovePoint(vec2 *pInoutPos, vec2 *pInoutVel, float Elasticity, i
 		}
 
 		if(CheckPoint(Pos.x, Pos.y + Vel.y))
+		{
+			pInoutVel->y *= -Elasticity;
+			if(pBounces)
+				(*pBounces)++;
+			Affected++;
+		}
+
+		if(Affected == 0)
+		{
+			pInoutVel->x *= -Elasticity;
+			pInoutVel->y *= -Elasticity;
+		}
+	}
+	else
+	{
+		*pInoutPos = Pos + Vel;
+	}
+}
+
+void CCollision::MovePoint_(vec2 *pInoutPos, vec2 *pInoutVel, float Elasticity, int *pBounces, bool InWater)
+{
+	if(pBounces)
+		*pBounces = 0;
+
+	vec2 Pos = *pInoutPos;
+	vec2 Vel = *pInoutVel;
+	if(CheckPoint_(round(Pos.x + Vel.x), round(Pos.y + Vel.y), InWater))
+	{
+		int Affected = 0;
+		if(CheckPoint_(round(Pos.x + Vel.x), round(Pos.y), InWater))
+		{
+			pInoutVel->x *= -Elasticity;
+			if(pBounces)
+				(*pBounces)++;
+			Affected++;
+		}
+
+		if(CheckPoint_(round(Pos.x), round(Pos.y + Vel.y), InWater))
 		{
 			pInoutVel->y *= -Elasticity;
 			if(pBounces)

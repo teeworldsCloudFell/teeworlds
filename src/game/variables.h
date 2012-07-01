@@ -95,6 +95,17 @@ MACRO_CONFIG_INT(SvDoorSwitchTime, sv_door_switch_time, 12, 0, 100, CFGFLAG_SERV
 MACRO_CONFIG_INT(SvLaserjumps, sv_laserjumps, 0, 0, 1, CFGFLAG_SERVER, "Laserjumps (Instagib Only)")
 MACRO_CONFIG_INT(SvShowChatkills, sv_show_chatkills, 0, 0, 1, CFGFLAG_SERVER, "Show Chatkills in Chat")
 
+MACRO_CONFIG_INT(SvWaterGravity, sv_water_gravity, 30, -10000, 10000, CFGFLAG_SERVER, "gravty")
+MACRO_CONFIG_INT(SvWaterMaxX, sv_water_maxx, 600, -10000, 10000, CFGFLAG_SERVER, "maxx")
+MACRO_CONFIG_INT(SvWaterMaxY, sv_water_maxy, 450, -10000, 10000, CFGFLAG_SERVER, "maxy")
+MACRO_CONFIG_INT(SvWaterFriction, sv_water_friction, 90, -10000, 10000, CFGFLAG_SERVER, "friction")
+MACRO_CONFIG_INT(SvWaterOxygen, sv_water_oxygen, 1, 0, 1, CFGFLAG_SERVER, "use oxygen")
+MACRO_CONFIG_INT(SvWaterOxygenDrain, sv_water_oxy_drain, 1300, -100000, 100000, CFGFLAG_SERVER, "oxygen drainage")
+MACRO_CONFIG_INT(SvWaterOxygenRegen, sv_water_oxy_regen, 250, -100000, 100000, CFGFLAG_SERVER, "oxygen regeneration")
+MACRO_CONFIG_INT(SvWaterOxygenEmoteid, sv_water_oxy_emoteid, 3, 0, 100000, CFGFLAG_SERVER, "emote id")
+MACRO_CONFIG_INT(SvWaterGain, sv_water_gain, 100, 0, 100000, CFGFLAG_SERVER, "speed change when accelerated by water")
+MACRO_CONFIG_INT(SvWaterReflect, sv_water_reflect, 1, 0, 1, CFGFLAG_SERVER, "reflect lasers by water")
+
 // debug
 #ifdef CONF_DEBUG // this one can crash the server if not used correctly
 	MACRO_CONFIG_INT(DbgDummies, dbg_dummies, 0, 0, 15, CFGFLAG_SERVER, "")
