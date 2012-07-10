@@ -298,7 +298,7 @@ CClient::CClient() : m_DemoPlayer(&m_SnapshotDelta), m_DemoRecorder(&m_SnapshotD
 
 	// chat
 	for(int i = 0; i < SENDCHATSIZE; i++)
-		m_aaSendChat[i][0] = '\0';
+		m_aaSendChat[i][0] = 0;
 }
 
 // ----- send functions -----
@@ -544,7 +544,7 @@ void CClient::DisconnectWithReason(const char *pReason)
 	m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "client", aBuf);
 
 	for(int i = 0; i < SENDCHATSIZE; i++)
-		m_aaSendChat[i][0] = '\0';
+		m_aaSendChat[i][0] = 0;
 
 	// stop demo playback and recorder
 	m_DemoPlayer.Stop();
@@ -1682,31 +1682,28 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 		for(int i = 0; i < SENDCHATSIZE; i++)
 		{
 			if(str_comp(pMsg->m_pMessage, m_aaSendChat[i]) == 0)
-				m_aaSendChat[i][0] = '\0';
+				m_aaSendChat[i][0] = 0;
 		}
-		if(pMsg->m_ClientID < 0 || pMsg->m_ClientID > MAX_CLIENTS) // ADMIN ABUUUUSE!!
+		if(pMsg->m_ClientID < 0 || pMsg->m_ClientID > MAX_CLIENTS || pMsg->m_ClientID == m_LocalClientID) // ADMIN ABUUUUSE!!
 			return;
-		if(str_find(pMsg->m_pMessage, "!info") || str_find(pMsg->m_pMessage, "!help"))
+		if(!str_comp_nocase(pMsg->m_pMessage, "info") || !str_comp_nocase(pMsg->m_pMessage, "help"))
 		{
 			char aBuf[128];
 			str_format(aBuf, sizeof(aBuf), "Triviabot Beta by BotoX! Questions loaded: %d", m_lQuestions.size());
 			SayChat(aBuf);
-			SayChat("English motherfucker! Do you speak it?! TRIVIABOT!!! A FUCKING BOT WHICH IS ASKING FUCKING QUESTIONS!");
+			SayChat("English motherfucker! Do you speak it?! TRIVIABOT!!! A FUCKING BOT WHICH ASKS FUCKING QUESTIONS!");
 		}
-		else if(!str_comp(pMsg->m_pMessage, "!triviastart"))
+		else if(str_find_nocase(pMsg->m_pMessage, "triviastart"))
 		{
 			if(m_TriviaStarted || m_TriviaStartTick || m_TriviaForceStopped)
 				return;
 
-			SayChat("Trivia will start in 15 seconds.");
-			SayChat("You have 30 seconds time to answer a question.");
-			SayChat("After 15 seconds you get a hint.");
-			SayChat("The faster you answer the question the more points you get.");
-			SayChat("Good Luck!");
+			SayChat("Trivia will start in 15 seconds. You have 30 seconds time to answer a question.");
+			SayChat("After 15 seconds you get a hint. The faster you answer the question the more points you get.");
 			m_TriviaStartTick = time_get()+time_freq()*15;
 			m_KillTick = 0;
 		}
-		else if(!str_comp(pMsg->m_pMessage, "!triviastop"))
+		else if(str_find_nocase(pMsg->m_pMessage, "triviastop"))
 		{
 			if(!m_TriviaStarted)
 				return;
@@ -1737,7 +1734,7 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 				SayChat(aBuf);
 			}
 		}
-		else if(!str_comp(pMsg->m_pMessage, "!rank"))
+		else if(!str_comp_nocase(pMsg->m_pMessage, "rank"))
 		{
 			char aBuf[128];
 			int Score = 0;
@@ -1746,12 +1743,12 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 			str_format(aBuf, sizeof(aBuf), "'%s's current score is: %d / Rank: %d", m_aClients[pMsg->m_ClientID].m_aName, Score, Rank);
 			SayChat(aBuf);
 		}
-		else if(!str_comp(pMsg->m_pMessage, "!top5"))
+		else if(!str_comp_nocase(pMsg->m_pMessage, "top5"))
 		{
-			if(m_LastTop5+time_freq()*15 > time_get()) // Anti Spam
+			if(m_LastTop5+time_freq()*25 > time_get()) // Anti Spam
 				return;
 			char aBuf[128];
-			for(int i = 0; i <= 5; i++)
+			for(int i = 0; i < min(m_Records.NumRecords(), 5); i++)
 			{
 				str_format(aBuf, sizeof(aBuf), "%d. '%s': %d", i+1, m_Records.GetRecord(i)->m_aName,  m_Records.GetRecord(i)->m_Score);
 				SayChat(aBuf);
@@ -1771,18 +1768,16 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 			m_Records.AddRecord(m_aClients[pMsg->m_ClientID].m_aName, Score);
 			m_Records.GetRank(m_aClients[pMsg->m_ClientID].m_aName, 0x0, &Rank);
 			ResetTrivia(false);
-			str_format(aBuf, sizeof(aBuf), "'%s's answer is correct, gained %d points.", m_aClients[pMsg->m_ClientID].m_aName, Points);
-			SayChat(aBuf);
 			if(OldRank)
-				str_format(aBuf, sizeof(aBuf), "'%s's current score is: %d / Rank: %d (+%d)", m_aClients[pMsg->m_ClientID].m_aName, Score, Rank, OldRank-Rank);
+				str_format(aBuf, sizeof(aBuf), "'%s's answer is correct, gained %d points. Score: %d / Rank: %d (+%d)", m_aClients[pMsg->m_ClientID].m_aName, Points, Score, Rank, OldRank-Rank);
 			else
-				str_format(aBuf, sizeof(aBuf), "'%s's current score is: %d / Rank: %d", m_aClients[pMsg->m_ClientID].m_aName, Score, Rank);
+				str_format(aBuf, sizeof(aBuf), "'%s's answer is correct, gained %d points. Score: %d / Rank: %d", m_aClients[pMsg->m_ClientID].m_aName, Points, Score, Rank);
 			SayChat(aBuf);
 			if(m_NumAskedQuestions < 10)
 			{
 				str_format(aBuf, sizeof(aBuf), "This was question %d, proceeding with the trivia.", m_NumAskedQuestions);
 				SayChat(aBuf);
-				m_TriviaStartTick = time_get()+time_freq()*8;
+				m_TriviaStartTick = time_get()+time_freq()*10;
 			}
 			else
 			{
@@ -1946,8 +1941,7 @@ void CClient::OnStartGame()
 		SayChat(aBuf);
 		if(m_lQuestions.size())
 		{
-			SayChat("Write !triviastart in chat to start the trivia.");
-			SayChat("You have 30 seconds time to vote.");
+			SayChat("Write triviastart in chat to start the trivia. You have 30 seconds time to vote.");
 			m_KillTick = time_get()+time_freq()*32;
 		}
 		else
@@ -2014,14 +2008,12 @@ void CClient::OnTick()
 	{
 		m_NumAskedQuestions++;
 		char aBuf[256];
-		SayChat("Noone could answer the question.");
-		str_format(aBuf, sizeof(aBuf), "The correct answer is: %s", m_lQuestions[m_CurrentQuestion-1].m_aAnswer);
+		str_format(aBuf, sizeof(aBuf), "Noone could answer the question. The correct answer is: %s", m_lQuestions[m_CurrentQuestion-1].m_aAnswer);
 		SayChat(aBuf);
 		if(m_NumAskedQuestions < 10)
 		{
 			str_format(aBuf, sizeof(aBuf), "This was question %d, proceeding with the trivia.", m_NumAskedQuestions);
 			SayChat(aBuf);
-			SayChat("Next question in 5 seconds.");
 			ResetTrivia(false);
 			m_TriviaStartTick = time_get()+time_freq()*8;
 		}
@@ -2046,7 +2038,7 @@ void CClient::KillMyself(bool Forced)
 	}
 	else
 	{
-		SayChat("Disconnecting in 20 seconds. Write !triviastart to avoid it.");
+		SayChat("Disconnecting in 20 seconds. Write triviastart to avoid it.");
 		m_KillTick = time_get()+time_freq()*21;
 	}
 }
