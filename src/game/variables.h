@@ -98,6 +98,7 @@ MACRO_CONFIG_INT(SvStopgoFeature, sv_stopgo_feature, 1, 0, 1, CFGFLAG_SERVER, "E
 MACRO_CONFIG_INT(SvLogDetects, sv_log_detects, 1, 0, 1, CFGFLAG_SERVER, "Write detected players into: detected_players.txt")
 MACRO_CONFIG_INT(SvDetectsNeeded, sv_detects_needed, 5, 1, 100, CFGFLAG_SERVER, "Detects needed in sv_reset_detects_seconds seconds to mark player as bot")
 MACRO_CONFIG_INT(SvResetDetectsSeconds, sv_reset_detects_seconds, 100, 1, 6000, CFGFLAG_SERVER, "Seconds until detects get resetted to 0")
+MACRO_CONFIG_INT(SvDetectRange, sv_detect_range, 15, 1, 28, CFGFLAG_SERVER, "The range in which the aim has to be on the tee to get detected")
 /* inQ */
 
 // debug
