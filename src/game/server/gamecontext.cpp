@@ -14,6 +14,7 @@
 #include "gamemodes/ctf.h"
 #include "gamemodes/mod.h"
 /* inQ */
+#include <time.h>
 #if defined(CONF_FAMILY_WINDOWS)
 	#include <stdio.h>
 #endif
@@ -438,6 +439,9 @@ void CGameContext::OnDetect(int ClientID)
 	if(g_Config.m_SvLogDetects)
 	{
 		IOHANDLE File;
+		time_t Rawtime;
+		struct tm *Timeinfo;
+
 		File = io_open("detected_players.txt", IOFLAG_APPEND);
 		if(!File)
 		{
@@ -448,8 +452,11 @@ void CGameContext::OnDetect(int ClientID)
 				return;
 			}
 		}
+
+		time(&Rawtime);
+		Timeinfo = localtime(&Rawtime);
 		Server()->GetClientAddr(ClientID, aIP, sizeof(aIP));
-		str_format(aBuf, sizeof(aBuf), "Name: \"%s\" Clan: \"%s\" IP: \"%s\"", Server()->ClientName(ClientID), Server()->ClientClan(ClientID), aIP);
+		str_format(aBuf, sizeof(aBuf), "[%d/%d/%d %d:%d:%d] Name: \"%s\" Clan: \"%s\" IP: \"%s\"", Timeinfo->tm_mday, Timeinfo->tm_mon+1, Timeinfo->tm_year+1900, Timeinfo->tm_hour, Timeinfo->tm_min, Timeinfo->tm_sec, Server()->ClientName(ClientID), Server()->ClientClan(ClientID), aIP);
 		io_write(File, aBuf, str_length(aBuf));
 		io_write_newline(File);
 		io_close(File);
@@ -1902,6 +1909,11 @@ void CGameContext::ConDetectedPlayers(IConsole::IResult *pResult, void *pUserDat
 		if(pSelf->m_apPlayers[i] && pSelf->m_apPlayers[i]->m_BotDetected)
 		{
 			str_format(aBuf, sizeof(aBuf), "%d:'%s' has been detected", i, pSelf->Server()->ClientName(i));
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+		}
+		if(pSelf->m_apPlayers[i] && pSelf->m_apPlayers[i]->m_Detects)
+		{
+			str_format(aBuf, sizeof(aBuf), "%d:'%s' has %d/%d detects (%d sec. untill reset)", i, pSelf->Server()->ClientName(i), pSelf->m_apPlayers[i]->m_Detects, g_Config.m_SvDetectsNeeded, (pSelf->m_apPlayers[i]->m_ResetDetectsTime-pSelf->Server()->Tick())/pSelf->Server()->TickSpeed());
 			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
 		}
 	}
