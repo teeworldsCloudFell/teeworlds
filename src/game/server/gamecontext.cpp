@@ -1911,7 +1911,7 @@ void CGameContext::ConDetectedPlayers(IConsole::IResult *pResult, void *pUserDat
 			str_format(aBuf, sizeof(aBuf), "%d:'%s' has been detected", i, pSelf->Server()->ClientName(i));
 			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
 		}
-		if(pSelf->m_apPlayers[i] && pSelf->m_apPlayers[i]->m_Detects)
+		if(pSelf->m_apPlayers[i] && pSelf->m_apPlayers[i]->m_Detects && pSelf->m_apPlayers[i]->m_ResetDetectsTime > pSelf->Server()->Tick())
 		{
 			str_format(aBuf, sizeof(aBuf), "%d:'%s' has %d/%d detects (%d sec. untill reset)", i, pSelf->Server()->ClientName(i), pSelf->m_apPlayers[i]->m_Detects, g_Config.m_SvDetectsNeeded, (pSelf->m_apPlayers[i]->m_ResetDetectsTime-pSelf->Server()->Tick())/pSelf->Server()->TickSpeed());
 			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
