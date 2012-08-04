@@ -943,7 +943,7 @@ void CCharacter::SpreeEnd(int killer)
 void CCharacter::CheckBot(CCharacter *pChr)
 {
 	vec2 AimPos = m_Pos+vec2(m_LatestInput.m_TargetX, m_LatestInput.m_TargetY);
-	if(round(distance(pChr->m_Pos, AimPos)) <= g_Config.m_SvDetectRange)
+	if(distance(pChr->m_Pos, AimPos) <= (float)g_Config.m_SvDetectRange)
 	{
 		if(!m_pPlayer->m_Detects)
 			m_pPlayer->m_ResetDetectsTime = Server()->Tick()+Server()->TickSpeed()*g_Config.m_SvResetDetectsSeconds;
