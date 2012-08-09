@@ -311,7 +311,7 @@ void CCharacter::FireWeapon()
 			int Hits = 0;
 			if(m_pPlayer->GetTeam() == TEAM_RED)
 			{
-				int Num = GameServer()->m_World.FindEntities(ProjStartPos, m_ProximityRadius*1.5f, (CEntity**)apEnts, 
+				int Num = GameServer()->m_World.FindEntities(ProjStartPos, m_ProximityRadius*1.5f, (CEntity**)apEnts,
 					MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
 
 				for (int i = 0; i < Num; ++i)
@@ -343,7 +343,7 @@ void CCharacter::FireWeapon()
 			}
 			else
 			{
-				int Num = GameServer()->m_World.FindEntities(ProjStartPos, m_ProximityRadius*0.65f, (CEntity**)apEnts, 
+				int Num = GameServer()->m_World.FindEntities(ProjStartPos, m_ProximityRadius*0.65f, (CEntity**)apEnts,
 					MAX_CLIENTS, CGameWorld::ENTTYPE_CHARACTER);
 
 				for (int i = 0; i < Num; ++i)
@@ -883,10 +883,8 @@ void CCharacter::Tick()
 	// check if character is hitting a door
 	if(m_HittingDoor)
 	{
-		if(length(m_Core.m_Vel) < 5)
-			m_Core.m_Vel = m_PushDirection*5;
-		else
-			m_Core.m_Vel = m_PushDirection*clamp(length(m_Core.m_Vel), 0.f, 15.f)*1.05f;
+		m_Core.m_Vel += m_PushDirection*length(m_Core.m_Vel);
+
 		if(m_Core.m_Jumped&3)
 			m_Core.m_Jumped &= ~2;
 	}
