@@ -730,10 +730,7 @@ void CCharacter::Tick()
 	// check if character is hitting a door
 	if(m_HittingDoor)
 	{
-		if(length(m_Core.m_Vel) < 5)
-			m_Core.m_Vel = m_PushDirection*5;
-		else
-			m_Core.m_Vel = m_PushDirection*clamp(length(m_Core.m_Vel), 0.f, 10.f)*1.05f;
+		m_Core.m_Vel += m_PushDirection*length(m_Core.m_Vel);
 		if(m_Core.m_Jumped&3)
 			m_Core.m_Jumped &= ~2;
 	}
