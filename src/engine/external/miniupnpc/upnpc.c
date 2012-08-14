@@ -52,7 +52,7 @@ const char * protofix(const char * proto)
  * 2 - get extenal ip address
  * 3 - Add port mapping
  * 4 - get this port mapping from the IGD */
-static void SetRedirectAndTest(struct UPNPUrls * urls,
+static int SetRedirectAndTest(struct UPNPUrls * urls,
                                struct IGDdatas * data,
 							   const char * iaddr,
 							   const char * iport,
@@ -64,13 +64,13 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 	char intClient[40];
 	char intPort[6];
 	char duration[16];
-#if DEBUG
 	int r;
 
+#if DEBUG
 	if(!iaddr || !iport || !eport || !proto)
 	{
 		fprintf(stderr, "Wrong arguments\n");
-		return;
+		return 1;
 	}
 #endif
 	proto = protofix(proto);
@@ -78,7 +78,7 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 	if(!proto)
 	{
 		fprintf(stderr, "invalid protocol\n");
-		return;
+		return 1;
 	}
 #endif
 
@@ -114,15 +114,20 @@ static void SetRedirectAndTest(struct UPNPUrls * urls,
 		       externalIPAddress, eport, proto, intClient, intPort, duration);
 	}
 #else
-	UPNP_AddPortMapping(urls->controlURL, data->first.servicetype,
+	r = UPNP_AddPortMapping(urls->controlURL, data->first.servicetype,
 	                        eport, iport, iaddr, 0, proto, 0, leaseDuration);
+	if(r!=UPNPCOMMAND_SUCCESS)
+		return 1;
 
 	UPNP_GetSpecificPortMappingEntry(urls->controlURL,
 	                                 data->first.servicetype,
     	                             eport, proto,
 									 intClient, intPort, NULL/*desc*/,
 	                                 NULL/*enabled*/, duration);
+	if(r!=UPNPCOMMAND_SUCCESS)
+		return 1;
 #endif
+	return 0;
 }
 
 static void RemoveRedirect(struct UPNPUrls * urls,
@@ -206,7 +211,7 @@ int SetupPortForward(unsigned short ExtPort, int UseIPv6)
 			}
 			printf("Local LAN ip address : %s\n", lanaddr);
 #endif
-			SetRedirectAndTest(&urls, &data, lanaddr, extPort, extPort, "udp", "0");
+			retcode = SetRedirectAndTest(&urls, &data, lanaddr, extPort, extPort, "udp", "0");
 			FreeUPNPUrls(&urls);
 		}
 		else

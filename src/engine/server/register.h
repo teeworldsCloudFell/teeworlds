@@ -23,6 +23,13 @@ class CRegister
 		int64 m_LastSend;
 	};
 
+	struct CUPnPPortMapData
+	{
+		bool m_UseIPv6;
+		unsigned short m_Port;
+		CRegister *m_pRegister;
+	};
+
 	class CNetServer *m_pNetServer;
 	class IEngineMasterServer *m_pMasterServer;
 	class IConsole *m_pConsole;
@@ -31,8 +38,9 @@ class CRegister
 	int64 m_RegisterStateStart;
 	int m_RegisterFirst;
 	int m_RegisterCount;
-	bool m_TryedUPnP;
+	bool m_TriedUPnP;
 	bool m_UPnPPortForwarded;
+	int m_UPnPPortMapError;
 
 	CMasterserverInfo m_aMasterserverInfo[IMasterServer::MAX_MASTERSERVERS];
 	int m_RegisterRegisteredServer;
@@ -42,7 +50,10 @@ class CRegister
 	void RegisterSendHeartbeat(NETADDR Addr);
 	void RegisterSendCountRequest(NETADDR Addr);
 	void RegisterGotCount(struct CNetChunk *pChunk);
-	int UPnPPortMapAdd(bool UseIPv6=false);
+
+	static void UPnPPortMapAddThread(void *pUser);
+	void UPnPPortMapAdd(bool UseIPv6=false);
+	int UPnPPortMapRemove();
 
 public:
 	CRegister();
@@ -50,7 +61,6 @@ public:
 	void Init(class CNetServer *pNetServer, class IEngineMasterServer *pMasterServer, class IConsole *pConsole);
 	void RegisterUpdate(int Nettype);
 	int RegisterProcessPacket(struct CNetChunk *pPacket);
-	int UPnPPortMapRemove();
 };
 
 #endif

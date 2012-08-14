@@ -21,8 +21,9 @@ CRegister::CRegister()
 	m_RegisterStateStart = 0;
 	m_RegisterFirst = 1;
 	m_RegisterCount = 0;
-	m_TryedUPnP = false;
+	m_TriedUPnP = false;
 	m_UPnPPortForwarded = false;
+	m_UPnPPortMapError = -1;
 
 	mem_zero(m_aMasterserverInfo, sizeof(m_aMasterserverInfo));
 	m_RegisterRegisteredServer = -1;
@@ -241,12 +242,29 @@ void CRegister::RegisterUpdate(int Nettype)
 		if(Now > m_RegisterStateStart+Freq*60)
 			RegisterNewState(REGISTERSTATE_START);
 
-		if(!m_TryedUPnP)
+		if(!m_TriedUPnP)
 		{
-			if(!UPnPPortMapAdd())
+			UPnPPortMapAdd();
+			m_TriedUPnP = true;
+		}
+		if(m_UPnPPortMapError != -1)
+		{
+			char aBuf[128];
+			if(m_UPnPPortMapError == 0)
+			{
+				str_format(aBuf, sizeof(aBuf), "Port %hu forwarded with UPnP", g_Config.m_SvPort);
+				m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "register", aBuf);
+				m_UPnPPortMapError = -1;
+				m_UPnPPortForwarded = true;
 				RegisterNewState(REGISTERSTATE_START);
-
-			m_TryedUPnP = true;
+			}
+			else
+			{
+				str_format(aBuf, sizeof(aBuf), "Couldn't forward port %hu with UPnP", g_Config.m_SvPort);
+				m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "register", aBuf);
+				m_UPnPPortMapError = -1;
+				m_UPnPPortForwarded = false;
+			}
 		}
 	}
 }
@@ -304,28 +322,26 @@ int CRegister::RegisterProcessPacket(CNetChunk *pPacket)
 	return 0;
 }
 
-int CRegister::UPnPPortMapAdd(bool UseIPv6)
+void CRegister::UPnPPortMapAddThread(void *pUser)
+{
+	CUPnPPortMapData *pData = (CUPnPPortMapData *)pUser;
+	pData->m_pRegister->m_UPnPPortMapError = SetupPortForward(pData->m_Port, pData->m_UseIPv6);
+	delete pData;
+}
+
+void CRegister::UPnPPortMapAdd(bool UseIPv6)
 {
 	char aBuf[128];
-	unsigned short Port = g_Config.m_SvPort;
-
-	str_format(aBuf, sizeof(aBuf), "Trying to forward port %hu with UPnP", Port);
+	str_format(aBuf, sizeof(aBuf), "Trying to forward port %hu with UPnP", g_Config.m_SvPort);
 	m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "register", aBuf);
 
-	int Error = SetupPortForward(Port, UseIPv6);
-	if(!Error)
-	{
-		str_format(aBuf, sizeof(aBuf), "Port %hu forwarded with UPnP", Port);
-		m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "register", aBuf);
-		m_UPnPPortForwarded = true;
-	}
-	else
-	{
-		str_format(aBuf, sizeof(aBuf), "Couldn't forward port %hu with UPnP", Port);
-		m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "register", aBuf);
-	}
+	CUPnPPortMapData *Tmp = new CUPnPPortMapData();
+	Tmp->m_UseIPv6 = UseIPv6;
+	Tmp->m_Port = g_Config.m_SvPort;
+	Tmp->m_pRegister = this;
 
-	return Error;
+	void *LoadThread = thread_create(UPnPPortMapAddThread, Tmp);
+	thread_detach(LoadThread);
 }
 
 int CRegister::UPnPPortMapRemove()
