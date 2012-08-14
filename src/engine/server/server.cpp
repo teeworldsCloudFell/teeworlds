@@ -1415,6 +1415,7 @@ int CServer::Run()
 
 	if(m_pCurrentMapData)
 		mem_free(m_pCurrentMapData);
+
 	return 0;
 }
 

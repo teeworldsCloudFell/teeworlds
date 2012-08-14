@@ -5,6 +5,7 @@
 #include <engine/shared/config.h>
 #include <engine/console.h>
 #include <engine/masterserver.h>
+#include <engine/external/miniupnpc/upnpc.h>
 
 #include <mastersrv/mastersrv.h>
 
@@ -20,9 +21,16 @@ CRegister::CRegister()
 	m_RegisterStateStart = 0;
 	m_RegisterFirst = 1;
 	m_RegisterCount = 0;
+	m_TryedUPnP = false;
+	m_UPnPPortForwarded = false;
 
 	mem_zero(m_aMasterserverInfo, sizeof(m_aMasterserverInfo));
 	m_RegisterRegisteredServer = -1;
+}
+
+CRegister::~CRegister()
+{
+	UPnPPortMapRemove();
 }
 
 void CRegister::RegisterNewState(int State)
@@ -232,6 +240,14 @@ void CRegister::RegisterUpdate(int Nettype)
 		// check for restart
 		if(Now > m_RegisterStateStart+Freq*60)
 			RegisterNewState(REGISTERSTATE_START);
+
+		if(!m_TryedUPnP)
+		{
+			if(!UPnPPortMapAdd())
+				RegisterNewState(REGISTERSTATE_START);
+
+			m_TryedUPnP = true;
+		}
 	}
 }
 
@@ -286,4 +302,55 @@ int CRegister::RegisterProcessPacket(CNetChunk *pPacket)
 	}
 
 	return 0;
+}
+
+int CRegister::UPnPPortMapAdd(bool UseIPv6)
+{
+	char aBuf[128];
+	unsigned short Port = g_Config.m_SvPort;
+
+	str_format(aBuf, sizeof(aBuf), "Trying to forward port %hu with UPnP", Port);
+	m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "register", aBuf);
+
+	int Error = SetupPortForward(Port, UseIPv6);
+	if(!Error)
+	{
+		str_format(aBuf, sizeof(aBuf), "Port %hu forwarded with UPnP", Port);
+		m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "register", aBuf);
+		m_UPnPPortForwarded = true;
+	}
+	else
+	{
+		str_format(aBuf, sizeof(aBuf), "Couldn't forward port %hu with UPnP", Port);
+		m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "register", aBuf);
+	}
+
+	return Error;
+}
+
+int CRegister::UPnPPortMapRemove()
+{
+	if(!m_UPnPPortForwarded)
+		return 0;
+
+	char aBuf[128];
+	unsigned short Port = g_Config.m_SvPort;
+
+	str_format(aBuf, sizeof(aBuf), "Trying to remove portforward %hu from UPnP portmap", Port);
+	m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "register", aBuf);
+
+	int Error = DeletePortForward(Port);
+	if(!Error)
+	{
+		str_format(aBuf, sizeof(aBuf), "Portforward %hu removed from UPnP portmap", Port);
+		m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "register", aBuf);
+		m_UPnPPortForwarded = false;
+	}
+	else
+	{
+		str_format(aBuf, sizeof(aBuf), "Couldn't remove portforward %hu from UPnP portmap", Port);
+		m_pConsole->Print(IConsole::OUTPUT_LEVEL_STANDARD, "register", aBuf);
+	}
+
+	return Error;
 }

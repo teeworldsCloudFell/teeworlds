@@ -164,6 +164,7 @@ function build(settings)
 
 	-- set some platform specific settings
 	settings.cc.includes:Add("src")
+	settings.cc.includes:Add("other/miniupnpc/include")
 
 	if family == "unix" then
 		if platform == "macosx" then
@@ -200,6 +201,7 @@ function build(settings)
 	-- build the small libraries
 	wavpack = Compile(settings, Collect("src/engine/external/wavpack/*.c"))
 	pnglite = Compile(settings, Collect("src/engine/external/pnglite/*.c"))
+	upnpc = Compile(settings, Collect("src/engine/external/miniupnpc/*.c"))
 
 	-- build game components
 	engine_settings = settings:Copy()
@@ -224,6 +226,14 @@ function build(settings)
 		client_settings.link.libs:Add("opengl32")
 		client_settings.link.libs:Add("glu32")
 		client_settings.link.libs:Add("winmm")
+	end
+
+	-- miniupnpc
+	server_settings.link.libs:Add("miniupnpc")
+	if arch == "amd64" then
+		server_settings.link.libpath:Add("other/miniupnpc/lib64")
+	else
+		server_settings.link.libpath:Add("other/miniupnpc/lib32")
 	end
 
 	-- apply sdl settings
@@ -264,7 +274,7 @@ function build(settings)
 		client_link_other, client_osxlaunch)
 
 	server_exe = Link(server_settings, "teeworlds_srv", engine, server,
-		game_shared, game_server, zlib, server_link_other)
+		game_shared, game_server, zlib, upnpc, server_link_other)
 
 	serverlaunch = {}
 	if platform == "macosx" then
