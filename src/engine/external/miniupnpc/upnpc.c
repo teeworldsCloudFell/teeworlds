@@ -11,6 +11,7 @@
 #include <string.h>
 #include <time.h>
 #ifdef _WIN32
+#define STATICLIB
 #include <winsock2.h>
 #define snprintf _snprintf
 #else

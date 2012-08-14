@@ -226,6 +226,8 @@ function build(settings)
 		client_settings.link.libs:Add("opengl32")
 		client_settings.link.libs:Add("glu32")
 		client_settings.link.libs:Add("winmm")
+		-- miniupnpc
+		server_settings.link.libs:Add("iphlpapi")
 	end
 
 	-- miniupnpc
