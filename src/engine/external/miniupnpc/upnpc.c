@@ -130,32 +130,35 @@ static int SetRedirectAndTest(struct UPNPUrls * urls,
 	return 0;
 }
 
-static void RemoveRedirect(struct UPNPUrls * urls,
+static int RemoveRedirect(struct UPNPUrls * urls,
                struct IGDdatas * data,
 			   const char * eport,
 			   const char * proto)
 {
-#if DEBUG
 	int r;
-
+#if DEBUG
 	if(!proto || !eport)
 	{
 		fprintf(stderr, "invalid arguments\n");
 		return;
 	}
+#endif
 	proto = protofix(proto);
+#if DEBUG
 	if(!proto)
 	{
 		fprintf(stderr, "protocol invalid\n");
 		return;
 	}
+#endif
 
 	r = UPNP_DeletePortMapping(urls->controlURL, data->first.servicetype, eport, proto, 0);
-
+#if DEBUG
 	printf("UPNP_DeletePortMapping() returned : %d\n", r);
-#else
-	UPNP_DeletePortMapping(urls->controlURL, data->first.servicetype, eport, proto, 0);
 #endif
+	if(r!=UPNPCOMMAND_SUCCESS)
+		return 1;
+	return 0;
 }
 
 int SetupPortForward(unsigned short ExtPort, int UseIPv6)
@@ -287,7 +290,7 @@ int DeletePortForward(unsigned short ExtPort)
 			}
 			printf("Local LAN ip address : %s\n", lanaddr);
 #endif
-			RemoveRedirect(&urls, &data, extPort, "udp");
+			retcode = RemoveRedirect(&urls, &data, extPort, "udp");
 			FreeUPNPUrls(&urls);
 		}
 		else
