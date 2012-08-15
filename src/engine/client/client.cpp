@@ -1536,7 +1536,7 @@ void CClient::Update()
 		while(1)
 		{
 			CSnapshotStorage::CHolder *pCur = m_aSnapshots[SNAP_CURRENT];
-			int64 TickStart = (pCur->m_Tick)*time_freq()/50;
+			int64 TickStart = (pCur->m_Tick)*time_freq()/SERVER_TICK_SPEED;
 
 			if(TickStart < Now)
 			{
@@ -1565,22 +1565,22 @@ void CClient::Update()
 
 		if(m_aSnapshots[SNAP_CURRENT] && m_aSnapshots[SNAP_PREV])
 		{
-			int64 CurtickStart = (m_aSnapshots[SNAP_CURRENT]->m_Tick)*time_freq()/50;
-			int64 PrevtickStart = (m_aSnapshots[SNAP_PREV]->m_Tick)*time_freq()/50;
-			int PrevPredTick = (int)(PredNow*50/time_freq());
+			int64 CurtickStart = (m_aSnapshots[SNAP_CURRENT]->m_Tick)*time_freq()/SERVER_TICK_SPEED;
+			int64 PrevtickStart = (m_aSnapshots[SNAP_PREV]->m_Tick)*time_freq()/SERVER_TICK_SPEED;
+			int PrevPredTick = (int)(PredNow*SERVER_TICK_SPEED/time_freq());
 			int NewPredTick = PrevPredTick+1;
 
 			m_GameIntraTick = (Now - PrevtickStart) / (float)(CurtickStart-PrevtickStart);
 			m_GameTickTime = (Now - PrevtickStart) / (float)Freq; //(float)SERVER_TICK_SPEED);
 
-			CurtickStart = NewPredTick*time_freq()/50;
-			PrevtickStart = PrevPredTick*time_freq()/50;
+			CurtickStart = NewPredTick*time_freq()/SERVER_TICK_SPEED;
+			PrevtickStart = PrevPredTick*time_freq()/SERVER_TICK_SPEED;
 			m_PredIntraTick = (PredNow - PrevtickStart) / (float)(CurtickStart-PrevtickStart);
 
 			if(NewPredTick < m_aSnapshots[SNAP_PREV]->m_Tick-SERVER_TICK_SPEED || NewPredTick > m_aSnapshots[SNAP_PREV]->m_Tick+SERVER_TICK_SPEED)
 			{
 				m_pConsole->Print(IConsole::OUTPUT_LEVEL_ADDINFO, "client", "prediction time reset!");
-				m_PredictedTime.Init(m_aSnapshots[SNAP_CURRENT]->m_Tick*time_freq()/50);
+				m_PredictedTime.Init(m_aSnapshots[SNAP_CURRENT]->m_Tick*time_freq()/SERVER_TICK_SPEED);
 			}
 
 			if(NewPredTick > m_PredTick)
@@ -1596,7 +1596,7 @@ void CClient::Update()
 		// only do sane predictions
 		if(Repredict)
 		{
-			if(m_PredTick > m_CurGameTick && m_PredTick < m_CurGameTick+50)
+			if(m_PredTick > m_CurGameTick && m_PredTick < m_CurGameTick+SERVER_TICK_SPEED)
 				GameClient()->OnPredict();
 		}
 
