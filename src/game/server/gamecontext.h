@@ -3,6 +3,7 @@
 #ifndef GAME_SERVER_GAMECONTEXT_H
 #define GAME_SERVER_GAMECONTEXT_H
 
+#include <engine/engine.h>
 #include <engine/console.h>
 #include <engine/server.h>
 
@@ -11,6 +12,9 @@
 
 #include "eventhandler.h"
 #include "gameworld.h"
+
+#include "score.h"
+
 
 /*
 	Tick
@@ -36,7 +40,9 @@
 class CGameContext : public IGameServer
 {
 	IServer *m_pServer;
+	IEngine *m_pEngine;
 	class IConsole *m_pConsole;
+	class IConsole *m_pChatConsole;
 	CLayers m_Layers;
 	CCollision m_Collision;
 	CNetObjHandler m_NetObjHandler;
@@ -62,6 +68,24 @@ class CGameContext : public IGameServer
 	static void ConVote(IConsole::IResult *pResult, void *pUserData);
 	static void ConchainSpecialMotdupdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
 	static void ConchainSettingUpdate(IConsole::IResult *pResult, void *pUserData, IConsole::FCommandCallback pfnCallback, void *pCallbackUserData);
+	static void ConDetectedPlayers(IConsole::IResult *pResult, void *pUserData);
+	static void ConScoreSaveAll(IConsole::IResult *pResult, void *pUserData);
+
+	// chat console
+	void InitChatConsole();
+
+	static void SendChatResponse(const char *pLine, void *pUser);
+	static void ChatConInfo(IConsole::IResult *pResult, void *pUser);
+	static void ChatConCmdlist(IConsole::IResult *pResult, void *pUser);
+	static void ChatConTop5(IConsole::IResult *pResult, void *pUser);
+	static void ChatConRank(IConsole::IResult *pResult, void *pUser);
+	static void ChatConStats(IConsole::IResult *pResult, void *pUser);
+	static void ChatConTop5Daily(IConsole::IResult *pResult, void *pUser);
+	static void ChatConRankDaily(IConsole::IResult *pResult, void *pUser);
+
+	int m_ChatConsoleClientID;
+
+	class IScore *m_pScore;
 
 	CGameContext(int Resetting);
 	void Construct(int Resetting);
@@ -69,9 +93,12 @@ class CGameContext : public IGameServer
 	bool m_Resetting;
 public:
 	IServer *Server() const { return m_pServer; }
+	IEngine *Engine() const { return m_pEngine; }
 	class IConsole *Console() { return m_pConsole; }
+	class IConsole *ChatConsole() { return m_pChatConsole; }
 	CCollision *Collision() { return &m_Collision; }
 	CTuningParams *Tuning() { return &m_Tuning; }
+	class IScore *Score() { return m_pScore; }
 
 	CGameContext();
 	~CGameContext();
@@ -97,6 +124,8 @@ public:
 	void SendVoteStatus(int ClientID, int Total, int Yes, int No);
 	void AbortVoteOnDisconnect(int ClientID);
 	void AbortVoteOnTeamChange(int ClientID);
+	void OnDetect(int ClientID);
+	void SendMotd(int ClientID, const char *pMotd);
 
 	int m_VoteCreator;
 	int64 m_VoteCloseTime;

@@ -106,7 +106,9 @@ protected:
 
 	// info
 	int m_GameFlags;
-	const char *m_pGameType;
+
+	bool m_Instagib;
+
 	struct CGameInfo
 	{
 		int m_MatchCurrent;
@@ -120,6 +122,8 @@ protected:
 public:
 	IGameController(class CGameContext *pGameServer);
 	virtual ~IGameController() {};
+
+	const char *m_pGameType;
 
 	// event
 	/*
@@ -208,6 +212,9 @@ public:
 	
 	int GetRealPlayerNum() const { return m_aTeamSize[TEAM_RED]+m_aTeamSize[TEAM_BLUE]; }
 	int GetStartTeam();
+
+	void MakeInstagib();
+	bool IsInstagib();
 };
 
 #endif

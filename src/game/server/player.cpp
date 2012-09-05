@@ -29,6 +29,7 @@ CPlayer::CPlayer(CGameContext *pGameServer, int ClientID, bool Dummy)
 	m_RespawnDisabled = GameServer()->m_pController->GetStartRespawnState();
 	m_DeadSpecMode = false;
 	m_Spawning = 0;
+	m_Seconds = 0;
 }
 
 CPlayer::~CPlayer()
@@ -62,6 +63,14 @@ void CPlayer::Tick()
 			m_Latency.m_Accum = 0;
 			m_Latency.m_AccumMin = 1000;
 			m_Latency.m_AccumMax = 0;
+
+			// TimePlayed
+			m_Seconds++;
+			if(m_Seconds == 60)
+			{
+				m_Seconds = 0;
+				GameServer()->Score()->PlayerData(m_ClientID)->m_TimePlayed++;
+			}
 		}
 	}
 

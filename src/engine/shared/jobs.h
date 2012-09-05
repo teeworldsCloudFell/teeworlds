@@ -34,7 +34,7 @@ public:
 	};
 
 	int Status() const { return m_Status; }
-	int Result() const {return m_Result; }
+	int Result() const { return m_Result; }
 };
 
 class CJobPool

@@ -614,6 +614,14 @@ int net_addr_comp(const NETADDR *a, const NETADDR *b)
 	return mem_comp(a, b, sizeof(NETADDR));
 }
 
+void net_addr_range(const NETADDR *addr, char *string, int max_length)
+{
+	if(addr->type == NETTYPE_IPV4)
+		str_format(string, max_length, "%d.%d", addr->ip[0], addr->ip[1]);
+	else
+		str_format(string, max_length, "unknown type %d", addr->type);
+}
+
 void net_addr_str(const NETADDR *addr, char *string, int max_length, int add_port)
 {
 	if(addr->type == NETTYPE_IPV4)

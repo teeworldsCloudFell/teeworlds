@@ -544,6 +544,7 @@ int net_addr_comp(const NETADDR *a, const NETADDR *b);
 
 */
 void net_addr_str(const NETADDR *addr, char *string, int max_length, int add_port);
+void net_addr_range(const NETADDR *addr, char *string, int max_length);
 
 /*
 	Function: net_addr_from_str

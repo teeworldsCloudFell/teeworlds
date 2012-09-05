@@ -113,6 +113,7 @@ nethash = CHash("src/game/generated/nethash.cpp", "src/engine/shared/protocol.h"
 client_link_other = {}
 client_depends = {}
 server_link_other = {}
+server_sql_depends = {}
 
 if family == "windows" then
 	if platform == "win32" then
@@ -122,6 +123,8 @@ if family == "windows" then
 		table.insert(client_depends, CopyToDirectory(".", "other\\freetype\\lib64\\freetype.dll"))
 		table.insert(client_depends, CopyToDirectory(".", "other\\sdl\\lib64\\SDL.dll"))
 	end
+	table.insert(server_sql_depends, CopyToDirectory(".", "other\\mysql\\vc2005libs\\mysqlcppconn.dll"))
+	table.insert(server_sql_depends, CopyToDirectory(".", "other\\mysql\\vc2005libs\\libmysql.dll"))
 
 	if config.compiler.driver == "cl" then
 		client_link_other = {ResCompile("other/icons/teeworlds_cl.rc")}
@@ -146,7 +149,7 @@ function build(settings)
 	if config.compiler.driver == "cl" then
 		settings.cc.flags:Add("/wd4244")
 	else
-		settings.cc.flags:Add("-Wall", "-fno-exceptions")
+		settings.cc.flags:Add("-Wall")
 		if family == "windows" then
 			-- disable visibility attribute support for gcc on windows
 			settings.cc.defines:Add("NO_VIZ")
@@ -165,9 +168,10 @@ function build(settings)
 
 	-- set some platform specific settings
 	settings.cc.includes:Add("src")
+	settings.cc.includes:Add("other/mysql/include")
 
-	if family == "unix" then
-		if platform == "macosx" then
+	if family == "unix" then		
+   		if platform == "macosx" then
 			settings.link.frameworks:Add("Carbon")
 			settings.link.frameworks:Add("AppKit")
 		else
@@ -209,22 +213,33 @@ function build(settings)
 	launcher_settings = engine_settings:Copy()
 
 	if family == "unix" then
-		if platform == "macosx" then
+		server_settings.link.libs:Add("mysqlcppconn-static")
+		server_settings.link.libs:Add("mysqlclient")
+		
+   		if platform == "macosx" then
 			client_settings.link.frameworks:Add("OpenGL")
 			client_settings.link.frameworks:Add("AGL")
 			client_settings.link.frameworks:Add("Carbon")
 			client_settings.link.frameworks:Add("Cocoa")
 			launcher_settings.link.frameworks:Add("Cocoa")
+			server_settings.link.libpath:Add("other/mysql/mac/lib32")
 		else
 			client_settings.link.libs:Add("X11")
 			client_settings.link.libs:Add("GL")
 			client_settings.link.libs:Add("GLU")
+			if arch == "amd64" then
+				server_settings.link.libpath:Add("other/mysql/linux/lib64")
+			else
+				server_settings.link.libpath:Add("other/mysql/linux/lib32")
+			end
 		end
 
 	elseif family == "windows" then
 		client_settings.link.libs:Add("opengl32")
 		client_settings.link.libs:Add("glu32")
 		client_settings.link.libs:Add("winmm")
+		server_settings.link.libpath:Add("other/mysql/vc2005libs")
+		server_settings.link.libs:Add("mysqlcppconn")
 	end
 
 	-- apply sdl settings
@@ -280,7 +295,7 @@ function build(settings)
 
 	-- make targets
 	c = PseudoTarget("client".."_"..settings.config_name, client_exe, client_depends)
-	s = PseudoTarget("server".."_"..settings.config_name, server_exe, serverlaunch)
+	s = PseudoTarget("server".."_"..settings.config_name, server_exe, serverlaunch, server_sql_depends)
 	g = PseudoTarget("game".."_"..settings.config_name, client_exe, server_exe)
 
 	v = PseudoTarget("versionserver".."_"..settings.config_name, versionserver_exe)
