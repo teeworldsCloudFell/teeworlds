@@ -191,6 +191,7 @@ public:
 	bool IsBanned(int ClientID);
 	int GetClientInfo(int ClientID, CClientInfo *pInfo);
 	void GetClientAddr(int ClientID, char *pAddrStr, int Size);
+	void GetClientRange(int ClientID, char *pAddrStr, int Size);
 	const char *ClientName(int ClientID);
 	const char *ClientClan(int ClientID);
 	int ClientCountry(int ClientID);

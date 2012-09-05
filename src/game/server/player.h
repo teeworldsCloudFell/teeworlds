@@ -78,6 +78,10 @@ public:
 	int m_LastKill;
 	int m_LastReadyChange;
 
+	// Botdetection
+	int m_Detects;
+	int64 m_ResetDetectsTime;
+
 	// TODO: clean this up
 	struct
 	{
@@ -124,6 +128,7 @@ private:
 	int m_ClientID;
 	int m_Team;
 	bool m_Dummy;
+	int m_Seconds;
 
 	// used for spectator mode
 	int m_SpectatorID;

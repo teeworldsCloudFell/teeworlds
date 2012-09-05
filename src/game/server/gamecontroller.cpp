@@ -50,6 +50,8 @@ IGameController::IGameController(CGameContext *pGameServer)
 	m_aNumSpawnPoints[0] = 0;
 	m_aNumSpawnPoints[1] = 0;
 	m_aNumSpawnPoints[2] = 0;
+
+	m_Instagib = false;
 }
 
 //activity
@@ -207,17 +209,34 @@ int IGameController::OnCharacterDeath(CCharacter *pVictim, CPlayer *pKiller, int
 	if(!pKiller || Weapon == WEAPON_GAME)
 		return 0;
 	if(pKiller == pVictim->GetPlayer())
+	{
 		pVictim->GetPlayer()->m_Score--; // suicide
+		GameServer()->Score()->PlayerData(pKiller->GetCID())->m_Score--;
+		GameServer()->Score()->DailyPlayerData(pKiller->GetCID())->m_Score--;
+		GameServer()->Score()->PlayerData(pKiller->GetCID())->m_Deaths++;
+		GameServer()->Score()->DailyPlayerData(pKiller->GetCID())->m_Deaths++;
+	}
 	else
 	{
 		if(IsTeamplay() && pVictim->GetPlayer()->GetTeam() == pKiller->GetTeam())
+		{
 			pKiller->m_Score--; // teamkill
+			GameServer()->Score()->PlayerData(pKiller->GetCID())->m_Score--;
+			GameServer()->Score()->DailyPlayerData(pKiller->GetCID())->m_Score--;
+		}
 		else
+		{
 			pKiller->m_Score++; // normal kill
+			GameServer()->Score()->PlayerData(pKiller->GetCID())->m_Score++;
+			GameServer()->Score()->DailyPlayerData(pKiller->GetCID())->m_Score++;
+			GameServer()->Score()->PlayerData(pKiller->GetCID())->m_Kills++;
+			GameServer()->Score()->DailyPlayerData(pKiller->GetCID())->m_Kills++;
+			GameServer()->Score()->PlayerData(pVictim->GetPlayer()->GetCID())->m_Deaths++;
+			GameServer()->Score()->DailyPlayerData(pVictim->GetPlayer()->GetCID())->m_Deaths++;
+		}
 	}
 	if(Weapon == WEAPON_SELF)
 		pVictim->GetPlayer()->m_RespawnTick = Server()->Tick()+Server()->TickSpeed()*3.0f;
-
 
 	// update spectator modes for dead players in survival
 	if(m_GameFlags&GAMEFLAG_SURVIVAL)
@@ -232,7 +251,9 @@ int IGameController::OnCharacterDeath(CCharacter *pVictim, CPlayer *pKiller, int
 
 void IGameController::OnCharacterSpawn(CCharacter *pChr)
 {
-	if(m_GameFlags&GAMEFLAG_SURVIVAL)
+	if(IsInstagib())
+		pChr->GiveWeapon(WEAPON_LASER, -1);
+	else if(m_GameFlags&GAMEFLAG_SURVIVAL)
 	{
 		// give start equipment
 		pChr->IncreaseHealth(10);
@@ -300,7 +321,7 @@ bool IGameController::OnEntity(int Index, vec2 Pos)
 			Type = PICKUP_NINJA;
 	}
 
-	if(Type != -1)
+	if(Type != -1 && !IsInstagib())
 	{
 		CPickup *pPickup = new CPickup(&GameServer()->m_World, Type);
 		pPickup->m_Pos = Pos;
@@ -410,7 +431,25 @@ void IGameController::DoWincheckMatch()
 			(m_GameInfo.m_TimeLimit > 0 && (Server()->Tick()-m_GameStartTick) >= m_GameInfo.m_TimeLimit*Server()->TickSpeed()*60))
 		{
 			if(m_aTeamscore[TEAM_RED] != m_aTeamscore[TEAM_BLUE] || m_GameFlags&GAMEFLAG_SURVIVAL)
+			{
+				for(int i = 0; i < MAX_CLIENTS; i++)
+				{
+					if(GameServer()->m_apPlayers[i])
+					{
+						if(GameServer()->m_apPlayers[i]->GetTeam() == (m_aTeamscore[TEAM_RED] > m_aTeamscore[TEAM_BLUE] ? TEAM_RED : TEAM_BLUE))
+						{
+							GameServer()->Score()->PlayerData(i)->m_Wins++;
+							GameServer()->Score()->DailyPlayerData(i)->m_Wins++;
+						}
+						else
+						{
+							GameServer()->Score()->PlayerData(i)->m_Losses++;
+							GameServer()->Score()->DailyPlayerData(i)->m_Wins++;
+						}
+					}
+				}
 				EndMatch();
+			}
 			else
 				m_SuddenDeath = 1;
 		}
@@ -420,6 +459,7 @@ void IGameController::DoWincheckMatch()
 		// gather some stats
 		int Topscore = 0;
 		int TopscoreCount = 0;
+		int Topplayer = 0;
 		for(int i = 0; i < MAX_CLIENTS; i++)
 		{
 			if(GameServer()->m_apPlayers[i])
@@ -427,6 +467,7 @@ void IGameController::DoWincheckMatch()
 				if(GameServer()->m_apPlayers[i]->m_Score > Topscore)
 				{
 					Topscore = GameServer()->m_apPlayers[i]->m_Score;
+					Topplayer = i;
 					TopscoreCount = 1;
 				}
 				else if(GameServer()->m_apPlayers[i]->m_Score == Topscore)
@@ -439,7 +480,11 @@ void IGameController::DoWincheckMatch()
 			(m_GameInfo.m_TimeLimit > 0 && (Server()->Tick()-m_GameStartTick) >= m_GameInfo.m_TimeLimit*Server()->TickSpeed()*60))
 		{
 			if(TopscoreCount == 1)
+			{
+				GameServer()->Score()->PlayerData(Topplayer)->m_Wins++;
+				GameServer()->Score()->DailyPlayerData(Topplayer)->m_Wins++;
 				EndMatch();
+			}
 			else
 				m_SuddenDeath = 1;
 		}
@@ -1133,4 +1178,14 @@ int IGameController::GetStartTeam()
 		return Team;
 	}
 	return TEAM_SPECTATORS;
+}
+
+void IGameController::MakeInstagib()
+{
+	m_Instagib = true;
+}
+
+bool IGameController::IsInstagib()
+{
+	return m_Instagib;
 }

@@ -106,6 +106,11 @@ private:
 
 	int m_TriggeredEvents;
 
+	int Spree;
+	void SpreeAdd();
+	void SpreeEnd(int Killer);
+	bool OnSpree();
+
 	// ninja
 	struct
 	{

@@ -56,7 +56,11 @@ int CGameControllerCTF::OnCharacterDeath(CCharacter *pVictim, CPlayer *pKiller, 
 			F->m_Vel = vec2(0,0);
 
 			if(pKiller && pKiller->GetTeam() != pVictim->GetPlayer()->GetTeam())
+			{
 				pKiller->m_Score++;
+				GameServer()->Score()->PlayerData(pKiller->GetCID())->m_Score++;
+				GameServer()->Score()->DailyPlayerData(pKiller->GetCID())->m_Score++;
+			}
 
 			HadFlag |= 1;
 		}
@@ -94,12 +98,48 @@ void CGameControllerCTF::DoWincheckMatch()
 		if(m_SuddenDeath)
 		{
 			if(m_aTeamscore[TEAM_RED]/100 != m_aTeamscore[TEAM_BLUE]/100)
+			{
+				for(int i = 0; i < MAX_CLIENTS; i++)
+				{
+					if(GameServer()->m_apPlayers[i])
+					{
+						if(GameServer()->m_apPlayers[i]->GetTeam() == (m_aTeamscore[TEAM_RED] > m_aTeamscore[TEAM_BLUE] ? TEAM_RED : TEAM_BLUE))
+						{
+							GameServer()->Score()->PlayerData(i)->m_Wins++;
+							GameServer()->Score()->DailyPlayerData(i)->m_Wins++;
+						}
+						else
+						{
+							GameServer()->Score()->PlayerData(i)->m_Losses++;
+							GameServer()->Score()->DailyPlayerData(i)->m_Losses++;
+						}
+					}
+				}
 				EndMatch();
+			}
 		}
 		else
 		{
 			if(m_aTeamscore[TEAM_RED] != m_aTeamscore[TEAM_BLUE])
+			{
+				for(int i = 0; i < MAX_CLIENTS; i++)
+				{
+					if(GameServer()->m_apPlayers[i])
+					{
+						if(GameServer()->m_apPlayers[i]->GetTeam() == (m_aTeamscore[TEAM_RED] > m_aTeamscore[TEAM_BLUE] ? TEAM_RED : TEAM_BLUE))
+						{
+							GameServer()->Score()->PlayerData(i)->m_Wins++;
+							GameServer()->Score()->DailyPlayerData(i)->m_Wins++;
+						}
+						else
+						{
+							GameServer()->Score()->PlayerData(i)->m_Losses++;
+							GameServer()->Score()->DailyPlayerData(i)->m_Losses++;
+						}
+					}
+				}
 				EndMatch();
+			}
 			else
 				m_SuddenDeath = 1;
 		}
@@ -183,14 +223,19 @@ void CGameControllerCTF::Tick()
 					// CAPTURE! \o/
 					m_aTeamscore[fi^1] += 100;
 					F->m_pCarryingCharacter->GetPlayer()->m_Score += 5;
+					GameServer()->Score()->PlayerData(F->m_pCarryingCharacter->GetPlayer()->GetCID())->m_Score += 5;
+					GameServer()->Score()->DailyPlayerData(F->m_pCarryingCharacter->GetPlayer()->GetCID())->m_Score += 5;
 
 					char aBuf[64];
 					str_format(aBuf, sizeof(aBuf), "flag_capture player='%d:%s'",
 						F->m_pCarryingCharacter->GetPlayer()->GetCID(),
 						Server()->ClientName(F->m_pCarryingCharacter->GetPlayer()->GetCID()));
 					GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
-
 					GameServer()->SendGameMsg(GAMEMSG_CTF_CAPTURE, fi, F->m_pCarryingCharacter->GetPlayer()->GetCID(), Server()->Tick()-F->m_GrabTick, -1);
+
+					GameServer()->Score()->PlayerData(F->m_pCarryingCharacter->GetPlayer()->GetCID())->m_FlagCaps++;
+					GameServer()->Score()->DailyPlayerData(F->m_pCarryingCharacter->GetPlayer()->GetCID())->m_FlagCaps++;
+
 					for(int i = 0; i < 2; i++)
 						m_apFlags[i]->Reset();
 				}
@@ -212,6 +257,8 @@ void CGameControllerCTF::Tick()
 					{
 						CCharacter *pChr = apCloseCCharacters[i];
 						pChr->GetPlayer()->m_Score += 1;
+						GameServer()->Score()->PlayerData(pChr->GetPlayer()->GetCID())->m_Score++;
+						GameServer()->Score()->DailyPlayerData(pChr->GetPlayer()->GetCID())->m_Score++;
 
 						char aBuf[256];
 						str_format(aBuf, sizeof(aBuf), "flag_return player='%d:%s'",
@@ -234,6 +281,8 @@ void CGameControllerCTF::Tick()
 					F->m_AtStand = 0;
 					F->m_pCarryingCharacter = apCloseCCharacters[i];
 					F->m_pCarryingCharacter->GetPlayer()->m_Score += 1;
+					GameServer()->Score()->PlayerData(F->m_pCarryingCharacter->GetPlayer()->GetCID())->m_Score++;
+					GameServer()->Score()->DailyPlayerData(F->m_pCarryingCharacter->GetPlayer()->GetCID())->m_Score++;
 
 					char aBuf[256];
 					str_format(aBuf, sizeof(aBuf), "flag_grab player='%d:%s'",

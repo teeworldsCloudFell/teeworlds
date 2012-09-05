@@ -20,6 +20,8 @@
 #include "gamecontext.h"
 #include "player.h"
 
+#include "sql.h"
+
 enum
 {
 	RESET,
@@ -40,6 +42,7 @@ void CGameContext::Construct(int Resetting)
 	m_pVoteOptionLast = 0;
 	m_NumVoteOptions = 0;
 	m_LockTeams = 0;
+	m_pScore = 0;
 
 	if(Resetting==NO_RESET)
 		m_pVoteOptionHeap = new CHeap();
@@ -61,6 +64,8 @@ CGameContext::~CGameContext()
 		delete m_apPlayers[i];
 	if(!m_Resetting)
 		delete m_pVoteOptionHeap;
+	delete m_pChatConsole;
+	m_pChatConsole = 0;
 }
 
 void CGameContext::Clear()
@@ -426,6 +431,13 @@ void CGameContext::SendTuningParams(int ClientID)
 	Server()->SendMsg(&Msg, MSGFLAG_VITAL, ClientID);
 }
 
+void CGameContext::SendMotd(int ClientID, const char *pMotd)
+{
+	CNetMsg_Sv_Motd Msg;
+	Msg.m_pMessage = pMotd;
+	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, ClientID);
+}
+
 void CGameContext::SwapTeams()
 {
 	if(!m_pController->IsTeamplay())
@@ -438,6 +450,25 @@ void CGameContext::SwapTeams()
 		if(m_apPlayers[i] && m_apPlayers[i]->GetTeam() != TEAM_SPECTATORS)
 			m_pController->DoTeamChange(m_apPlayers[i], m_apPlayers[i]->GetTeam()^1, false);
 	}
+}
+
+void CGameContext::OnDetect(int ClientID)
+{
+	Score()->PlayerData(ClientID)->m_BotDetected++;
+
+	char aBuf[128];
+	str_format(aBuf, sizeof(aBuf), "%d:'%s' has been detected!", ClientID, Server()->ClientName(ClientID));
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(m_apPlayers[i] && Server()->IsAuthed(i))
+			SendChatTarget(i, aBuf);
+	}
+
+	if(Score()->PlayerData(ClientID)->m_BotDetected > 1)
+		return;
+
+	Score()->SaveScore(ClientID);
 }
 
 void CGameContext::OnTick()
@@ -578,6 +609,10 @@ void CGameContext::OnClientPredictedInput(int ClientID, void *pInput)
 
 void CGameContext::OnClientEnter(int ClientID)
 {
+	Score()->PlayerData(ClientID)->Reset();
+	Score()->DailyPlayerData(ClientID)->Reset();
+	Score()->LoadScore(ClientID);
+
 	m_pController->OnPlayerConnect(m_apPlayers[ClientID]);
 
 	m_VoteUpdate = true;
@@ -635,6 +670,8 @@ void CGameContext::OnClientEnter(int ClientID)
 		Msg.m_Team = NewClientInfoMsg.m_Team;
 		Server()->SendPackMsg(&Msg, MSGFLAG_NOSEND, -1);
 	}
+
+	Score()->ShowRank(ClientID, Server()->ClientName(ClientID));
 }
 
 void CGameContext::OnClientConnected(int ClientID, bool Dummy)
@@ -663,6 +700,8 @@ void CGameContext::OnClientTeamChange(int ClientID)
 
 void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 {
+	Score()->SaveScore(ClientID);
+
 	// update clients on drop
 	if(Server()->ClientIngame(ClientID))
 	{
@@ -682,6 +721,7 @@ void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 
 	AbortVoteOnDisconnect(ClientID);
 	m_pController->OnPlayerDisconnect(m_apPlayers[ClientID]);
+
 	delete m_apPlayers[ClientID];
 	m_apPlayers[ClientID] = 0;
 
@@ -714,20 +754,31 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 			Team = CGameContext::CHAT_ALL;
 
 		if(g_Config.m_SvSpamprotection && pPlayer->m_LastChat && pPlayer->m_LastChat+Server()->TickSpeed() > Server()->Tick())
-			return;
+			pPlayer->m_LastChat = Server()->Tick();
+		else
+ 		{
+			pPlayer->m_LastChat = Server()->Tick();
 
-		pPlayer->m_LastChat = Server()->Tick();
+			if(pMsg->m_pMessage[0] == '/')
+			{
+				m_ChatConsoleClientID = ClientID;
+				ChatConsole()->ExecuteLine(pMsg->m_pMessage + 1);
+				m_ChatConsoleClientID = -1;
+			}
+			else
+			{
+				// check for invalid chars
+				unsigned char *pMessage = (unsigned char *)pMsg->m_pMessage;
+				while (*pMessage)
+				{
+					if(*pMessage < 32)
+						*pMessage = ' ';
+					pMessage++;
+				}
 
-		// check for invalid chars
-		unsigned char *pMessage = (unsigned char *)pMsg->m_pMessage;
-		while (*pMessage)
-		{
-			if(*pMessage < 32)
-				*pMessage = ' ';
-			pMessage++;
+				SendChat(ClientID, Team, pMsg->m_pMessage);
+			}
 		}
-
-		SendChat(ClientID, Team, pMsg->m_pMessage);
 	}
 	else if(MsgID == NETMSGTYPE_CL_CALLVOTE)
 	{
@@ -1302,6 +1353,27 @@ void CGameContext::ConchainSettingUpdate(IConsole::IResult *pResult, void *pUser
 	}
 }
 
+void CGameContext::ConDetectedPlayers(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	char aBuf[128];
+
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Detected players:");
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(pSelf->m_apPlayers[i] && pSelf->Score()->PlayerData(i)->m_BotDetected)
+		{
+			str_format(aBuf, sizeof(aBuf), "%d:'%s' has been detected %d times", i, pSelf->Server()->ClientName(i), pSelf->Score()->PlayerData(i)->m_BotDetected);
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+		}
+	}
+}
+
+void CGameContext::ConScoreSaveAll(IConsole::IResult *pResult, void *pUserData)
+{
+	((CGameContext *)pUserData)->Score()->SaveScoreAll(false);
+}
+
 void CGameContext::OnConsoleInit()
 {
 	m_pServer = Kernel()->RequestInterface<IServer>();
@@ -1326,6 +1398,8 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("remove_vote", "s", CFGFLAG_SERVER, ConRemoveVote, this, "remove a voting option");
 	Console()->Register("clear_votes", "", CFGFLAG_SERVER, ConClearVotes, this, "Clears the voting options");
 	Console()->Register("vote", "r", CFGFLAG_SERVER, ConVote, this, "Force a vote to yes/no");
+	Console()->Register("detected", "", CFGFLAG_SERVER, ConDetectedPlayers, this, "Shows currently detected players");
+	Console()->Register("save_all", "", CFGFLAG_SERVER, ConScoreSaveAll, this, "Save everybodys playerstats");
 
 	Console()->Chain("sv_motd", ConchainSpecialMotdupdate, this);
 
@@ -1336,10 +1410,166 @@ void CGameContext::OnConsoleInit()
 	Console()->Chain("sv_spectator_slots", ConchainSettingUpdate, this);
 }
 
+void CGameContext::ChatConInfo(IConsole::IResult *pResult, void *pUser)
+{
+	CGameContext *pSelf = (CGameContext *)pUser;
+
+	pSelf->ChatConsole()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat", "Savedscore mod made by BotoX");
+	pSelf->ChatConsole()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat", "Used systems: CSqlScore Class by SushiTee");
+}
+
+void CGameContext::ChatConTop5(IConsole::IResult *pResult, void *pUser)
+{
+	CGameContext *pSelf = (CGameContext *)pUser;
+	pSelf->Score()->SaveScoreAll(false, true);
+
+	if(pResult->NumArguments() > 0)
+		pSelf->Score()->ShowTop5(pSelf->m_ChatConsoleClientID,  max(1, pResult->GetInteger(0)));
+	else
+		pSelf->Score()->ShowTop5(pSelf->m_ChatConsoleClientID);
+}
+
+void CGameContext::ChatConRank(IConsole::IResult *pResult, void *pUser)
+{
+	CGameContext *pSelf = (CGameContext *)pUser;
+	pSelf->Score()->SaveScoreAll(false, true);
+
+	if(pResult->NumArguments() > 0)
+	{
+		char aStr[256];
+		str_copy(aStr, pResult->GetString(0), sizeof(aStr));
+		
+		// strip trailing spaces
+		int i = str_length(aStr);
+		while(i >= 0)
+		{
+			if(aStr[i] < 0 || aStr[i] > 32)
+				break;
+			aStr[i] = 0;
+			i--;
+		}
+		pSelf->Score()->ShowRank(pSelf->m_ChatConsoleClientID, aStr, true);
+	}
+	else
+		pSelf->Score()->ShowRank(pSelf->m_ChatConsoleClientID, pSelf->Server()->ClientName(pSelf->m_ChatConsoleClientID));
+}
+
+void CGameContext::ChatConStats(IConsole::IResult *pResult, void *pUser)
+{
+	CGameContext *pSelf = (CGameContext *)pUser;
+	pSelf->Score()->SaveScoreAll(false, true);
+
+	if(pResult->NumArguments() > 0)
+	{
+		char aStr[256];
+		str_copy(aStr, pResult->GetString(0), sizeof(aStr));
+		
+		// strip trailing spaces
+		int i = str_length(aStr);
+		while(i >= 0)
+		{
+			if(aStr[i] < 0 || aStr[i] > 32)
+				break;
+			aStr[i] = 0;
+			i--;
+		}
+		pSelf->Score()->ShowStats(pSelf->m_ChatConsoleClientID, aStr, true);
+	}
+	else
+		pSelf->Score()->ShowStats(pSelf->m_ChatConsoleClientID, pSelf->Server()->ClientName(pSelf->m_ChatConsoleClientID));
+}
+
+void CGameContext::ChatConTop5Daily(IConsole::IResult *pResult, void *pUser)
+{
+	CGameContext *pSelf = (CGameContext *)pUser;
+	pSelf->Score()->SaveScoreAll(false, true);
+
+	if(pResult->NumArguments() > 0)
+		pSelf->Score()->ShowTop5(pSelf->m_ChatConsoleClientID,  max(1, pResult->GetInteger(0)), true);
+	else
+		pSelf->Score()->ShowTop5(pSelf->m_ChatConsoleClientID, 1, true);
+}
+
+void CGameContext::ChatConRankDaily(IConsole::IResult *pResult, void *pUser)
+{
+	CGameContext *pSelf = (CGameContext *)pUser;
+	pSelf->Score()->SaveScoreAll(false, true);
+
+	if(pResult->NumArguments() > 0)
+	{
+		char aStr[256];
+		str_copy(aStr, pResult->GetString(0), sizeof(aStr));
+		
+		// strip trailing spaces
+		int i = str_length(aStr);
+		while(i >= 0)
+		{
+			if(aStr[i] < 0 || aStr[i] > 32)
+				break;
+			aStr[i] = 0;
+			i--;
+		}
+		pSelf->Score()->ShowRank(pSelf->m_ChatConsoleClientID, aStr, true, true);
+	}
+	else
+		pSelf->Score()->ShowRank(pSelf->m_ChatConsoleClientID, pSelf->Server()->ClientName(pSelf->m_ChatConsoleClientID), false, true);
+}
+
+void CGameContext::ChatConCmdlist(IConsole::IResult *pResult, void *pUser)
+{
+	CGameContext *pSelf = (CGameContext *)pUser;
+
+	pSelf->ChatConsole()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat", "---Command List---");
+	pSelf->ChatConsole()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat", "\"/info\" information about the mod");
+	pSelf->ChatConsole()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat", "\"/rank\" shows your rank");
+	pSelf->ChatConsole()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat", "\"/rank NAME\" shows the rank of a specific player");
+	pSelf->ChatConsole()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat", "\"/stats\" shows your full statistics");
+	pSelf->ChatConsole()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat", "\"/stats NAME\" shows the full statistics of a specific player");
+	pSelf->ChatConsole()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat", "\"/top5 X\" shows the top 5 (from X)");
+	pSelf->ChatConsole()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat", "\"/rankday\" shows your todays rank");
+	pSelf->ChatConsole()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat", "\"/rankday NAME\" shows the todays rank of a specific player");
+	pSelf->ChatConsole()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "chat", "\"/top5day X\" shows the todays top 5 (from X)");
+}
+
+void CGameContext::InitChatConsole()
+{
+	m_pChatConsole = CreateConsole(CFGFLAG_SERVERCHAT);
+	m_ChatConsoleClientID = -1;
+
+	ChatConsole()->RegisterPrintCallback(IConsole::OUTPUT_LEVEL_STANDARD, SendChatResponse, this);
+	ChatConsole()->Register("info", "", CFGFLAG_SERVERCHAT, ChatConInfo, this, "");
+	ChatConsole()->Register("cmdlist", "", CFGFLAG_SERVERCHAT, ChatConCmdlist, this, "");
+	ChatConsole()->Register("top5", "?i", CFGFLAG_SERVERCHAT, ChatConTop5, this, "");
+	ChatConsole()->Register("rank", "?r", CFGFLAG_SERVERCHAT, ChatConRank, this, "");
+	ChatConsole()->Register("stats", "?r", CFGFLAG_SERVERCHAT, ChatConStats, this, "");
+	ChatConsole()->Register("top5day", "?i", CFGFLAG_SERVERCHAT, ChatConTop5Daily, this, "");
+	ChatConsole()->Register("rankday", "?r", CFGFLAG_SERVERCHAT, ChatConRankDaily, this, "");
+}
+
+void CGameContext::SendChatResponse(const char *pLine, void *pUser)
+{
+	CGameContext *pSelf = (CGameContext *)pUser;
+	if(pSelf->m_ChatConsoleClientID == -1)
+		return;
+
+	static volatile int ReentryGuard = 0;
+	if(ReentryGuard)
+		return;
+	ReentryGuard++;
+
+	while(*pLine && *pLine != ' ')
+		pLine++;
+	if(*pLine && *(pLine + 1))
+		pSelf->SendChatTarget(pSelf->m_ChatConsoleClientID, pLine + 1);
+
+	ReentryGuard--;
+}
+
 void CGameContext::OnInit()
 {
 	// init everything
 	m_pServer = Kernel()->RequestInterface<IServer>();
+	m_pEngine = Kernel()->RequestInterface<IEngine>();
 	m_pConsole = Kernel()->RequestInterface<IConsole>();
 	m_World.SetGameServer(this);
 	m_Events.SetGameServer(this);
@@ -1349,20 +1579,63 @@ void CGameContext::OnInit()
 
 	m_Layers.Init(Kernel());
 	m_Collision.Init(&m_Layers);
+	InitChatConsole();
 
 	// select gametype
 	if(str_comp_nocase(g_Config.m_SvGametype, "mod") == 0)
+	{
 		m_pController = new CGameControllerMOD(this);
+		m_pController->m_pGameType = "s|MOD";
+	}
 	else if(str_comp_nocase(g_Config.m_SvGametype, "ctf") == 0)
+	{
 		m_pController = new CGameControllerCTF(this);
-	else if(str_comp_nocase(g_Config.m_SvGametype, "lms") == 0)
-		m_pController = new CGameControllerLMS(this);
-	else if(str_comp_nocase(g_Config.m_SvGametype, "sur") == 0)
-		m_pController = new CGameControllerSUR(this);
+		m_pController->m_pGameType = "s|CTF";
+	}
 	else if(str_comp_nocase(g_Config.m_SvGametype, "tdm") == 0)
+	{
 		m_pController = new CGameControllerTDM(this);
-	else
+		m_pController->m_pGameType = "s|TDM";
+	}
+	else if(str_comp_nocase(g_Config.m_SvGametype, "lms") == 0)
+	{
+		m_pController = new CGameControllerLMS(this);
+		m_pController->m_pGameType = "s|LMS";
+	}
+	else if(str_comp_nocase(g_Config.m_SvGametype, "sur") == 0)
+	{
+		m_pController = new CGameControllerSUR(this);
+		m_pController->m_pGameType = "s|SUR";
+	}
+	else if(str_comp_nocase(g_Config.m_SvGametype, "idm") == 0)
+	{
 		m_pController = new CGameControllerDM(this);
+		m_pController->MakeInstagib();
+		m_pController->m_pGameType = "s|iDM";
+	}
+	else if(str_comp_nocase(g_Config.m_SvGametype, "ictf") == 0)
+	{
+		m_pController = new CGameControllerCTF(this);
+		m_pController->MakeInstagib();
+		m_pController->m_pGameType = "s|iCTF";
+	}
+	else if(str_comp_nocase(g_Config.m_SvGametype, "itdm") == 0)
+	{
+		m_pController = new CGameControllerTDM(this);
+		m_pController->MakeInstagib();
+		m_pController->m_pGameType = "s|iTDM";
+	}
+	else
+	{
+		m_pController = new CGameControllerDM(this);
+		m_pController->m_pGameType = "s|DM";
+	}
+
+	// delete old score object
+	if(m_pScore)
+		delete m_pScore;
+
+	m_pScore = new CSqlScore(this);
 
 	// create all entities from the game layer
 	CMapItemLayerTilemap *pTileMap = m_Layers.GameLayer();
@@ -1392,6 +1665,8 @@ void CGameContext::OnInit()
 
 void CGameContext::OnShutdown()
 {
+	Score()->SaveScoreAll(true);
+
 	delete m_pController;
 	m_pController = 0;
 	Clear();
