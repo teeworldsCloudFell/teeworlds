@@ -768,6 +768,7 @@ void IGameController::MakeinQ(const char *Gametype, bool Option)
 {
 	m_pinQ = Option;
 	m_pGameType = Gametype;
+	GameServer()->Tuning()->m_LaserReach = 0;
 }
 
 bool IGameController::IsinQ()
