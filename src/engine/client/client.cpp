@@ -460,7 +460,6 @@ int *CClient::GetInput(int Tick)
 // ------ state handling -----
 void CClient::SetState(int s)
 {
-	int Old = m_State;
 	if(g_Config.m_Debug)
 	{
 		char aBuf[128];
@@ -580,6 +579,8 @@ void CClient::DisconnectWithReason(const char *pReason)
 	m_aSnapshots[SNAP_CURRENT] = 0;
 	m_aSnapshots[SNAP_PREV] = 0;
 	m_RecivedSnapshots = 0;
+
+	ResetTrivia(true);
 }
 
 void CClient::Disconnect()
@@ -1928,7 +1929,7 @@ void CClient::OnNewSnapshot()
 
 void CClient::OnGameOver()
 {
-	SayChat("gg"); // loooooool
+	SayChat("gg");
 }
 
 void CClient::OnStartGame()
