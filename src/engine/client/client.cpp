@@ -1682,6 +1682,9 @@ void CClient::OnMessage(int Msg, CUnpacker *Unpacker)
 		m_pConsole->Print(IConsole::OUTPUT_LEVEL_DEBUG, "chat", aBuf);
 		for(int i = 0; i < SENDCHATSIZE; i++)
 		{
+			if(!m_aaSendChat[i][0])
+				continue;
+
 			if(str_comp(pMsg->m_pMessage, m_aaSendChat[i]) == 0)
 				m_aaSendChat[i][0] = 0;
 		}
