@@ -645,11 +645,16 @@ void CGameContext::OnClientDrop(int ClientID, const char *pReason)
 	m_VoteUpdate = true;
 
 	// update spectator modes
+	int NumPlayers = 0;
 	for(int i = 0; i < MAX_CLIENTS; ++i)
 	{
 		if(m_apPlayers[i] && m_apPlayers[i]->m_SpectatorID == ClientID)
 			m_apPlayers[i]->m_SpectatorID = SPEC_FREEVIEW;
+		if(m_apPlayers[i] && m_apPlayers[i]->GetTeam() != TEAM_SPECTATORS)
+			NumPlayers++;
 	}
+	if(!NumPlayers)
+		m_World.m_Paused = 0;
 }
 
 void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
@@ -690,25 +695,16 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 		/* inQ */
 		if(pPlayer->m_Muted && m_pController->IsinQ())
 		{
-			int time;
-			time = pPlayer->m_Muted;
+			int Time = pPlayer->m_Muted;
 			char aBuf[256];
-			if(time >= 60*Server()->TickSpeed())
+			if(Time >= 60*Server()->TickSpeed())
 			{
-				int sec;
-				sec = time;
-
-				while(sec >= 60*Server()->TickSpeed())
-					sec -= 60*Server()->TickSpeed();
-
-				time = time/60/Server()->TickSpeed();
-
-				str_format(aBuf, sizeof(aBuf), "You are muted for %d minutes and %d seconds", time, sec/Server()->TickSpeed());
+				str_format(aBuf, sizeof(aBuf), "You are muted for %d minutes and %d seconds", Time/Server()->TickSpeed()/60, (Time/Server()->TickSpeed())%60);
 				SendChatTarget(ClientID, aBuf);
 			}
 			else
 			{
-				str_format(aBuf, sizeof(aBuf), "You are muted for %d seconds", time/Server()->TickSpeed());
+				str_format(aBuf, sizeof(aBuf), "You are muted for %d seconds", Time/Server()->TickSpeed());
 				SendChatTarget(ClientID, aBuf);
 			}
 			return;
@@ -1856,34 +1852,25 @@ void CGameContext::ConMute(IConsole::IResult *pResult, void *pUserData)
 		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Only available in inQ Gametype!");
 		return; }
 	int ClientID = clamp(pResult->GetInteger(0), 0, (int)MAX_CLIENTS-1);
-	int time;
+	int Time;
 	char aBuf[256];
 	if(pSelf->m_apPlayers[ClientID])
 	{
-		time = pResult->GetInteger(1);
-		time = time*pSelf->Server()->TickSpeed();
-		pSelf->m_apPlayers[ClientID]->m_Muted = time;
-		if(time >= 60*pSelf->Server()->TickSpeed())
+		Time = pResult->GetInteger(1);
+		pSelf->m_apPlayers[ClientID]->m_Muted = Time*pSelf->Server()->TickSpeed();
+		if(Time >= 60)
 		{
-			int sec;
-			sec = time;
-
-			while(sec >= 60*pSelf->Server()->TickSpeed())
-				sec -= 60*pSelf->Server()->TickSpeed();
-
-			time = time/60/pSelf->Server()->TickSpeed();
-
-			str_format(aBuf, sizeof(aBuf), "%s muted by admin for %d minutes and %d seconds", pSelf->Server()->ClientName(ClientID), time, sec/pSelf->Server()->TickSpeed());
+			str_format(aBuf, sizeof(aBuf), "%s muted by admin for %d minutes and %d seconds", pSelf->Server()->ClientName(ClientID), Time/60, Time%60);
 			pSelf->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
 		}
-		else if(!time)
+		else if(!Time)
 		{
 			str_format(aBuf, sizeof(aBuf), "%s unmuted by admin", pSelf->Server()->ClientName(ClientID));
 			pSelf->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
 		}
 		else
 		{
-			str_format(aBuf, sizeof(aBuf), "%s muted by admin for %d seconds", pSelf->Server()->ClientName(ClientID), time/pSelf->Server()->TickSpeed());
+			str_format(aBuf, sizeof(aBuf), "%s muted by admin for %d seconds", pSelf->Server()->ClientName(ClientID), Time);
 			pSelf->SendChat(-1, CGameContext::CHAT_ALL, aBuf);
 		}
 	}
