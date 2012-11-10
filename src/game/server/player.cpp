@@ -91,6 +91,9 @@ void CPlayer::Tick()
 		++m_LastActionTick;
 		++m_TeamChangeTick;
  	}
+
+ 	if(m_Muted)
+ 		m_Muted--;
 }
 
 void CPlayer::PostTick()
