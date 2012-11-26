@@ -71,8 +71,27 @@ void CGraphics_Threaded::FlushVertices()
 		}
 	}
 
+	// check if we have enough free memory in the commandbuffer
+	if(!m_pCommandBuffer->AddCommand(Cmd))
+	{
+		// kick command buffer and try again
+		KickCommandBuffer();
+		
+		Cmd.m_pVertices = (CCommandBuffer::SVertex *)m_pCommandBuffer->AllocData(sizeof(CCommandBuffer::SVertex)*NumVerts);
+		if(Cmd.m_pVertices == 0x0)
+		{
+			dbg_msg("graphics", "failed to allocate data for vertices");
+			return;
+		}
+
+		if(!m_pCommandBuffer->AddCommand(Cmd))
+		{
+			dbg_msg("graphics", "failed to allocate memory for render command");
+			return;
+		}
+	}
+
 	mem_copy(Cmd.m_pVertices, m_aVertices, sizeof(CCommandBuffer::SVertex)*NumVerts);
-	m_pCommandBuffer->AddCommand(Cmd);
 }
 
 void CGraphics_Threaded::AddVertices(int Count)
@@ -630,12 +649,9 @@ void CGraphics_Threaded::QuadsDrawFreeform(const CFreeformItem *pArray, int Num)
 	AddVertices(4*Num);
 }
 
-void CGraphics_Threaded::QuadsText(float x, float y, float Size, float r, float g, float b, float a, const char *pText)
+void CGraphics_Threaded::QuadsText(float x, float y, float Size, const char *pText)
 {
 	float StartX = x;
-
-	QuadsBegin();
-	SetColor(r,g,b,a);
 
 	while(*pText)
 	{
@@ -660,8 +676,6 @@ void CGraphics_Threaded::QuadsText(float x, float y, float Size, float r, float 
 			x += Size/2;
 		}
 	}
-
-	QuadsEnd();
 }
 
 int CGraphics_Threaded::IssueInit()
