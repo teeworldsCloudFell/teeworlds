@@ -726,21 +726,6 @@ void CCharacter::Tick()
 	// handle Weapons
 	HandleWeapons();
 	
-	// door crap
-	// check if character is hitting a door
-	if(m_HittingDoor)
-	{
-		m_Core.m_Vel += m_PushDirection*length(m_Core.m_Vel);
-		if(m_Core.m_Jumped&3)
-			m_Core.m_Jumped &= ~2;
-	}
-	
-	if(!m_HittingDoor)
-		m_OldPos = m_Core.m_Pos;
-		
-	// reset hitting door state
-	m_HittingDoor = false;
-
 	// Previnput
 	m_PrevInput = m_Input;
 
@@ -759,6 +744,21 @@ void CCharacter::TickDefered()
 		m_ReckoningCore.Move();
 		m_ReckoningCore.Quantize();
 	}
+
+	// door crap
+	// check if character is hitting a door
+	if(m_HittingDoor)
+	{
+		m_Core.m_Vel += m_PushDirection*length(m_Core.m_Vel);
+		if(m_Core.m_Jumped&3)
+			m_Core.m_Jumped &= ~2;
+	}
+
+	if(!m_HittingDoor)
+		m_OldPos = m_Core.m_Pos;
+
+	// reset hitting door state
+	m_HittingDoor = false;
 
 	//lastsentcore
 	vec2 StartPos = m_Core.m_Pos;
