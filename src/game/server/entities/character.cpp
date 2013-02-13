@@ -635,11 +635,11 @@ void CCharacter::Tick()
 
 		if(GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_WATER_UP)
 			m_Core.m_Vel.y -= g_Config.m_SvWaterGain/100.0f;
-		if(GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_WATER_DOWN)
+		else if(GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_WATER_DOWN)
 			m_Core.m_Vel.y += g_Config.m_SvWaterGain/100.0f;
-		if(GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_WATER_LEFT)
+		else if(GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_WATER_LEFT)
 			m_Core.m_Vel.x -= g_Config.m_SvWaterGain/100.0f;
-		if(GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_WATER_RIGHT)
+		else if(GameServer()->Collision()->GetTileIndex(TileIndex) == TILE_WATER_RIGHT)
 			m_Core.m_Vel.x += g_Config.m_SvWaterGain/100.0f;
 
 		m_InWater = true;
@@ -655,7 +655,7 @@ void CCharacter::Tick()
 	{
 		if(m_InWater)
 		{
-			if(!(Server()->Tick()%(int)(g_Config.m_SvWaterOxygenDrain / 1000.0f * 50)))
+			if(!(Server()->Tick()%(int)(g_Config.m_SvWaterOxygenDrain / 1000.0f * 50.0f)))
 			{
 				if(m_Armor)
 					m_Armor--;
@@ -668,7 +668,7 @@ void CCharacter::Tick()
 		}
 		else
 		{
-			if(!(Server()->Tick()%(int)(g_Config.m_SvWaterOxygenRegen / 1000.0f * 50)))
+			if(!(Server()->Tick()%(int)(g_Config.m_SvWaterOxygenRegen / 1000.0f * 50.0f)))
 				if(m_Armor < 10)
 					m_Armor++;
 		}
