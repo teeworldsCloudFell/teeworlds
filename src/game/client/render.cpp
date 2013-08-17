@@ -362,7 +362,7 @@ void CRenderTools::RenderTee(CAnimState *pAnim, CTeeRenderInfo *pInfo, int Emote
 	// second pass we draw the filling
 	for(int p = 0; p < 2; p++)
 	{
-		int OutLine = p==0 ? 1 : 0;
+		bool OutLine = p==0;
 
 		for(int f = 0; f < 2; f++)
 		{
@@ -474,7 +474,7 @@ void CRenderTools::RenderTee(CAnimState *pAnim, CTeeRenderInfo *pInfo, int Emote
 			Graphics()->QuadsBegin();
 			CAnimKeyframe *pFoot = f ? pAnim->GetFrontFoot() : pAnim->GetBackFoot();
 
-			float w = BaseSize/2.0f;
+			float w = BaseSize/2.25f;
 			float h = w;
 
 			Graphics()->QuadsSetRotation(pFoot->m_Angle*pi*2);

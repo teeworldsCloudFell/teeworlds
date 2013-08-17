@@ -7,10 +7,10 @@
 #include <engine/textrender.h>
 
 #include <game/generated/client_data.h>
+#include <game/client/localization.h>
 #include <game/client/render.h>
 #include "editor.h"
 
-#include <game/localization.h>
 
 CLayerTiles::CLayerTiles(int w, int h)
 {
@@ -29,6 +29,9 @@ CLayerTiles::CLayerTiles(int w, int h)
 
 	m_pTiles = new CTile[m_Width*m_Height];
 	mem_zero(m_pTiles, m_Width*m_Height*sizeof(CTile));
+
+	m_SelectedRuleSet = 0;
+	m_SelectedAmount = 50;
 }
 
 CLayerTiles::~CLayerTiles()
@@ -337,6 +340,7 @@ void CLayerTiles::ShowInfo()
 	float ScreenX0, ScreenY0, ScreenX1, ScreenY1;
 	Graphics()->GetScreen(&ScreenX0, &ScreenY0, &ScreenX1, &ScreenY1);
 	Graphics()->TextureSet(m_pEditor->Client()->GetDebugFont());
+	Graphics()->QuadsBegin();
 
 	int StartY = max(0, (int)(ScreenY0/32.0f)-1);
 	int StartX = max(0, (int)(ScreenX0/32.0f)-1);
@@ -351,17 +355,18 @@ void CLayerTiles::ShowInfo()
 			{
 				char aBuf[64];
 				str_format(aBuf, sizeof(aBuf), "%i", m_pTiles[c].m_Index);
-				m_pEditor->Graphics()->QuadsText(x*32, y*32, 16.0f, 1,1,1,1, aBuf);
+				m_pEditor->Graphics()->QuadsText(x*32, y*32, 16.0f, aBuf);
 
 				char aFlags[4] = {	m_pTiles[c].m_Flags&TILEFLAG_VFLIP ? 'V' : ' ',
 									m_pTiles[c].m_Flags&TILEFLAG_HFLIP ? 'H' : ' ',
 									m_pTiles[c].m_Flags&TILEFLAG_ROTATE? 'R' : ' ',
 									0};
-				m_pEditor->Graphics()->QuadsText(x*32, y*32+16, 16.0f, 1,1,1,1, aFlags);
+				m_pEditor->Graphics()->QuadsText(x*32, y*32+16, 16.0f, aFlags);
 			}
 			x += m_pTiles[c].m_Skip;
 		}
 
+	Graphics()->QuadsEnd();
 	Graphics()->MapScreen(ScreenX0, ScreenY0, ScreenX1, ScreenY1);
 }
 
@@ -372,18 +377,23 @@ int CLayerTiles::RenderProperties(CUIRect *pToolBox)
 	bool InGameGroup = !find_linear(m_pEditor->m_Map.m_pGameGroup->m_lLayers.all(), this).empty();
 	if(m_pEditor->m_Map.m_pGameLayer != this)
 	{
-		if(m_Image >= 0 && m_Image < m_pEditor->m_Map.m_lImages.size() && m_pEditor->m_Map.m_lImages[m_Image]->m_AutoMapper.IsLoaded())
+		if(m_Image >= 0 && m_Image < m_pEditor->m_Map.m_lImages.size() && m_pEditor->m_Map.m_lImages[m_Image]->m_pAutoMapper)
 		{
 			static int s_AutoMapperButton = 0;
 			pToolBox->HSplitBottom(12.0f, pToolBox, &Button);
 			if(m_pEditor->DoButton_Editor(&s_AutoMapperButton, "Auto map", 0, &Button, 0, ""))
 				m_pEditor->PopupSelectConfigAutoMapInvoke(m_pEditor->UI()->MouseX(), m_pEditor->UI()->MouseY());
 
-			int Result = m_pEditor->PopupSelectConfigAutoMapResult();
-			if(Result > -1)
+			bool Proceed = m_pEditor->PopupAutoMapProceedOrder();
+			if(Proceed)
 			{
-				m_pEditor->m_Map.m_lImages[m_Image]->m_AutoMapper.Proceed(this, Result);
-				return 1;
+				if(m_pEditor->m_Map.m_lImages[m_Image]->m_pAutoMapper->GetType() == IAutoMapper::TYPE_TILESET)
+				{
+					m_pEditor->m_Map.m_lImages[m_Image]->m_pAutoMapper->Proceed(this, m_SelectedRuleSet);
+					return 1; // only close the popup when it's a tileset
+				}
+				else if(m_pEditor->m_Map.m_lImages[m_Image]->m_pAutoMapper->GetType() == IAutoMapper::TYPE_DOODADS)
+					m_pEditor->m_Map.m_lImages[m_Image]->m_pAutoMapper->Proceed(this, m_SelectedRuleSet, m_SelectedAmount);
 			}
 		}
 	}
