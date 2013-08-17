@@ -664,724 +664,751 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 
 	if(!pRawMsg)
 	{
-		char aBuf[256];
-		str_format(aBuf, sizeof(aBuf), "dropped weird message '%s' (%d), failed on '%s'", m_NetObjHandler.GetMsgName(MsgID), MsgID, m_NetObjHandler.FailedMsgOn());
-		Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "server", aBuf);
+		if(g_Config.m_Debug)
+		{
+			char aBuf[256];
+			str_format(aBuf, sizeof(aBuf), "dropped weird message '%s' (%d), failed on '%s'", m_NetObjHandler.GetMsgName(MsgID), MsgID, m_NetObjHandler.FailedMsgOn());
+			Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "server", aBuf);
+		}
 		return;
 	}
 
-	if(MsgID == NETMSGTYPE_CL_SAY)
+	if(Server()->ClientIngame(ClientID))
 	{
-		CNetMsg_Cl_Say *pMsg = (CNetMsg_Cl_Say *)pRawMsg;
-		int Team = pMsg->m_Team;
-		if(Team)
-			Team = pPlayer->GetTeam();
-		else
-			Team = CGameContext::CHAT_ALL;
-
-		if(g_Config.m_SvSpamprotection && pPlayer->m_LastChat && pPlayer->m_LastChat+Server()->TickSpeed() > Server()->Tick())
-			return;
-
-		pPlayer->m_LastChat = Server()->Tick();
-
-		// check for invalid chars
-		unsigned char *pMessage = (unsigned char *)pMsg->m_pMessage;
-		while (*pMessage)
+		if(MsgID == NETMSGTYPE_CL_SAY)
 		{
-			if(*pMessage < 32)
-				*pMessage = ' ';
-			pMessage++;
-		}
-		/* inQ */
-		if(pPlayer->m_Muted && m_pController->IsinQ())
-		{
-			int Time = pPlayer->m_Muted;
-			char aBuf[256];
-			if(Time >= 60*Server()->TickSpeed())
-			{
-				str_format(aBuf, sizeof(aBuf), "You are muted for %d minutes and %d seconds", Time/Server()->TickSpeed()/60, (Time/Server()->TickSpeed())%60);
-				SendChatTarget(ClientID, aBuf);
-			}
-			else
-			{
-				str_format(aBuf, sizeof(aBuf), "You are muted for %d seconds", Time/Server()->TickSpeed());
-				SendChatTarget(ClientID, aBuf);
-			}
-			return;
-		}
-
-		char aBuf[128] = {0};
-		int Done = 0;
-
-		if((!str_comp(pMsg->m_pMessage, "info") || !str_comp(pMsg->m_pMessage, "/info") || !str_comp(pMsg->m_pMessage, "!info")) && (m_pController->IsInstagib() || m_pController->IsinQ()))
-		{
-			if(m_pController->IsInstagib() && !m_pController->IsinQ())
-			{
-				str_format(aBuf, sizeof(aBuf), "Trunk Instagib Mod %s by BotoX", INQ_VERSION);
-				SendChatTarget(ClientID, aBuf);
+			if(g_Config.m_SvSpamprotection && pPlayer->m_LastChat && pPlayer->m_LastChat+Server()->TickSpeed() > Server()->Tick())
 				return;
-			}
-			str_format(aBuf, sizeof(aBuf), "Trunk inQontroL Mod %s by BotoX", INQ_VERSION);
-			SendChatTarget(ClientID, aBuf);
-			SendChatTarget(ClientID, "Botdetection by BotoX included.");
-			SendChatTarget(ClientID, "Say \"cmdlist\" for list of command available.");
-			return;
-		}
-		else if((!str_comp(pMsg->m_pMessage, "cmdlist") || !str_comp(pMsg->m_pMessage, "/cmdlist") || !str_comp(pMsg->m_pMessage, "!cmdlist")) && m_pController->IsinQ())
-		{
-			SendChatTarget(ClientID, "---Command List---");
-			SendChatTarget(ClientID, "\"info\" Information about the mod");
-			SendChatTarget(ClientID, "\"stop\" Pause the game");
-			SendChatTarget(ClientID, "\"go\" Start the game");
-			SendChatTarget(ClientID, "\"restart\" Start a new round");
-			SendChatTarget(ClientID, "\"reset\" Reset the Spectator Slots");
-			SendChatTarget(ClientID, "\"1on1\" - \"6on6\" Starts a war");
-			if(Server()->IsAuthed(ClientID)) {
-				SendChatTarget(ClientID, "\"spec <client id>\" Set player to spectators");
-				SendChatTarget(ClientID, "\"red <client id>\" Set player to red Team");
-				SendChatTarget(ClientID, "\"blue <client id>\" Set player to blue Team");
-				SendChatTarget(ClientID, "\"mute <client id> <seconds>\" Mute player for x seconds"); }
-			return;
-		}
-		//Not for Spectators
-		else if((pPlayer->GetTeam() != -1 && m_pController->IsinQ()) || (Server()->IsAuthed(ClientID) && m_pController->IsinQ()))
-		{
-			if((!str_comp(pMsg->m_pMessage, "stop") || !str_comp(pMsg->m_pMessage, "/stop") || !str_comp(pMsg->m_pMessage, "!stop")) && !m_pController->m_Warmup && !m_World.m_Paused)
-			{
-				if(!g_Config.m_SvStopgoFeature && !Server()->IsAuthed(ClientID)) {
-					str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
-					Done++;
-					goto send_chat; }
-				m_World.m_Paused = 1;
-				str_format(aBuf, sizeof(aBuf), "Game paused");
-				Done++;
-			}
 
-			else if((!str_comp(pMsg->m_pMessage, "go") || !str_comp(pMsg->m_pMessage, "/go") || !str_comp(pMsg->m_pMessage, "!go")) && m_World.m_Paused)
-			{
-				if(!g_Config.m_SvStopgoFeature && !Server()->IsAuthed(ClientID)) {
-					str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
-					Done++;
-					goto send_chat; }
-				m_pController->m_FakeWarmup = g_Config.m_SvGoTime*Server()->TickSpeed();
-				Done++;
-			}
+			CNetMsg_Cl_Say *pMsg = (CNetMsg_Cl_Say *)pRawMsg;
+			int Team = pMsg->m_Team ? pPlayer->GetTeam() : CGameContext::CHAT_ALL;
+			
+			// trim right and set maximum length to 128 utf8-characters
+			int Length = 0;
+			const char *p = pMsg->m_pMessage;
+			const char *pEnd = 0;
+			while(*p)
+ 			{
+				const char *pStrOld = p;
+				int Code = str_utf8_decode(&p);
 
-			else if(!str_comp(pMsg->m_pMessage, "restart") || !str_comp(pMsg->m_pMessage, "/restart") || !str_comp(pMsg->m_pMessage, "!restart"))
-			{
-				if(!g_Config.m_SvRestartFeature && !Server()->IsAuthed(ClientID))
-					str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
-				else if(!m_pController->m_Warmup)
-					m_pController->DoWarmup(g_Config.m_SvRestartTime);
-				else
-					m_pController->DoWarmup(0);
-				Done++;
-			}
-
-			else if(!str_comp(pMsg->m_pMessage, "1on1") || !str_comp(pMsg->m_pMessage, "/1on1") || !str_comp(pMsg->m_pMessage, "!1on1"))
-			{
-				if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
-					str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
-				else if(MAX_CLIENTS>=2)
+				// check if unicode is not empty
+				if(Code > 0x20 && Code != 0xA0 && Code != 0x034F && (Code < 0x2000 || Code > 0x200F) && (Code < 0x2028 || Code > 0x202F) &&
+					(Code < 0x205F || Code > 0x2064) && (Code < 0x206A || Code > 0x206F) && (Code < 0xFE00 || Code > 0xFE0F) &&
+					Code != 0xFEFF && (Code < 0xFFF9 || Code > 0xFFFC))
 				{
-					g_Config.m_SvSpectatorSlots = MAX_CLIENTS-2;
-					m_pController->DoWarmup(g_Config.m_SvWarTime);
-					SendBroadcast("Upcoming 1on1! Please stay on spectator", -1);
-					str_format(aBuf, sizeof(aBuf), "The 1on1 will start in %d seconds!", g_Config.m_SvWarTime);
+					pEnd = 0;
 				}
-				else
-					str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
-				Done++;
-			}
+				else if(pEnd == 0)
+					pEnd = pStrOld;
 
-			else if(!str_comp(pMsg->m_pMessage, "2on2") || !str_comp(pMsg->m_pMessage, "/2on2") || !str_comp(pMsg->m_pMessage, "!2on2"))
-			{
-				if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
-					str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
-				else if(MAX_CLIENTS>=4)
+				if(++Length >= 127)
 				{
-					g_Config.m_SvSpectatorSlots = MAX_CLIENTS-4;
-					m_pController->DoWarmup(g_Config.m_SvWarTime);
-					SendBroadcast("Upcoming 2on2! Please stay on spectator", -1);
-					str_format(aBuf, sizeof(aBuf), "The 2on2 will start in %d seconds!", g_Config.m_SvWarTime);
-				}
-				else
-					str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
-				Done++;
-			}
-
-			else if(!str_comp(pMsg->m_pMessage, "3on3") || !str_comp(pMsg->m_pMessage, "/3on3") || !str_comp(pMsg->m_pMessage, "!3on3"))
-			{
-				if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
-					str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
-				else if(MAX_CLIENTS>=6)
-				{
-					g_Config.m_SvSpectatorSlots = MAX_CLIENTS-6;
-					m_pController->DoWarmup(g_Config.m_SvWarTime);
-					SendBroadcast("Upcoming 3on3! Please stay on spectator", -1);
-					str_format(aBuf, sizeof(aBuf), "The 3on3 will start in %d seconds!", g_Config.m_SvWarTime);
-				}
-				else
-					str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
-				Done++;
-			}
-			else if(!str_comp(pMsg->m_pMessage, "4on4") || !str_comp(pMsg->m_pMessage, "/4on4") || !str_comp(pMsg->m_pMessage, "!4on4"))
-			{
-				if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
-					str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
-				else if(MAX_CLIENTS>=8)
-				{
-					g_Config.m_SvSpectatorSlots = MAX_CLIENTS-8;
-					m_pController->DoWarmup(g_Config.m_SvWarTime);
-					SendBroadcast("Upcoming 4on4! Please stay on spectator", -1);
-					str_format(aBuf, sizeof(aBuf), "The 4on4 will start in %d seconds!", g_Config.m_SvWarTime);
-				}
-				else
-					str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
-				Done++;
-			}
-			else if(!str_comp(pMsg->m_pMessage, "5on5") || !str_comp(pMsg->m_pMessage, "/5on5") || !str_comp(pMsg->m_pMessage, "!5on5"))
-			{
-				if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
-					str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
-				else if(MAX_CLIENTS>=10)
-				{
-					g_Config.m_SvSpectatorSlots = MAX_CLIENTS-10;
-					m_pController->DoWarmup(g_Config.m_SvWarTime);
-					SendBroadcast("Upcoming 5on5! Please stay on spectator", -1);
-					str_format(aBuf, sizeof(aBuf), "The 5on5 will start in %d seconds!", g_Config.m_SvWarTime);
-				}
-				else
-					str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
-				Done++;
-			}
-			else if(!str_comp(pMsg->m_pMessage, "6on6") || !str_comp(pMsg->m_pMessage, "/6on6") || !str_comp(pMsg->m_pMessage, "!6on6"))
-			{
-				if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
-					str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
-				else if(MAX_CLIENTS>=12)
-				{
-					g_Config.m_SvSpectatorSlots = MAX_CLIENTS-12;
-					m_pController->DoWarmup(g_Config.m_SvWarTime);
-					SendBroadcast("Upcoming 6on6! Please stay on spectator", -1);
-					str_format(aBuf, sizeof(aBuf), "The 6on6 will start in %d seconds!", g_Config.m_SvWarTime);
-				}
-				else
-					str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
-				Done++;
-			}
-			else if(!str_comp(pMsg->m_pMessage, "reset") || !str_comp(pMsg->m_pMessage, "/reset") || !str_comp(pMsg->m_pMessage, "!reset"))
-			{
-				if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID)) {
-					str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
-					Done++;
-					goto send_chat; }
-				g_Config.m_SvSpectatorSlots = 0;
-				str_format(aBuf, sizeof(aBuf), "Spectator Slots reseted");
-				Done++;
-			}
-			//Admin Features
-			else if(Server()->IsAuthed(ClientID))
-			{
-				if(!strncmp(pMsg->m_pMessage, "spec", 4) || !strncmp(pMsg->m_pMessage, "/spec", 5) || !strncmp(pMsg->m_pMessage, "!spec", 5))
-				{
-					Done++;
-					if(!str_comp(pMsg->m_pMessage, "spec") || !str_comp(pMsg->m_pMessage, "spec "))
-						goto send_chat;
-					int id;
-					if(sscanf(pMsg->m_pMessage, "spec %d", &id) == 1)
-						goto spec;
-					else if(sscanf(pMsg->m_pMessage, "/spec %d", &id) == 1)
-						goto spec;
-					else if(sscanf(pMsg->m_pMessage, "!spec %d", &id) == 1)
-						goto spec;
-
-					goto send_chat;
-					//SendChatTarget(ClientID, "Please stick to the given structure:");
-					//SendChatTarget(ClientID, "spec <client id>");
-					//return;
-spec:
-					id = clamp(id, 0, (int)MAX_CLIENTS-1);
-					if(!m_apPlayers[id]) {
-						SendChatTarget(ClientID, "Invalid client id!");
-						return; }
-					else {
-						SendChat(ClientID, Team, pMsg->m_pMessage);
-						m_apPlayers[id]->SetTeam(-1);
-						return; }
-				}
-				else if(!strncmp(pMsg->m_pMessage, "red", 3) || !strncmp(pMsg->m_pMessage, "/red", 4) || !strncmp(pMsg->m_pMessage, "!red", 4))
-				{
-					Done++;
-					if(!str_comp(pMsg->m_pMessage, "red") || !str_comp(pMsg->m_pMessage, "red "))
-						goto send_chat;
-					int id;
-					if(sscanf(pMsg->m_pMessage, "red %d", &id) == 1)
-						goto red;
-					else if(sscanf(pMsg->m_pMessage, "/red %d", &id) == 1)
-						goto red;
-					else if(sscanf(pMsg->m_pMessage, "!red %d", &id) == 1)
-						goto red;
-
-					goto send_chat;
-					//SendChatTarget(ClientID, "Please stick to the given structure:");
-					//SendChatTarget(ClientID, "red <client id>");
-					//return;
-red:
-					id = clamp(id, 0, (int)MAX_CLIENTS-1);
-					if(!m_apPlayers[id]) {
-						SendChatTarget(ClientID, "Invalid client id!");
-						return; }
-					else {
-						SendChat(ClientID, Team, pMsg->m_pMessage);
-						m_apPlayers[id]->SetTeam(0);
-						return; }
-				}
-				else if(!strncmp(pMsg->m_pMessage, "blue", 4) || !strncmp(pMsg->m_pMessage, "/blue", 5) || !strncmp(pMsg->m_pMessage, "!blue", 5))
-				{
-					Done++;
-					if(!str_comp(pMsg->m_pMessage, "blue") || !str_comp(pMsg->m_pMessage, "blue "))
-						goto send_chat;
-					int id;
-					if(sscanf(pMsg->m_pMessage, "blue %d", &id) == 1)
-						goto blue;
-					else if(sscanf(pMsg->m_pMessage, "/blue %d", &id) == 1)
-						goto blue;
-					else if(sscanf(pMsg->m_pMessage, "!blue %d", &id) == 1)
-						goto blue;
-
-					goto send_chat;
-					//SendChatTarget(ClientID, "Please stick to the given structure:");
-					//SendChatTarget(ClientID, "blue <client id>");
-					return;
-blue:
-					id = clamp(id, 0, (int)MAX_CLIENTS-1);
-					if(!m_apPlayers[id]) {
-						SendChatTarget(ClientID, "Invalid client id!");
-						return; }
-					else {
-						SendChat(ClientID, Team, pMsg->m_pMessage);
-						m_apPlayers[id]->SetTeam(1);
-						return; }
-				}
-
-				else if(!strncmp(pMsg->m_pMessage, "mute", 4) || !strncmp(pMsg->m_pMessage, "/mute", 5) || !strncmp(pMsg->m_pMessage, "!mute", 5))
-				{
-					Done++;
-					if(!str_comp(pMsg->m_pMessage, "mute") || !str_comp(pMsg->m_pMessage, "mute "))
-						goto send_chat;
-					int id;
-					int time;
-					if(sscanf(pMsg->m_pMessage, "mute %d %d", &id, &time) == 2)
-						goto mute;
-					if(sscanf(pMsg->m_pMessage, "/mute %d %d", &id, &time) == 2)
-						goto mute;
-					if(sscanf(pMsg->m_pMessage, "!mute %d %d", &id, &time) == 2)
-						goto mute;
-
-					goto send_chat;
-					//SendChatTarget(ClientID, "Please stick to the given structure:");
-					//SendChatTarget(ClientID, "mute <client id> <seconds>");
-					//return;
-mute:
-					id = clamp(id, 0, (int)MAX_CLIENTS-1);
-					if(!m_apPlayers[id]) {
-						SendChatTarget(ClientID, "Invalid client id!");
-						return; }
-					else {
-						time = time*Server()->TickSpeed();
-						m_apPlayers[id]->m_Muted = time;
-						if(time >= 60*Server()->TickSpeed()) {
-							int sec;
-							sec = time;
-							while(sec >= 60*Server()->TickSpeed())
-								sec -= 60*Server()->TickSpeed();
-							time = time/Server()->TickSpeed();
-							time = time/60;
-							str_format(aBuf, sizeof(aBuf), "%s muted by admin for %d minutes and %d seconds", Server()->ClientName(id), time, sec/Server()->TickSpeed()); }
-						else
-							str_format(aBuf, sizeof(aBuf), "%s muted by admin for %d seconds", Server()->ClientName(ClientID), time/Server()->TickSpeed()); }
-				}
-			}
-		}
-send_chat:
-		if((!str_comp_num(pMsg->m_pMessage, "/", 1) || !str_comp_num(pMsg->m_pMessage, "!", 1)) && m_pController->IsinQ() && !Done)
-		{
-			SendChatTarget(ClientID, "Wrong command or not available at the moment.");
-			SendChatTarget(ClientID, "Say \"cmdlist\" for list of command available.");
-			return;
-		}
-		SendChat(ClientID, Team, pMsg->m_pMessage);
-
-		if(aBuf[0] != 0 && m_pController->IsinQ())
-			SendChatTarget(-1, aBuf);
-		/* inQ */
-	}
-	else if(MsgID == NETMSGTYPE_CL_CALLVOTE)
-	{
-		if(g_Config.m_SvSpamprotection && pPlayer->m_LastVoteTry && pPlayer->m_LastVoteTry+Server()->TickSpeed()*3 > Server()->Tick())
-			return;
-
-		int64 Now = Server()->Tick();
-		pPlayer->m_LastVoteTry = Now;
-		if(pPlayer->GetTeam() == TEAM_SPECTATORS)
-		{
-			SendChatTarget(ClientID, "Spectators aren't allowed to start a vote.");
-			return;
-		}
-
-		if(m_VoteCloseTime)
-		{
-			SendChatTarget(ClientID, "Wait for current vote to end before calling a new one.");
-			return;
-		}
-
-		int Timeleft = pPlayer->m_LastVoteCall + Server()->TickSpeed()*60 - Now;
-		if(pPlayer->m_LastVoteCall && Timeleft > 0)
-		{
-			char aChatmsg[512] = {0};
-			str_format(aChatmsg, sizeof(aChatmsg), "You must wait %d seconds before making another vote", (Timeleft/Server()->TickSpeed())+1);
-			SendChatTarget(ClientID, aChatmsg);
-			return;
-		}
-
-		char aChatmsg[512] = {0};
-		char aDesc[VOTE_DESC_LENGTH] = {0};
-		char aCmd[VOTE_CMD_LENGTH] = {0};
-		CNetMsg_Cl_CallVote *pMsg = (CNetMsg_Cl_CallVote *)pRawMsg;
-		const char *pReason = pMsg->m_Reason[0] ? pMsg->m_Reason : "No reason given";
-
-		if(str_comp_nocase(pMsg->m_Type, "option") == 0)
-		{
-			CVoteOptionServer *pOption = m_pVoteOptionFirst;
-			while(pOption)
-			{
-				if(str_comp_nocase(pMsg->m_Value, pOption->m_aDescription) == 0)
-				{
-					str_format(aChatmsg, sizeof(aChatmsg), "'%s' called vote to change server option '%s' (%s)", Server()->ClientName(ClientID),
-								pOption->m_aDescription, pReason);
-					str_format(aDesc, sizeof(aDesc), "%s", pOption->m_aDescription);
-					str_format(aCmd, sizeof(aCmd), "%s", pOption->m_aCommand);
+					*(const_cast<char *>(p)) = 0;
 					break;
 				}
+ 			}
+			if(pEnd != 0)
+				*(const_cast<char *>(pEnd)) = 0;
 
-				pOption = pOption->m_pNext;
+			// drop empty and autocreated spam messages (more than 16 characters per second)
+			if(Length == 0 || (g_Config.m_SvSpamprotection && pPlayer->m_LastChat && pPlayer->m_LastChat+Server()->TickSpeed()*((15+Length)/16) > Server()->Tick()))
+				return;
+
+			/* inQ */
+			if(pPlayer->m_Muted && m_pController->IsinQ())
+			{
+				int Time = pPlayer->m_Muted;
+				char aBuf[256];
+				if(Time >= 60*Server()->TickSpeed())
+				{
+					str_format(aBuf, sizeof(aBuf), "You are muted for %d minutes and %d seconds", Time/Server()->TickSpeed()/60, (Time/Server()->TickSpeed())%60);
+					SendChatTarget(ClientID, aBuf);
+				}
+				else
+				{
+					str_format(aBuf, sizeof(aBuf), "You are muted for %d seconds", Time/Server()->TickSpeed());
+					SendChatTarget(ClientID, aBuf);
+				}
+				return;
 			}
 
-			if(!pOption)
+			char aBuf[128] = {0};
+			int Done = 0;
+
+			if((!str_comp(pMsg->m_pMessage, "info") || !str_comp(pMsg->m_pMessage, "/info") || !str_comp(pMsg->m_pMessage, "!info")) && (m_pController->IsInstagib() || m_pController->IsinQ()))
 			{
-				str_format(aChatmsg, sizeof(aChatmsg), "'%s' isn't an option on this server", pMsg->m_Value);
+				if(m_pController->IsInstagib() && !m_pController->IsinQ())
+				{
+					str_format(aBuf, sizeof(aBuf), "Trunk Instagib Mod %s by BotoX", INQ_VERSION);
+					SendChatTarget(ClientID, aBuf);
+					return;
+				}
+				str_format(aBuf, sizeof(aBuf), "Trunk inQontroL Mod %s by BotoX", INQ_VERSION);
+				SendChatTarget(ClientID, aBuf);
+				SendChatTarget(ClientID, "Botdetection by BotoX included.");
+				SendChatTarget(ClientID, "Say \"cmdlist\" for list of command available.");
+				return;
+			}
+			else if((!str_comp(pMsg->m_pMessage, "cmdlist") || !str_comp(pMsg->m_pMessage, "/cmdlist") || !str_comp(pMsg->m_pMessage, "!cmdlist")) && m_pController->IsinQ())
+			{
+				SendChatTarget(ClientID, "---Command List---");
+				SendChatTarget(ClientID, "\"info\" Information about the mod");
+				SendChatTarget(ClientID, "\"stop\" Pause the game");
+				SendChatTarget(ClientID, "\"go\" Start the game");
+				SendChatTarget(ClientID, "\"restart\" Start a new round");
+				SendChatTarget(ClientID, "\"reset\" Reset the Spectator Slots");
+				SendChatTarget(ClientID, "\"1on1\" - \"6on6\" Starts a war");
+				if(Server()->IsAuthed(ClientID)) {
+					SendChatTarget(ClientID, "\"spec <client id>\" Set player to spectators");
+					SendChatTarget(ClientID, "\"red <client id>\" Set player to red Team");
+					SendChatTarget(ClientID, "\"blue <client id>\" Set player to blue Team");
+					SendChatTarget(ClientID, "\"mute <client id> <seconds>\" Mute player for x seconds"); }
+				return;
+			}
+			//Not for Spectators
+			else if((pPlayer->GetTeam() != -1 && m_pController->IsinQ()) || (Server()->IsAuthed(ClientID) && m_pController->IsinQ()))
+			{
+				if((!str_comp(pMsg->m_pMessage, "stop") || !str_comp(pMsg->m_pMessage, "/stop") || !str_comp(pMsg->m_pMessage, "!stop")) && !m_pController->m_Warmup && !m_World.m_Paused)
+				{
+					if(!g_Config.m_SvStopgoFeature && !Server()->IsAuthed(ClientID)) {
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+						Done++;
+						goto send_chat; }
+					m_World.m_Paused = 1;
+					str_format(aBuf, sizeof(aBuf), "Game paused");
+					Done++;
+				}
+
+				else if((!str_comp(pMsg->m_pMessage, "go") || !str_comp(pMsg->m_pMessage, "/go") || !str_comp(pMsg->m_pMessage, "!go")) && m_World.m_Paused)
+				{
+					if(!g_Config.m_SvStopgoFeature && !Server()->IsAuthed(ClientID)) {
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+						Done++;
+						goto send_chat; }
+					m_pController->m_FakeWarmup = g_Config.m_SvGoTime*Server()->TickSpeed();
+					Done++;
+				}
+
+				else if(!str_comp(pMsg->m_pMessage, "restart") || !str_comp(pMsg->m_pMessage, "/restart") || !str_comp(pMsg->m_pMessage, "!restart"))
+				{
+					if(!g_Config.m_SvRestartFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					else if(!m_pController->m_Warmup)
+						m_pController->DoWarmup(g_Config.m_SvRestartTime);
+					else
+						m_pController->DoWarmup(0);
+					Done++;
+				}
+
+				else if(!str_comp(pMsg->m_pMessage, "1on1") || !str_comp(pMsg->m_pMessage, "/1on1") || !str_comp(pMsg->m_pMessage, "!1on1"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					else if(MAX_CLIENTS>=2)
+					{
+						g_Config.m_SvSpectatorSlots = MAX_CLIENTS-2;
+						m_pController->DoWarmup(g_Config.m_SvWarTime);
+						SendBroadcast("Upcoming 1on1! Please stay on spectator", -1);
+						str_format(aBuf, sizeof(aBuf), "The 1on1 will start in %d seconds!", g_Config.m_SvWarTime);
+					}
+					else
+						str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
+					Done++;
+				}
+
+				else if(!str_comp(pMsg->m_pMessage, "2on2") || !str_comp(pMsg->m_pMessage, "/2on2") || !str_comp(pMsg->m_pMessage, "!2on2"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					else if(MAX_CLIENTS>=4)
+					{
+						g_Config.m_SvSpectatorSlots = MAX_CLIENTS-4;
+						m_pController->DoWarmup(g_Config.m_SvWarTime);
+						SendBroadcast("Upcoming 2on2! Please stay on spectator", -1);
+						str_format(aBuf, sizeof(aBuf), "The 2on2 will start in %d seconds!", g_Config.m_SvWarTime);
+					}
+					else
+						str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
+					Done++;
+				}
+
+				else if(!str_comp(pMsg->m_pMessage, "3on3") || !str_comp(pMsg->m_pMessage, "/3on3") || !str_comp(pMsg->m_pMessage, "!3on3"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					else if(MAX_CLIENTS>=6)
+					{
+						g_Config.m_SvSpectatorSlots = MAX_CLIENTS-6;
+						m_pController->DoWarmup(g_Config.m_SvWarTime);
+						SendBroadcast("Upcoming 3on3! Please stay on spectator", -1);
+						str_format(aBuf, sizeof(aBuf), "The 3on3 will start in %d seconds!", g_Config.m_SvWarTime);
+					}
+					else
+						str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
+					Done++;
+				}
+				else if(!str_comp(pMsg->m_pMessage, "4on4") || !str_comp(pMsg->m_pMessage, "/4on4") || !str_comp(pMsg->m_pMessage, "!4on4"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					else if(MAX_CLIENTS>=8)
+					{
+						g_Config.m_SvSpectatorSlots = MAX_CLIENTS-8;
+						m_pController->DoWarmup(g_Config.m_SvWarTime);
+						SendBroadcast("Upcoming 4on4! Please stay on spectator", -1);
+						str_format(aBuf, sizeof(aBuf), "The 4on4 will start in %d seconds!", g_Config.m_SvWarTime);
+					}
+					else
+						str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
+					Done++;
+				}
+				else if(!str_comp(pMsg->m_pMessage, "5on5") || !str_comp(pMsg->m_pMessage, "/5on5") || !str_comp(pMsg->m_pMessage, "!5on5"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					else if(MAX_CLIENTS>=10)
+					{
+						g_Config.m_SvSpectatorSlots = MAX_CLIENTS-10;
+						m_pController->DoWarmup(g_Config.m_SvWarTime);
+						SendBroadcast("Upcoming 5on5! Please stay on spectator", -1);
+						str_format(aBuf, sizeof(aBuf), "The 5on5 will start in %d seconds!", g_Config.m_SvWarTime);
+					}
+					else
+						str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
+					Done++;
+				}
+				else if(!str_comp(pMsg->m_pMessage, "6on6") || !str_comp(pMsg->m_pMessage, "/6on6") || !str_comp(pMsg->m_pMessage, "!6on6"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					else if(MAX_CLIENTS>=12)
+					{
+						g_Config.m_SvSpectatorSlots = MAX_CLIENTS-12;
+						m_pController->DoWarmup(g_Config.m_SvWarTime);
+						SendBroadcast("Upcoming 6on6! Please stay on spectator", -1);
+						str_format(aBuf, sizeof(aBuf), "The 6on6 will start in %d seconds!", g_Config.m_SvWarTime);
+					}
+					else
+						str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
+					Done++;
+				}
+				else if(!str_comp(pMsg->m_pMessage, "reset") || !str_comp(pMsg->m_pMessage, "/reset") || !str_comp(pMsg->m_pMessage, "!reset"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID)) {
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+						Done++;
+						goto send_chat; }
+					g_Config.m_SvSpectatorSlots = 0;
+					str_format(aBuf, sizeof(aBuf), "Spectator Slots reseted");
+					Done++;
+				}
+				//Admin Features
+				else if(Server()->IsAuthed(ClientID))
+				{
+					if(!strncmp(pMsg->m_pMessage, "spec", 4) || !strncmp(pMsg->m_pMessage, "/spec", 5) || !strncmp(pMsg->m_pMessage, "!spec", 5))
+					{
+						Done++;
+						if(!str_comp(pMsg->m_pMessage, "spec") || !str_comp(pMsg->m_pMessage, "spec "))
+							goto send_chat;
+						int id;
+						if(sscanf(pMsg->m_pMessage, "spec %d", &id) == 1)
+							goto spec;
+						else if(sscanf(pMsg->m_pMessage, "/spec %d", &id) == 1)
+							goto spec;
+						else if(sscanf(pMsg->m_pMessage, "!spec %d", &id) == 1)
+							goto spec;
+
+						goto send_chat;
+						//SendChatTarget(ClientID, "Please stick to the given structure:");
+						//SendChatTarget(ClientID, "spec <client id>");
+						//return;
+	spec:
+						id = clamp(id, 0, (int)MAX_CLIENTS-1);
+						if(!m_apPlayers[id]) {
+							SendChatTarget(ClientID, "Invalid client id!");
+							return; }
+						else {
+							SendChat(ClientID, Team, pMsg->m_pMessage);
+							m_apPlayers[id]->SetTeam(-1);
+							return; }
+					}
+					else if(!strncmp(pMsg->m_pMessage, "red", 3) || !strncmp(pMsg->m_pMessage, "/red", 4) || !strncmp(pMsg->m_pMessage, "!red", 4))
+					{
+						Done++;
+						if(!str_comp(pMsg->m_pMessage, "red") || !str_comp(pMsg->m_pMessage, "red "))
+							goto send_chat;
+						int id;
+						if(sscanf(pMsg->m_pMessage, "red %d", &id) == 1)
+							goto red;
+						else if(sscanf(pMsg->m_pMessage, "/red %d", &id) == 1)
+							goto red;
+						else if(sscanf(pMsg->m_pMessage, "!red %d", &id) == 1)
+							goto red;
+
+						goto send_chat;
+						//SendChatTarget(ClientID, "Please stick to the given structure:");
+						//SendChatTarget(ClientID, "red <client id>");
+						//return;
+	red:
+						id = clamp(id, 0, (int)MAX_CLIENTS-1);
+						if(!m_apPlayers[id]) {
+							SendChatTarget(ClientID, "Invalid client id!");
+							return; }
+						else {
+							SendChat(ClientID, Team, pMsg->m_pMessage);
+							m_apPlayers[id]->SetTeam(0);
+							return; }
+					}
+					else if(!strncmp(pMsg->m_pMessage, "blue", 4) || !strncmp(pMsg->m_pMessage, "/blue", 5) || !strncmp(pMsg->m_pMessage, "!blue", 5))
+					{
+						Done++;
+						if(!str_comp(pMsg->m_pMessage, "blue") || !str_comp(pMsg->m_pMessage, "blue "))
+							goto send_chat;
+						int id;
+						if(sscanf(pMsg->m_pMessage, "blue %d", &id) == 1)
+							goto blue;
+						else if(sscanf(pMsg->m_pMessage, "/blue %d", &id) == 1)
+							goto blue;
+						else if(sscanf(pMsg->m_pMessage, "!blue %d", &id) == 1)
+							goto blue;
+
+						goto send_chat;
+						//SendChatTarget(ClientID, "Please stick to the given structure:");
+						//SendChatTarget(ClientID, "blue <client id>");
+						return;
+	blue:
+						id = clamp(id, 0, (int)MAX_CLIENTS-1);
+						if(!m_apPlayers[id]) {
+							SendChatTarget(ClientID, "Invalid client id!");
+							return; }
+						else {
+							SendChat(ClientID, Team, pMsg->m_pMessage);
+							m_apPlayers[id]->SetTeam(1);
+							return; }
+					}
+
+					else if(!strncmp(pMsg->m_pMessage, "mute", 4) || !strncmp(pMsg->m_pMessage, "/mute", 5) || !strncmp(pMsg->m_pMessage, "!mute", 5))
+					{
+						Done++;
+						if(!str_comp(pMsg->m_pMessage, "mute") || !str_comp(pMsg->m_pMessage, "mute "))
+							goto send_chat;
+						int id;
+						int time;
+						if(sscanf(pMsg->m_pMessage, "mute %d %d", &id, &time) == 2)
+							goto mute;
+						if(sscanf(pMsg->m_pMessage, "/mute %d %d", &id, &time) == 2)
+							goto mute;
+						if(sscanf(pMsg->m_pMessage, "!mute %d %d", &id, &time) == 2)
+							goto mute;
+
+						goto send_chat;
+						//SendChatTarget(ClientID, "Please stick to the given structure:");
+						//SendChatTarget(ClientID, "mute <client id> <seconds>");
+						//return;
+	mute:
+						id = clamp(id, 0, (int)MAX_CLIENTS-1);
+						if(!m_apPlayers[id]) {
+							SendChatTarget(ClientID, "Invalid client id!");
+							return; }
+						else {
+							time = time*Server()->TickSpeed();
+							m_apPlayers[id]->m_Muted = time;
+							if(time >= 60*Server()->TickSpeed()) {
+								int sec;
+								sec = time;
+								while(sec >= 60*Server()->TickSpeed())
+									sec -= 60*Server()->TickSpeed();
+								time = time/Server()->TickSpeed();
+								time = time/60;
+								str_format(aBuf, sizeof(aBuf), "%s muted by admin for %d minutes and %d seconds", Server()->ClientName(id), time, sec/Server()->TickSpeed()); }
+							else
+								str_format(aBuf, sizeof(aBuf), "%s muted by admin for %d seconds", Server()->ClientName(ClientID), time/Server()->TickSpeed()); }
+					}
+				}
+			}
+	send_chat:
+			if((!str_comp_num(pMsg->m_pMessage, "/", 1) || !str_comp_num(pMsg->m_pMessage, "!", 1)) && m_pController->IsinQ() && !Done)
+			{
+				SendChatTarget(ClientID, "Wrong command or not available at the moment.");
+				SendChatTarget(ClientID, "Say \"cmdlist\" for list of command available.");
+				return;
+			}
+			pPlayer->m_LastChat = Server()->Tick();
+			SendChat(ClientID, Team, pMsg->m_pMessage);
+
+			if(aBuf[0] != 0 && m_pController->IsinQ())
+				SendChatTarget(-1, aBuf);
+			/* inQ */
+		}
+		else if(MsgID == NETMSGTYPE_CL_CALLVOTE)
+		{
+			if(g_Config.m_SvSpamprotection && pPlayer->m_LastVoteTry && pPlayer->m_LastVoteTry+Server()->TickSpeed()*3 > Server()->Tick())
+				return;
+
+			int64 Now = Server()->Tick();
+			pPlayer->m_LastVoteTry = Now;
+			if(pPlayer->GetTeam() == TEAM_SPECTATORS)
+			{
+				SendChatTarget(ClientID, "Spectators aren't allowed to start a vote.");
+				return;
+			}
+
+			if(m_VoteCloseTime)
+			{
+				SendChatTarget(ClientID, "Wait for current vote to end before calling a new one.");
+				return;
+			}
+
+			int Timeleft = pPlayer->m_LastVoteCall + Server()->TickSpeed()*60 - Now;
+			if(pPlayer->m_LastVoteCall && Timeleft > 0)
+			{
+				char aChatmsg[512] = {0};
+				str_format(aChatmsg, sizeof(aChatmsg), "You must wait %d seconds before making another vote", (Timeleft/Server()->TickSpeed())+1);
 				SendChatTarget(ClientID, aChatmsg);
 				return;
 			}
-		}
-		else if(str_comp_nocase(pMsg->m_Type, "kick") == 0)
-		{
-			if(!g_Config.m_SvVoteKick)
-			{
-				SendChatTarget(ClientID, "Server does not allow voting to kick players");
-				return;
-			}
 
-			if(g_Config.m_SvVoteKickMin)
-			{
-				int PlayerNum = 0;
-				for(int i = 0; i < MAX_CLIENTS; ++i)
-					if(m_apPlayers[i] && m_apPlayers[i]->GetTeam() != TEAM_SPECTATORS)
-						++PlayerNum;
+			char aChatmsg[512] = {0};
+			char aDesc[VOTE_DESC_LENGTH] = {0};
+			char aCmd[VOTE_CMD_LENGTH] = {0};
+			CNetMsg_Cl_CallVote *pMsg = (CNetMsg_Cl_CallVote *)pRawMsg;
+			const char *pReason = pMsg->m_Reason[0] ? pMsg->m_Reason : "No reason given";
 
-				if(PlayerNum < g_Config.m_SvVoteKickMin)
+			if(str_comp_nocase(pMsg->m_Type, "option") == 0)
+			{
+				CVoteOptionServer *pOption = m_pVoteOptionFirst;
+				while(pOption)
 				{
-					str_format(aChatmsg, sizeof(aChatmsg), "Kick voting requires %d players on the server", g_Config.m_SvVoteKickMin);
+					if(str_comp_nocase(pMsg->m_Value, pOption->m_aDescription) == 0)
+					{
+						str_format(aChatmsg, sizeof(aChatmsg), "'%s' called vote to change server option '%s' (%s)", Server()->ClientName(ClientID),
+									pOption->m_aDescription, pReason);
+						str_format(aDesc, sizeof(aDesc), "%s", pOption->m_aDescription);
+						str_format(aCmd, sizeof(aCmd), "%s", pOption->m_aCommand);
+						break;
+					}
+
+					pOption = pOption->m_pNext;
+				}
+
+				if(!pOption)
+				{
+					str_format(aChatmsg, sizeof(aChatmsg), "'%s' isn't an option on this server", pMsg->m_Value);
 					SendChatTarget(ClientID, aChatmsg);
 					return;
 				}
 			}
-
-			int KickID = str_toint(pMsg->m_Value);
-			if(KickID < 0 || KickID >= MAX_CLIENTS || !m_apPlayers[KickID])
+			else if(str_comp_nocase(pMsg->m_Type, "kick") == 0)
 			{
-				SendChatTarget(ClientID, "Invalid client id to kick");
-				return;
-			}
-			if(KickID == ClientID)
-			{
-				SendChatTarget(ClientID, "You can't kick yourself");
-				return;
-			}
-			if(Server()->IsAuthed(KickID))
-			{
-				SendChatTarget(ClientID, "You can't kick admins");
-				char aBufKick[128];
-				str_format(aBufKick, sizeof(aBufKick), "'%s' called for vote to kick you", Server()->ClientName(ClientID));
-				SendChatTarget(KickID, aBufKick);
-				return;
-			}
-
-			str_format(aChatmsg, sizeof(aChatmsg), "'%s' called for vote to kick '%s' (%s)", Server()->ClientName(ClientID), Server()->ClientName(KickID), pReason);
-			str_format(aDesc, sizeof(aDesc), "Kick '%s'", Server()->ClientName(KickID));
-			if (!g_Config.m_SvVoteKickBantime)
-				str_format(aCmd, sizeof(aCmd), "kick %d Kicked by vote", KickID);
-			else
-			{
-				char aAddrStr[NETADDR_MAXSTRSIZE] = {0};
-				Server()->GetClientAddr(KickID, aAddrStr, sizeof(aAddrStr));
-				str_format(aCmd, sizeof(aCmd), "ban %s %d Banned by vote", aAddrStr, g_Config.m_SvVoteKickBantime);
-			}
-		}
-		else if(str_comp_nocase(pMsg->m_Type, "spectate") == 0)
-		{
-			if(!g_Config.m_SvVoteSpectate)
-			{
-				SendChatTarget(ClientID, "Server does not allow voting to move players to spectators");
-				return;
-			}
-
-			int SpectateID = str_toint(pMsg->m_Value);
-			if(SpectateID < 0 || SpectateID >= MAX_CLIENTS || !m_apPlayers[SpectateID] || m_apPlayers[SpectateID]->GetTeam() == TEAM_SPECTATORS)
-			{
-				SendChatTarget(ClientID, "Invalid client id to move");
-				return;
-			}
-			if(SpectateID == ClientID)
-			{
-				SendChatTarget(ClientID, "You can't move yourself");
-				return;
-			}
-
-			str_format(aChatmsg, sizeof(aChatmsg), "'%s' called for vote to move '%s' to spectators (%s)", Server()->ClientName(ClientID), Server()->ClientName(SpectateID), pReason);
-			str_format(aDesc, sizeof(aDesc), "move '%s' to spectators", Server()->ClientName(SpectateID));
-			str_format(aCmd, sizeof(aCmd), "set_team %d -1 %d", SpectateID, g_Config.m_SvVoteSpectateRejoindelay);
-		}
-
-		if(aCmd[0])
-		{
-			SendChat(-1, CGameContext::CHAT_ALL, aChatmsg);
-			StartVote(aDesc, aCmd, pReason);
-			pPlayer->m_Vote = 1;
-			pPlayer->m_VotePos = m_VotePos = 1;
-			m_VoteCreator = ClientID;
-			pPlayer->m_LastVoteCall = Now;
-		}
-	}
-	else if(MsgID == NETMSGTYPE_CL_VOTE)
-	{
-		if(!m_VoteCloseTime)
-			return;
-
-		if(pPlayer->m_Vote == 0)
-		{
-			CNetMsg_Cl_Vote *pMsg = (CNetMsg_Cl_Vote *)pRawMsg;
-			if(!pMsg->m_Vote)
-				return;
-
-			pPlayer->m_Vote = pMsg->m_Vote;
-			pPlayer->m_VotePos = ++m_VotePos;
-			m_VoteUpdate = true;
-		}
-	}
-	else if (MsgID == NETMSGTYPE_CL_SETTEAM && !m_World.m_Paused)
-	{
-		CNetMsg_Cl_SetTeam *pMsg = (CNetMsg_Cl_SetTeam *)pRawMsg;
-
-		if(pPlayer->GetTeam() == pMsg->m_Team || (g_Config.m_SvSpamprotection && pPlayer->m_LastSetTeam && pPlayer->m_LastSetTeam+Server()->TickSpeed()*3 > Server()->Tick()))
-			return;
-
-		if(pMsg->m_Team != TEAM_SPECTATORS && m_LockTeams)
-		{
-			pPlayer->m_LastSetTeam = Server()->Tick();
-			SendBroadcast("Teams are locked", ClientID);
-			return;
-		}
-
-		if(pPlayer->m_TeamChangeTick > Server()->Tick())
-		{
-			pPlayer->m_LastSetTeam = Server()->Tick();
-			int TimeLeft = (pPlayer->m_TeamChangeTick - Server()->Tick())/Server()->TickSpeed();
-			char aBuf[128];
-			str_format(aBuf, sizeof(aBuf), "Time to wait before changing team: %02d:%02d", TimeLeft/60, TimeLeft%60);
-			SendBroadcast(aBuf, ClientID);
-			return;
-		}
-
-		// Switch team on given client and kill/respawn him
-		if(m_pController->CanJoinTeam(pMsg->m_Team, ClientID))
-		{
-			if(m_pController->CanChangeTeam(pPlayer, pMsg->m_Team))
-			{
-				pPlayer->m_LastSetTeam = Server()->Tick();
-				if(pPlayer->GetTeam() == TEAM_SPECTATORS || pMsg->m_Team == TEAM_SPECTATORS)
-					m_VoteUpdate = true;
-				pPlayer->SetTeam(pMsg->m_Team);
-				(void)m_pController->CheckTeamBalance();
-				pPlayer->m_TeamChangeTick = Server()->Tick();
-			}
-			else
-				SendBroadcast("Teams must be balanced, please join other team", ClientID);
-		}
-		else
-		{
-			char aBuf[128];
-			str_format(aBuf, sizeof(aBuf), "Only %d active players are allowed", Server()->MaxClients()-g_Config.m_SvSpectatorSlots);
-			SendBroadcast(aBuf, ClientID);
-		}
-	}
-	else if (MsgID == NETMSGTYPE_CL_SETSPECTATORMODE && !m_World.m_Paused)
-	{
-		CNetMsg_Cl_SetSpectatorMode *pMsg = (CNetMsg_Cl_SetSpectatorMode *)pRawMsg;
-
-		if(pPlayer->GetTeam() != TEAM_SPECTATORS || pPlayer->m_SpectatorID == pMsg->m_SpectatorID || ClientID == pMsg->m_SpectatorID ||
-			(g_Config.m_SvSpamprotection && pPlayer->m_LastSetSpectatorMode && pPlayer->m_LastSetSpectatorMode+Server()->TickSpeed()*3 > Server()->Tick()))
-			return;
-
-		pPlayer->m_LastSetSpectatorMode = Server()->Tick();
-		if(pMsg->m_SpectatorID != SPEC_FREEVIEW && (!m_apPlayers[pMsg->m_SpectatorID] || m_apPlayers[pMsg->m_SpectatorID]->GetTeam() == TEAM_SPECTATORS))
-			SendChatTarget(ClientID, "Invalid spectator id used");
-		else
-			pPlayer->m_SpectatorID = pMsg->m_SpectatorID;
-	}
-	else if (MsgID == NETMSGTYPE_CL_STARTINFO)
-	{
-		if(pPlayer->m_IsReady)
-			return;
-
-		CNetMsg_Cl_StartInfo *pMsg = (CNetMsg_Cl_StartInfo *)pRawMsg;
-		pPlayer->m_LastChangeInfo = Server()->Tick();
-
-		// set start infos
-		Server()->SetClientName(ClientID, pMsg->m_pName);
-		Server()->SetClientClan(ClientID, pMsg->m_pClan);
-		Server()->SetClientCountry(ClientID, pMsg->m_Country);
-		str_copy(pPlayer->m_TeeInfos.m_SkinName, pMsg->m_pSkin, sizeof(pPlayer->m_TeeInfos.m_SkinName));
-		pPlayer->m_TeeInfos.m_UseCustomColor = pMsg->m_UseCustomColor;
-		pPlayer->m_TeeInfos.m_ColorBody = pMsg->m_ColorBody;
-		pPlayer->m_TeeInfos.m_ColorFeet = pMsg->m_ColorFeet;
-		m_pController->OnPlayerInfoChange(pPlayer);
-
-		// send vote options
-		CNetMsg_Sv_VoteClearOptions ClearMsg;
-		Server()->SendPackMsg(&ClearMsg, MSGFLAG_VITAL, ClientID);
-
-		CNetMsg_Sv_VoteOptionListAdd OptionMsg;
-		int NumOptions = 0;
-		OptionMsg.m_pDescription0 = "";
-		OptionMsg.m_pDescription1 = "";
-		OptionMsg.m_pDescription2 = "";
-		OptionMsg.m_pDescription3 = "";
-		OptionMsg.m_pDescription4 = "";
-		OptionMsg.m_pDescription5 = "";
-		OptionMsg.m_pDescription6 = "";
-		OptionMsg.m_pDescription7 = "";
-		OptionMsg.m_pDescription8 = "";
-		OptionMsg.m_pDescription9 = "";
-		OptionMsg.m_pDescription10 = "";
-		OptionMsg.m_pDescription11 = "";
-		OptionMsg.m_pDescription12 = "";
-		OptionMsg.m_pDescription13 = "";
-		OptionMsg.m_pDescription14 = "";
-		CVoteOptionServer *pCurrent = m_pVoteOptionFirst;
-		while(pCurrent)
-		{
-			switch(NumOptions++)
-			{
-			case 0: OptionMsg.m_pDescription0 = pCurrent->m_aDescription; break;
-			case 1: OptionMsg.m_pDescription1 = pCurrent->m_aDescription; break;
-			case 2: OptionMsg.m_pDescription2 = pCurrent->m_aDescription; break;
-			case 3: OptionMsg.m_pDescription3 = pCurrent->m_aDescription; break;
-			case 4: OptionMsg.m_pDescription4 = pCurrent->m_aDescription; break;
-			case 5: OptionMsg.m_pDescription5 = pCurrent->m_aDescription; break;
-			case 6: OptionMsg.m_pDescription6 = pCurrent->m_aDescription; break;
-			case 7: OptionMsg.m_pDescription7 = pCurrent->m_aDescription; break;
-			case 8: OptionMsg.m_pDescription8 = pCurrent->m_aDescription; break;
-			case 9: OptionMsg.m_pDescription9 = pCurrent->m_aDescription; break;
-			case 10: OptionMsg.m_pDescription10 = pCurrent->m_aDescription; break;
-			case 11: OptionMsg.m_pDescription11 = pCurrent->m_aDescription; break;
-			case 12: OptionMsg.m_pDescription12 = pCurrent->m_aDescription; break;
-			case 13: OptionMsg.m_pDescription13 = pCurrent->m_aDescription; break;
-			case 14:
+				if(!g_Config.m_SvVoteKick)
 				{
-					OptionMsg.m_pDescription14 = pCurrent->m_aDescription;
-					OptionMsg.m_NumOptions = NumOptions;
-					Server()->SendPackMsg(&OptionMsg, MSGFLAG_VITAL, ClientID);
-					OptionMsg = CNetMsg_Sv_VoteOptionListAdd();
-					NumOptions = 0;
-					OptionMsg.m_pDescription1 = "";
-					OptionMsg.m_pDescription2 = "";
-					OptionMsg.m_pDescription3 = "";
-					OptionMsg.m_pDescription4 = "";
-					OptionMsg.m_pDescription5 = "";
-					OptionMsg.m_pDescription6 = "";
-					OptionMsg.m_pDescription7 = "";
-					OptionMsg.m_pDescription8 = "";
-					OptionMsg.m_pDescription9 = "";
-					OptionMsg.m_pDescription10 = "";
-					OptionMsg.m_pDescription11 = "";
-					OptionMsg.m_pDescription12 = "";
-					OptionMsg.m_pDescription13 = "";
-					OptionMsg.m_pDescription14 = "";
+					SendChatTarget(ClientID, "Server does not allow voting to kick players");
+					return;
+				}
+
+				if(g_Config.m_SvVoteKickMin)
+				{
+					int PlayerNum = 0;
+					for(int i = 0; i < MAX_CLIENTS; ++i)
+						if(m_apPlayers[i] && m_apPlayers[i]->GetTeam() != TEAM_SPECTATORS)
+							++PlayerNum;
+
+					if(PlayerNum < g_Config.m_SvVoteKickMin)
+					{
+						str_format(aChatmsg, sizeof(aChatmsg), "Kick voting requires %d players on the server", g_Config.m_SvVoteKickMin);
+						SendChatTarget(ClientID, aChatmsg);
+						return;
+					}
+				}
+
+				int KickID = str_toint(pMsg->m_Value);
+				if(KickID < 0 || KickID >= MAX_CLIENTS || !m_apPlayers[KickID])
+				{
+					SendChatTarget(ClientID, "Invalid client id to kick");
+					return;
+				}
+				if(KickID == ClientID)
+				{
+					SendChatTarget(ClientID, "You can't kick yourself");
+					return;
+				}
+				if(Server()->IsAuthed(KickID))
+				{
+					SendChatTarget(ClientID, "You can't kick admins");
+					char aBufKick[128];
+					str_format(aBufKick, sizeof(aBufKick), "'%s' called for vote to kick you", Server()->ClientName(ClientID));
+					SendChatTarget(KickID, aBufKick);
+					return;
+				}
+
+				str_format(aChatmsg, sizeof(aChatmsg), "'%s' called for vote to kick '%s' (%s)", Server()->ClientName(ClientID), Server()->ClientName(KickID), pReason);
+				str_format(aDesc, sizeof(aDesc), "Kick '%s'", Server()->ClientName(KickID));
+				if (!g_Config.m_SvVoteKickBantime)
+					str_format(aCmd, sizeof(aCmd), "kick %d Kicked by vote", KickID);
+				else
+				{
+					char aAddrStr[NETADDR_MAXSTRSIZE] = {0};
+					Server()->GetClientAddr(KickID, aAddrStr, sizeof(aAddrStr));
+					str_format(aCmd, sizeof(aCmd), "ban %s %d Banned by vote", aAddrStr, g_Config.m_SvVoteKickBantime);
 				}
 			}
-			pCurrent = pCurrent->m_pNext;
+			else if(str_comp_nocase(pMsg->m_Type, "spectate") == 0)
+			{
+				if(!g_Config.m_SvVoteSpectate)
+				{
+					SendChatTarget(ClientID, "Server does not allow voting to move players to spectators");
+					return;
+				}
+
+				int SpectateID = str_toint(pMsg->m_Value);
+				if(SpectateID < 0 || SpectateID >= MAX_CLIENTS || !m_apPlayers[SpectateID] || m_apPlayers[SpectateID]->GetTeam() == TEAM_SPECTATORS)
+				{
+					SendChatTarget(ClientID, "Invalid client id to move");
+					return;
+				}
+				if(SpectateID == ClientID)
+				{
+					SendChatTarget(ClientID, "You can't move yourself");
+					return;
+				}
+
+				str_format(aChatmsg, sizeof(aChatmsg), "'%s' called for vote to move '%s' to spectators (%s)", Server()->ClientName(ClientID), Server()->ClientName(SpectateID), pReason);
+				str_format(aDesc, sizeof(aDesc), "move '%s' to spectators", Server()->ClientName(SpectateID));
+				str_format(aCmd, sizeof(aCmd), "set_team %d -1 %d", SpectateID, g_Config.m_SvVoteSpectateRejoindelay);
+			}
+
+			if(aCmd[0])
+			{
+				SendChat(-1, CGameContext::CHAT_ALL, aChatmsg);
+				StartVote(aDesc, aCmd, pReason);
+				pPlayer->m_Vote = 1;
+				pPlayer->m_VotePos = m_VotePos = 1;
+				m_VoteCreator = ClientID;
+				pPlayer->m_LastVoteCall = Now;
+			}
 		}
-		if(NumOptions > 0)
+		else if(MsgID == NETMSGTYPE_CL_VOTE)
 		{
-			OptionMsg.m_NumOptions = NumOptions;
-			Server()->SendPackMsg(&OptionMsg, MSGFLAG_VITAL, ClientID);
-			NumOptions = 0;
+			if(!m_VoteCloseTime)
+				return;
+
+			if(pPlayer->m_Vote == 0)
+			{
+				CNetMsg_Cl_Vote *pMsg = (CNetMsg_Cl_Vote *)pRawMsg;
+				if(!pMsg->m_Vote)
+					return;
+
+				pPlayer->m_Vote = pMsg->m_Vote;
+				pPlayer->m_VotePos = ++m_VotePos;
+				m_VoteUpdate = true;
+			}
 		}
-
-		// send tuning parameters to client
-		SendTuningParams(ClientID);
-
-		// client is ready to enter
-		pPlayer->m_IsReady = true;
-		CNetMsg_Sv_ReadyToEnter m;
-		Server()->SendPackMsg(&m, MSGFLAG_VITAL|MSGFLAG_FLUSH, ClientID);
-	}
-	else if (MsgID == NETMSGTYPE_CL_CHANGEINFO)
-	{
-		if(g_Config.m_SvSpamprotection && pPlayer->m_LastChangeInfo && pPlayer->m_LastChangeInfo+Server()->TickSpeed()*5 > Server()->Tick())
-			return;
-
-		CNetMsg_Cl_ChangeInfo *pMsg = (CNetMsg_Cl_ChangeInfo *)pRawMsg;
-		pPlayer->m_LastChangeInfo = Server()->Tick();
-
-		// set infos
-		char aOldName[MAX_NAME_LENGTH];
-		str_copy(aOldName, Server()->ClientName(ClientID), sizeof(aOldName));
-		Server()->SetClientName(ClientID, pMsg->m_pName);
-		if(str_comp(aOldName, Server()->ClientName(ClientID)) != 0)
+		else if (MsgID == NETMSGTYPE_CL_SETTEAM && !m_World.m_Paused)
 		{
-			char aChatText[256];
-			str_format(aChatText, sizeof(aChatText), "'%s' changed name to '%s'", aOldName, Server()->ClientName(ClientID));
-			SendChat(-1, CGameContext::CHAT_ALL, aChatText);
+			CNetMsg_Cl_SetTeam *pMsg = (CNetMsg_Cl_SetTeam *)pRawMsg;
+
+			if(pPlayer->GetTeam() == pMsg->m_Team || (g_Config.m_SvSpamprotection && pPlayer->m_LastSetTeam && pPlayer->m_LastSetTeam+Server()->TickSpeed()*3 > Server()->Tick()))
+				return;
+
+			if(pMsg->m_Team != TEAM_SPECTATORS && m_LockTeams)
+			{
+				pPlayer->m_LastSetTeam = Server()->Tick();
+				SendBroadcast("Teams are locked", ClientID);
+				return;
+			}
+
+			if(pPlayer->m_TeamChangeTick > Server()->Tick())
+			{
+				pPlayer->m_LastSetTeam = Server()->Tick();
+				int TimeLeft = (pPlayer->m_TeamChangeTick - Server()->Tick())/Server()->TickSpeed();
+				char aBuf[128];
+				str_format(aBuf, sizeof(aBuf), "Time to wait before changing team: %02d:%02d", TimeLeft/60, TimeLeft%60);
+				SendBroadcast(aBuf, ClientID);
+				return;
+			}
+
+			// Switch team on given client and kill/respawn him
+			if(m_pController->CanJoinTeam(pMsg->m_Team, ClientID))
+			{
+				if(m_pController->CanChangeTeam(pPlayer, pMsg->m_Team))
+				{
+					pPlayer->m_LastSetTeam = Server()->Tick();
+					if(pPlayer->GetTeam() == TEAM_SPECTATORS || pMsg->m_Team == TEAM_SPECTATORS)
+						m_VoteUpdate = true;
+					pPlayer->SetTeam(pMsg->m_Team);
+					(void)m_pController->CheckTeamBalance();
+					pPlayer->m_TeamChangeTick = Server()->Tick();
+				}
+				else
+					SendBroadcast("Teams must be balanced, please join other team", ClientID);
+			}
+			else
+			{
+				char aBuf[128];
+				str_format(aBuf, sizeof(aBuf), "Only %d active players are allowed", Server()->MaxClients()-g_Config.m_SvSpectatorSlots);
+				SendBroadcast(aBuf, ClientID);
+			}
 		}
-		Server()->SetClientClan(ClientID, pMsg->m_pClan);
-		Server()->SetClientCountry(ClientID, pMsg->m_Country);
-		str_copy(pPlayer->m_TeeInfos.m_SkinName, pMsg->m_pSkin, sizeof(pPlayer->m_TeeInfos.m_SkinName));
-		pPlayer->m_TeeInfos.m_UseCustomColor = pMsg->m_UseCustomColor;
-		pPlayer->m_TeeInfos.m_ColorBody = pMsg->m_ColorBody;
-		pPlayer->m_TeeInfos.m_ColorFeet = pMsg->m_ColorFeet;
-		m_pController->OnPlayerInfoChange(pPlayer);
+		else if (MsgID == NETMSGTYPE_CL_SETSPECTATORMODE && !m_World.m_Paused)
+		{
+			CNetMsg_Cl_SetSpectatorMode *pMsg = (CNetMsg_Cl_SetSpectatorMode *)pRawMsg;
+
+			if(pPlayer->GetTeam() != TEAM_SPECTATORS || pPlayer->m_SpectatorID == pMsg->m_SpectatorID || ClientID == pMsg->m_SpectatorID ||
+				(g_Config.m_SvSpamprotection && pPlayer->m_LastSetSpectatorMode && pPlayer->m_LastSetSpectatorMode+Server()->TickSpeed()*3 > Server()->Tick()))
+				return;
+
+			pPlayer->m_LastSetSpectatorMode = Server()->Tick();
+			if(pMsg->m_SpectatorID != SPEC_FREEVIEW && (!m_apPlayers[pMsg->m_SpectatorID] || m_apPlayers[pMsg->m_SpectatorID]->GetTeam() == TEAM_SPECTATORS))
+				SendChatTarget(ClientID, "Invalid spectator id used");
+			else
+				pPlayer->m_SpectatorID = pMsg->m_SpectatorID;
+		}
+		else if (MsgID == NETMSGTYPE_CL_CHANGEINFO)
+		{
+			if(g_Config.m_SvSpamprotection && pPlayer->m_LastChangeInfo && pPlayer->m_LastChangeInfo+Server()->TickSpeed()*5 > Server()->Tick())
+				return;
+
+			CNetMsg_Cl_ChangeInfo *pMsg = (CNetMsg_Cl_ChangeInfo *)pRawMsg;
+			pPlayer->m_LastChangeInfo = Server()->Tick();
+
+			// set infos
+			char aOldName[MAX_NAME_LENGTH];
+			str_copy(aOldName, Server()->ClientName(ClientID), sizeof(aOldName));
+			Server()->SetClientName(ClientID, pMsg->m_pName);
+			if(str_comp(aOldName, Server()->ClientName(ClientID)) != 0)
+			{
+				char aChatText[256];
+				str_format(aChatText, sizeof(aChatText), "'%s' changed name to '%s'", aOldName, Server()->ClientName(ClientID));
+				SendChat(-1, CGameContext::CHAT_ALL, aChatText);
+			}
+			Server()->SetClientClan(ClientID, pMsg->m_pClan);
+			Server()->SetClientCountry(ClientID, pMsg->m_Country);
+			str_copy(pPlayer->m_TeeInfos.m_SkinName, pMsg->m_pSkin, sizeof(pPlayer->m_TeeInfos.m_SkinName));
+			pPlayer->m_TeeInfos.m_UseCustomColor = pMsg->m_UseCustomColor;
+			pPlayer->m_TeeInfos.m_ColorBody = pMsg->m_ColorBody;
+			pPlayer->m_TeeInfos.m_ColorFeet = pMsg->m_ColorFeet;
+			m_pController->OnPlayerInfoChange(pPlayer);
+		}
+		else if (MsgID == NETMSGTYPE_CL_EMOTICON && !m_World.m_Paused)
+		{
+			CNetMsg_Cl_Emoticon *pMsg = (CNetMsg_Cl_Emoticon *)pRawMsg;
+
+			if(g_Config.m_SvSpamprotection && pPlayer->m_LastEmote && pPlayer->m_LastEmote+Server()->TickSpeed()*3 > Server()->Tick())
+				return;
+
+			pPlayer->m_LastEmote = Server()->Tick();
+
+			SendEmoticon(ClientID, pMsg->m_Emoticon);
+		}
+		else if (MsgID == NETMSGTYPE_CL_KILL && !m_World.m_Paused)
+		{
+			if(pPlayer->m_LastKill && pPlayer->m_LastKill+Server()->TickSpeed()*3 > Server()->Tick())
+				return;
+
+			pPlayer->m_LastKill = Server()->Tick();
+			pPlayer->KillCharacter(WEAPON_SELF);
+		}
 	}
-	else if (MsgID == NETMSGTYPE_CL_EMOTICON && !m_World.m_Paused)
+	else
 	{
-		CNetMsg_Cl_Emoticon *pMsg = (CNetMsg_Cl_Emoticon *)pRawMsg;
+		if(MsgID == NETMSGTYPE_CL_STARTINFO)
+		{
+			if(pPlayer->m_IsReady)
+				return;
 
-		if(g_Config.m_SvSpamprotection && pPlayer->m_LastEmote && pPlayer->m_LastEmote+Server()->TickSpeed()*3 > Server()->Tick())
-			return;
+			CNetMsg_Cl_StartInfo *pMsg = (CNetMsg_Cl_StartInfo *)pRawMsg;
+			pPlayer->m_LastChangeInfo = Server()->Tick();
 
-		pPlayer->m_LastEmote = Server()->Tick();
+			// set start infos
+			Server()->SetClientName(ClientID, pMsg->m_pName);
+			Server()->SetClientClan(ClientID, pMsg->m_pClan);
+			Server()->SetClientCountry(ClientID, pMsg->m_Country);
+			str_copy(pPlayer->m_TeeInfos.m_SkinName, pMsg->m_pSkin, sizeof(pPlayer->m_TeeInfos.m_SkinName));
+			pPlayer->m_TeeInfos.m_UseCustomColor = pMsg->m_UseCustomColor;
+			pPlayer->m_TeeInfos.m_ColorBody = pMsg->m_ColorBody;
+			pPlayer->m_TeeInfos.m_ColorFeet = pMsg->m_ColorFeet;
+			m_pController->OnPlayerInfoChange(pPlayer);
 
-		SendEmoticon(ClientID, pMsg->m_Emoticon);
-	}
-	else if (MsgID == NETMSGTYPE_CL_KILL && !m_World.m_Paused)
-	{
-		if(pPlayer->m_LastKill && pPlayer->m_LastKill+Server()->TickSpeed()*3 > Server()->Tick())
-			return;
+			// send vote options
+			CNetMsg_Sv_VoteClearOptions ClearMsg;
+			Server()->SendPackMsg(&ClearMsg, MSGFLAG_VITAL, ClientID);
 
-		pPlayer->m_LastKill = Server()->Tick();
-		pPlayer->KillCharacter(WEAPON_SELF);
+			CNetMsg_Sv_VoteOptionListAdd OptionMsg;
+			int NumOptions = 0;
+			OptionMsg.m_pDescription0 = "";
+			OptionMsg.m_pDescription1 = "";
+			OptionMsg.m_pDescription2 = "";
+			OptionMsg.m_pDescription3 = "";
+			OptionMsg.m_pDescription4 = "";
+			OptionMsg.m_pDescription5 = "";
+			OptionMsg.m_pDescription6 = "";
+			OptionMsg.m_pDescription7 = "";
+			OptionMsg.m_pDescription8 = "";
+			OptionMsg.m_pDescription9 = "";
+			OptionMsg.m_pDescription10 = "";
+			OptionMsg.m_pDescription11 = "";
+			OptionMsg.m_pDescription12 = "";
+			OptionMsg.m_pDescription13 = "";
+			OptionMsg.m_pDescription14 = "";
+			CVoteOptionServer *pCurrent = m_pVoteOptionFirst;
+			while(pCurrent)
+			{
+				switch(NumOptions++)
+				{
+				case 0: OptionMsg.m_pDescription0 = pCurrent->m_aDescription; break;
+				case 1: OptionMsg.m_pDescription1 = pCurrent->m_aDescription; break;
+				case 2: OptionMsg.m_pDescription2 = pCurrent->m_aDescription; break;
+				case 3: OptionMsg.m_pDescription3 = pCurrent->m_aDescription; break;
+				case 4: OptionMsg.m_pDescription4 = pCurrent->m_aDescription; break;
+				case 5: OptionMsg.m_pDescription5 = pCurrent->m_aDescription; break;
+				case 6: OptionMsg.m_pDescription6 = pCurrent->m_aDescription; break;
+				case 7: OptionMsg.m_pDescription7 = pCurrent->m_aDescription; break;
+				case 8: OptionMsg.m_pDescription8 = pCurrent->m_aDescription; break;
+				case 9: OptionMsg.m_pDescription9 = pCurrent->m_aDescription; break;
+				case 10: OptionMsg.m_pDescription10 = pCurrent->m_aDescription; break;
+				case 11: OptionMsg.m_pDescription11 = pCurrent->m_aDescription; break;
+				case 12: OptionMsg.m_pDescription12 = pCurrent->m_aDescription; break;
+				case 13: OptionMsg.m_pDescription13 = pCurrent->m_aDescription; break;
+				case 14:
+					{
+						OptionMsg.m_pDescription14 = pCurrent->m_aDescription;
+						OptionMsg.m_NumOptions = NumOptions;
+						Server()->SendPackMsg(&OptionMsg, MSGFLAG_VITAL, ClientID);
+						OptionMsg = CNetMsg_Sv_VoteOptionListAdd();
+						NumOptions = 0;
+						OptionMsg.m_pDescription1 = "";
+						OptionMsg.m_pDescription2 = "";
+						OptionMsg.m_pDescription3 = "";
+						OptionMsg.m_pDescription4 = "";
+						OptionMsg.m_pDescription5 = "";
+						OptionMsg.m_pDescription6 = "";
+						OptionMsg.m_pDescription7 = "";
+						OptionMsg.m_pDescription8 = "";
+						OptionMsg.m_pDescription9 = "";
+						OptionMsg.m_pDescription10 = "";
+						OptionMsg.m_pDescription11 = "";
+						OptionMsg.m_pDescription12 = "";
+						OptionMsg.m_pDescription13 = "";
+						OptionMsg.m_pDescription14 = "";
+					}
+				}
+				pCurrent = pCurrent->m_pNext;
+			}
+			if(NumOptions > 0)
+			{
+				OptionMsg.m_NumOptions = NumOptions;
+				Server()->SendPackMsg(&OptionMsg, MSGFLAG_VITAL, ClientID);
+			}
+
+			// send tuning parameters to client
+			SendTuningParams(ClientID);
+
+			// client is ready to enter
+			pPlayer->m_IsReady = true;
+			CNetMsg_Sv_ReadyToEnter m;
+			Server()->SendPackMsg(&m, MSGFLAG_VITAL|MSGFLAG_FLUSH, ClientID);
+		}
 	}
 }
 
