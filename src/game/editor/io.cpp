@@ -450,6 +450,7 @@ int CEditorMap::Save(class IStorage *pStorage, const char *pFileName)
 	}
 
 	df.AddItem(MAPITEMTYPE_ENVPOINTS, 0, TotalSize, pPoints);
+	mem_free(pPoints);
 
 	// finish the data file
 	df.Finish();
@@ -493,6 +494,7 @@ int CEditorMap::Load(class IStorage *pStorage, const char *pFileName, int Storag
 		editor->reset();
 		editor_load_old(df, this);
 		*/
+		return 0;
 	}
 	else if(pItem->m_Version == 1)
 	{
@@ -537,6 +539,7 @@ int CEditorMap::Load(class IStorage *pStorage, const char *pFileName, int Storag
 					{
 						*pImg = ImgInfo;
 						pImg->m_TexID = m_pEditor->Graphics()->LoadTextureRaw(ImgInfo.m_Width, ImgInfo.m_Height, ImgInfo.m_Format, ImgInfo.m_pData, CImageInfo::FORMAT_AUTO, 0);
+						ImgInfo.m_pData = 0;
 						pImg->m_External = 1;
 					}
 				}
@@ -779,6 +782,8 @@ int CEditorMap::Load(class IStorage *pStorage, const char *pFileName, int Storag
 			}
 		}
 	}
+	else
+		return 0;
 
 	return 1;
 }
