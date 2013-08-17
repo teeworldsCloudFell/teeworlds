@@ -1713,12 +1713,14 @@ int main(int argc, const char **argv) // ignore_convention
 	// free
 	delete pServer;
 	delete pKernel;
+	delete pEngine;
 	delete pEngineMap;
 	delete pGameServer;
 	delete pConsole;
 	delete pEngineMasterServer;
 	delete pStorage;
 	delete pConfig;
+
 	return 0;
 }
 

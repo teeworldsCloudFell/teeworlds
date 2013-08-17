@@ -305,7 +305,7 @@ int CUI::DoButtonLogic(const void *pID, const char *pText, int Checked, const CU
 	return ReturnValue;
 }
 
-int CUI::DoPickerLogic(const void *pID, const CUIRect *pRect, int *pX, int *pY)
+int CUI::DoPickerLogic(const void *pID, const CUIRect *pRect, float *pX, float *pY)
 {
 	int Inside = MouseInside(pRect);
 
@@ -322,13 +322,13 @@ int CUI::DoPickerLogic(const void *pID, const CUIRect *pRect, int *pX, int *pY)
 	else if(Inside)
 		SetHotItem(pID);
 
-	if(ActiveItem() != pID || !Inside)
+	if(ActiveItem() != pID)
 		return 0;
 
 	if(pX)
-		*pX = (m_MouseX - pRect->x) / Scale();
+		*pX = clamp(m_MouseX - pRect->x, 0.0f, pRect->w) / Scale();
 	if(pY)
-		*pY = (m_MouseY - pRect->y) / Scale();
+		*pY = clamp(m_MouseY - pRect->y, 0.0f, pRect->h) / Scale();
 
 	return 1;
 }

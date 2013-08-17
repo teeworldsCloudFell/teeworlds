@@ -48,12 +48,16 @@ CMenus::CMenus()
 
 	m_NeedRestartGraphics = false;
 	m_NeedRestartSound = false;
-	m_TeePartSelected = SKINPART_BODY;
+	m_TeePartSelected = CSkins::SKINPART_BODY;
 	m_aSaveSkinName[0] = 0;
+	m_RefreshSkinSelector = true;
+	m_pSelectedSkin = 0;
 	m_MenuActive = true;
 	m_UseMouseButtons = true;
 
 	m_MenuPage = PAGE_START;
+
+	m_InfoMode = false;
 
 	m_EscapePressed = false;
 	m_EnterPressed = false;
@@ -373,13 +377,13 @@ int CMenus::DoButton_SpriteClean(int ImageID, int SpriteID, const CUIRect *pRect
 	return ReturnValue;
 }
 
-int CMenus::DoButton_SpriteCleanID(const void *pID, int ImageID, int SpriteID, const CUIRect *pRect)
+int CMenus::DoButton_SpriteCleanID(const void *pID, int ImageID, int SpriteID, const CUIRect *pRect, bool Blend)
 {
 	int Inside = UI()->MouseInside(pRect);
 
 	Graphics()->TextureSet(g_pData->m_aImages[ImageID].m_Id);
 	Graphics()->QuadsBegin();
-	Graphics()->SetColor(1.0f, 1.0f, 1.0f, Inside ? 1.0f : 0.6f);
+	Graphics()->SetColor(1.0f, 1.0f, 1.0f, !Blend || Inside ? 1.0f : 0.6f);
 	RenderTools()->SelectSprite(SpriteID);
 	IGraphics::CQuadItem QuadItem(pRect->x, pRect->y, pRect->w, pRect->h);
 	Graphics()->QuadsDrawTL(&QuadItem, 1);
@@ -410,12 +414,13 @@ int CMenus::DoEditBox(void *pID, const CUIRect *pRect, char *pStr, unsigned StrS
 	bool UpdateOffset = false;
 	static int s_AtIndex = 0;
 	static bool s_DoScroll = false;
-	static float s_ScrollStart = 0.0f;
 
 	FontSize *= UI()->Scale();
 
 	if(UI()->LastActiveItem() == pID)
 	{
+		static float s_ScrollStart = 0.0f;
+
 		int Len = str_length(pStr);
 		if(Len == 0)
 			s_AtIndex = 0;
@@ -1160,10 +1165,17 @@ void CMenus::RenderMenubar(CUIRect r)
 				g_Config.m_UiBrowserPage = PAGE_LAN;
 			}
 
+			char aBuf[32];
+			if(m_BorwserPage == PAGE_BROWSER_BROWSER)
+				str_copy(aBuf, Localize("Friends"), sizeof(aBuf));
+			else if(m_BorwserPage == PAGE_BROWSER_FRIENDS)
+				str_copy(aBuf, Localize("Browser"), sizeof(aBuf));
 			static int s_FilterButton=0;
-			if(DoButton_Menu(&s_FilterButton, Localize("Filter"), 0, &Right))
+			if(DoButton_Menu(&s_FilterButton, aBuf, 0, &Right))
 			{
-				// TODO
+				m_BorwserPage++;
+				if(m_BorwserPage >= NUM_PAGE_BROWSER)
+					m_BorwserPage = 0;
 			}
 		}
 		else if(m_MenuPage == PAGE_DEMOS)
@@ -1667,7 +1679,6 @@ int CMenus::Render()
 		// make sure that other windows doesn't do anything funnay!
 		//UI()->SetHotItem(0);
 		//UI()->SetActiveItem(0);
-		char aBuf[128];
 		const char *pTitle = "";
 		const char *pExtraText = "";
 		const char *pButtonText = "";
@@ -1738,6 +1749,11 @@ int CMenus::Render()
 			pExtraText = Localize("Are you sure you want to save your skin? If a skin with this name already exists, it will be replaced.");
 			NumOptions = 6;
 			ExtraAlign = -1;
+		}
+		else if(m_Popup == POPUP_DELETE_SKIN)
+		{
+			pTitle = Localize("Delete skin");
+			pExtraText = Localize("Are you sure that you want to delete the skin?");
 		}
 		else if(m_Popup == POPUP_SOUNDERROR)
 		{
@@ -1860,6 +1876,7 @@ int CMenus::Render()
 
 			if(Client()->MapDownloadTotalsize() > 0)
 			{
+				char aBuf[128];
 				int64 Now = time_get();
 				if(Now-m_DownloadLastCheckTime >= time_freq())
 				{
@@ -2138,6 +2155,42 @@ int CMenus::Render()
 					m_Popup = POPUP_NONE;
 					SaveSkinfile();
 					m_aSaveSkinName[0] = 0;
+					m_RefreshSkinSelector = true;
+				}
+			}
+		}
+		else if(m_Popup == POPUP_DELETE_SKIN)
+		{
+			CUIRect Yes, No;
+			Box.HSplitTop(27.0f, 0, &Box);
+			UI()->DoLabel(&Box, pExtraText, ButtonHeight*ms_FontmodHeight*0.8f, ExtraAlign);
+
+			// buttons
+			BottomBar.VSplitMid(&No, &Yes);
+			No.VSplitRight(SpacingW/2.0f, &No, 0);
+			Yes.VSplitLeft(SpacingW/2.0f, 0, &Yes);
+
+			static int s_ButtonNo = 0;
+			if(DoButton_Menu(&s_ButtonNo, Localize("No"), 0, &No) || m_EscapePressed)
+				m_Popup = POPUP_NONE;
+
+			static int s_ButtonYes = 0;
+			if(DoButton_Menu(&s_ButtonYes, Localize("Yes"), 0, &Yes) || m_EnterPressed)
+			{
+				m_Popup = POPUP_NONE;
+				// delete demo
+				if(m_pSelectedSkin)
+				{
+					char aBuf[512];
+					str_format(aBuf, sizeof(aBuf), "skins/%s.json", m_pSelectedSkin->m_aName);
+					if(Storage()->RemoveFile(aBuf, IStorage::TYPE_SAVE))
+					{
+						m_pClient->m_pSkins->RemoveSkin(m_pSelectedSkin);
+						m_RefreshSkinSelector = true;
+						m_pSelectedSkin = 0;
+					}
+					else
+						PopupMessage(Localize("Error"), Localize("Unable to delete the skin"), Localize("Ok"));
 				}
 			}
 		}
@@ -2176,6 +2229,9 @@ int CMenus::Render()
 			if(DoButton_Menu(&s_Button, pButtonText, 0, &BottomBar) || m_EscapePressed || m_EnterPressed)
 				m_Popup = m_NextPopup;
 		}
+
+		if(m_Popup == POPUP_NONE)
+			UI()->SetActiveItem(0);
 	}
 
 	return 0;
@@ -2208,6 +2264,9 @@ bool CMenus::OnMouseMove(float x, float y)
 
 	if(!m_MenuActive)
 		return false;
+
+	// prev mouse position
+	m_PrevMousePos = m_MousePos;
 
 	UI()->ConvertMouseMove(&x, &y);
 	m_MousePos.x += x;

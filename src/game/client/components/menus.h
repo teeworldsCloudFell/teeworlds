@@ -11,9 +11,11 @@
 #include <engine/friends.h>
 
 #include <game/voting.h>
-#include <game/localization.h>
 #include <game/client/component.h>
+#include <game/client/localization.h>
 #include <game/client/ui.h>
+
+#include "skins.h"
 
 
 // compnent to fetch keypresses, override all other input
@@ -37,7 +39,7 @@ class CMenus : public CComponent
 	int DoButton_DemoPlayer(const void *pID, const char *pText, const CUIRect *pRect);
 	int DoButton_SpriteID(const void *pID, int ImageID, int SpriteID, const CUIRect *pRect, int Corners=CUI::CORNER_ALL, float r=5.0f, bool Fade=true);
 	int DoButton_SpriteClean(int ImageID, int SpriteID, const CUIRect *pRect);
-	int DoButton_SpriteCleanID(const void *pID, int ImageID, int SpriteID, const CUIRect *pRect);
+	int DoButton_SpriteCleanID(const void *pID, int ImageID, int SpriteID, const CUIRect *pRect, bool Blend=true);
 	int DoButton_Toggle(const void *pID, int Checked, const CUIRect *pRect, bool Active);
 	int DoButton_Menu(const void *pID, const char *pText, int Checked, const CUIRect *pRect, int Corners=CUI::CORNER_ALL, float r=5.0f, float FontFactor=0.0f, vec4 ColorHot=vec4(1.0f, 1.0f, 1.0f, 0.75f), bool TextFade=true);
 	int DoButton_MenuImage(const void *pID, const char *pText, int Checked, const CUIRect *pRect, const char *pImageName, float r=5.0f, float FontFactor=0.0f);
@@ -115,6 +117,7 @@ class CMenus : public CComponent
 		POPUP_RENAME_DEMO,
 		POPUP_REMOVE_FRIEND,
 		POPUP_SAVE_SKIN,
+		POPUP_DELETE_SKIN,
 		POPUP_SOUNDERROR,
 		POPUP_PASSWORD,
 		POPUP_QUIT,
@@ -135,6 +138,10 @@ class CMenus : public CComponent
 		PAGE_SYSTEM,
 		PAGE_START,
 
+		PAGE_BROWSER_BROWSER=0,
+		PAGE_BROWSER_FRIENDS,
+		NUM_PAGE_BROWSER,
+
 		SETTINGS_GENERAL=0,
 		SETTINGS_PLAYER,
 		SETTINGS_TEE,
@@ -147,9 +154,12 @@ class CMenus : public CComponent
 	int m_Popup;
 	int m_ActivePage;
 	int m_MenuPage;
+	int m_BorwserPage;
 	bool m_MenuActive;
 	bool m_UseMouseButtons;
 	vec2 m_MousePos;
+	vec2 m_PrevMousePos;
+	bool m_InfoMode;
 
 	// images
 	struct CMenuImage
@@ -195,7 +205,8 @@ class CMenus : public CComponent
 	char m_aSaveSkinName[24];
 
 	void SaveSkinfile();
-	void WriteLineSkinfile(IOHANDLE File, const char *pLine);
+	bool m_RefreshSkinSelector;
+	const CSkins::CSkin *m_pSelectedSkin;
 
 	//
 	bool m_EscapePressed;
@@ -324,12 +335,14 @@ class CMenus : public CComponent
 		{
 			OVERLAY_SERVERINFO=0,
 			OVERLAY_HEADERINFO,
+			OVERLAY_PLAYERSINFO,
 		};
 
 		int m_Type;
 		const void *m_pData;
 		float m_X;
 		float m_Y;
+		bool m_Reset;
 	};
 
 	CInfoOverlay m_InfoOverlay;
@@ -424,6 +437,7 @@ class CMenus : public CComponent
 	// found in menus_browser.cpp
 	int m_ScrollOffset;
 	void RenderServerbrowserServerList(CUIRect View);
+	void RenderServerbrowserFriendList(CUIRect View);
 	void RenderServerbrowserServerDetail(CUIRect View, const CServerInfo *pInfo);
 	void RenderServerbrowserFilters(CUIRect View);
 	void RenderServerbrowserFriends(CUIRect View);
