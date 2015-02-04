@@ -3,8 +3,8 @@
 #ifndef GAME_VERSION_H
 #define GAME_VERSION_H
 #include "generated/nethash.cpp"
-#define GAME_VERSION "0.6.2"
+#define GAME_VERSION "0.6.3"
 #define GAME_NETVERSION "0.6 626fce9a778df4d4"
-#define ZESC_VERSION "1.3-final"
-static const char GAME_RELEASE_VERSION[8] = {'0', '.', '6', '.', '2', 0};
+#define ZESC_VERSION "1.3.1-final"
+static const char GAME_RELEASE_VERSION[8] = {'0', '.', '6', '.', '3', 0};
 #endif
