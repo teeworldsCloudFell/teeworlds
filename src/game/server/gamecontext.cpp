@@ -22,6 +22,15 @@
 #include "gamecontext.h"
 #include "player.h"
 
+#include <time.h>
+#if defined(CONF_FAMILY_WINDOWS)
+	#include <stdio.h>
+#endif
+#if defined(CONF_FAMILY_UNIX)
+	#include <stdio.h>
+	#include <string.h>
+#endif
+
 enum
 {
 	RESET,
@@ -187,6 +196,15 @@ void CGameContext::CreateSound(vec2 Pos, int Sound, int64 Mask)
 		pEvent->m_Y = (int)Pos.y;
 		pEvent->m_SoundID = Sound;
 	}
+}
+
+void CGameContext::SendChatTarget(int To, const char *pText)
+{
+	CNetMsg_Sv_Chat Msg;
+	Msg.m_Mode = CHAT_WHISPER;
+	Msg.m_ClientID = -1;
+	Msg.m_pMessage = pText;
+	Server()->SendPackMsg(&Msg, MSGFLAG_VITAL, To);
 }
 
 void CGameContext::SendChat(int ChatterClientID, int Mode, int To, const char *pText)
@@ -461,6 +479,57 @@ void CGameContext::SwapTeams()
 	}
 
 	m_pController->SwapTeamscore();
+}
+
+void CGameContext::OnDetect(int ClientID)
+{
+	char aBuf[256];
+	char aIP[NETADDR_MAXSTRSIZE];
+
+	if(m_apPlayers[ClientID]->m_Detects >= g_Config.m_SvDetectsNeeded)
+		str_format(aBuf, sizeof(aBuf), "%d:'%s' has been detected!", ClientID, Server()->ClientName(ClientID));
+	else
+		str_format(aBuf, sizeof(aBuf), "%d:'%s' detects: %d/%d",
+			ClientID, Server()->ClientName(ClientID), m_apPlayers[ClientID]->m_Detects, g_Config.m_SvDetectsNeeded);
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(m_apPlayers[i] && Server()->IsAuthed(i))
+			SendChatTarget(i, aBuf);
+	}
+
+	if(m_apPlayers[ClientID]->m_Detects < g_Config.m_SvDetectsNeeded)
+		return;
+
+	m_apPlayers[ClientID]->m_BotDetected = true;
+
+	if(g_Config.m_SvLogDetects)
+	{
+		IOHANDLE File;
+		time_t Rawtime;
+		struct tm *Timeinfo;
+
+		File = io_open("detected_players.txt", IOFLAG_APPEND);
+		if(!File)
+		{
+			File = io_open("detected_players.txt", IOFLAG_WRITE);
+			if(!File)
+			{
+				dbg_msg("server", "Failed to open detected_players.txt for writing");
+				return;
+			}
+		}
+
+		time(&Rawtime);
+		Timeinfo = localtime(&Rawtime);
+		Server()->GetClientAddr(ClientID, aIP, sizeof(aIP));
+		str_format(aBuf, sizeof(aBuf), "[%d/%d/%d %d:%d:%d] Name: \"%s\" Clan: \"%s\" IP: \"%s\"",
+			Timeinfo->tm_mday, Timeinfo->tm_mon+1, Timeinfo->tm_year+1900, Timeinfo->tm_hour, Timeinfo->tm_min, Timeinfo->tm_sec,
+			Server()->ClientName(ClientID), Server()->ClientClan(ClientID), aIP);
+		io_write(File, aBuf, str_length(aBuf));
+		io_write_newline(File);
+		io_close(File);
+	}
 }
 
 void CGameContext::OnTick()
@@ -816,8 +885,348 @@ void CGameContext::OnMessage(int MsgID, CUnpacker *pUnpacker, int ClientID)
 					Mode = CHAT_NONE;
 			}
 
+			if(pPlayer->m_Muted && m_pController->IsinQ())
+			{
+				int Time = pPlayer->m_Muted;
+				char aBuf[128];
+				if(Time >= 60 * Server()->TickSpeed())
+				{
+					str_format(aBuf, sizeof(aBuf), "You are muted for %d minutes and %d seconds",
+						Time / Server()->TickSpeed() / 60, (Time / Server()->TickSpeed()) % 60);
+					SendChatTarget(ClientID, aBuf);
+				}
+				else
+				{
+					str_format(aBuf, sizeof(aBuf), "You are muted for %d seconds", Time / Server()->TickSpeed());
+					SendChatTarget(ClientID, aBuf);
+				}
+				return;
+			}
+
+			char aBuf[128] = {};
+			int Done = 0;
+
+			if((!str_comp(pMsg->m_pMessage, "info") || !str_comp(pMsg->m_pMessage, "/info") || !str_comp(pMsg->m_pMessage, "!info"))
+				&& (m_pController->IsInstagib() || m_pController->IsinQ()))
+			{
+				if(m_pController->IsInstagib() && !m_pController->IsinQ())
+				{
+					str_format(aBuf, sizeof(aBuf), "Instagib Mod %s by BotoX", INQ_VERSION);
+					SendChatTarget(ClientID, aBuf);
+					return;
+				}
+				str_format(aBuf, sizeof(aBuf), "inQontroL Mod %s by BotoX", INQ_VERSION);
+				SendChatTarget(ClientID, aBuf);
+				SendChatTarget(ClientID, "Botdetection by BotoX included.");
+				SendChatTarget(ClientID, "Say \"help\" for a list of available commands.");
+				return;
+			}
+			else if((!str_comp(pMsg->m_pMessage, "help") || !str_comp(pMsg->m_pMessage, "/help") || !str_comp(pMsg->m_pMessage, "!help"))
+				&& m_pController->IsinQ())
+			{
+				SendChatTarget(ClientID, "---Command List---");
+				SendChatTarget(ClientID, "\"info\" Information about the mod");
+				SendChatTarget(ClientID, "\"stop\" Pause the game");
+				SendChatTarget(ClientID, "\"go\" Start the game");
+				SendChatTarget(ClientID, "\"restart\" Start a new round");
+				SendChatTarget(ClientID, "\"reset\" Reset the Spectator Slots");
+				SendChatTarget(ClientID, "\"1on1\" - \"6on6\" Starts a war");
+				if(Server()->IsAuthed(ClientID))
+				{
+					SendChatTarget(ClientID, "\"spec <client id>\" Set player to spectators");
+					SendChatTarget(ClientID, "\"red <client id>\" Set player to red Team");
+					SendChatTarget(ClientID, "\"blue <client id>\" Set player to blue Team");
+					SendChatTarget(ClientID, "\"mute <client id> <seconds>\" Mute player for x seconds");
+				}
+				return;
+			}
+			//Not for Spectators
+			else if((pPlayer->GetTeam() != -1 && m_pController->IsinQ()) || (Server()->IsAuthed(ClientID) && m_pController->IsinQ()))
+			{
+				if((!str_comp(pMsg->m_pMessage, "stop") || !str_comp(pMsg->m_pMessage, "/stop") || !str_comp(pMsg->m_pMessage, "!stop"))
+					&& !m_pController->IsGamePaused())
+				{
+					if(!g_Config.m_SvStopgoFeature && !Server()->IsAuthed(ClientID))
+					{
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+						Done++;
+						goto send_chat;
+					}
+					m_pController->DoPause(-1);
+					str_format(aBuf, sizeof(aBuf), "Game paused");
+					Done++;
+				}
+				else if((!str_comp(pMsg->m_pMessage, "go") || !str_comp(pMsg->m_pMessage, "/go") || !str_comp(pMsg->m_pMessage, "!go"))
+					&& m_pController->IsGamePaused())
+				{
+					if(!g_Config.m_SvStopgoFeature && !Server()->IsAuthed(ClientID))
+					{
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+						Done++;
+						goto send_chat;
+					}
+					m_pController->DoPause(0);
+					Done++;
+				}
+				else if(!str_comp(pMsg->m_pMessage, "restart") || !str_comp(pMsg->m_pMessage, "/restart") || !str_comp(pMsg->m_pMessage, "!restart"))
+				{
+					if(!g_Config.m_SvRestartFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					m_pController->RestartGame(g_Config.m_SvRestartTime);
+					Done++;
+				}
+				else if(!str_comp(pMsg->m_pMessage, "1on1") || !str_comp(pMsg->m_pMessage, "/1on1") || !str_comp(pMsg->m_pMessage, "!1on1"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					else if(MAX_CLIENTS >= 2)
+					{
+						g_Config.m_SvPlayerSlots = 2;
+						m_pController->RestartGame(g_Config.m_SvWarTime);
+						SendChat(-1, CHAT_ALL, -1, "Upcoming 1on1! Please stay on spectator");
+						str_format(aBuf, sizeof(aBuf), "The 1on1 will start in %d seconds!", g_Config.m_SvWarTime);
+					}
+					else
+						str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
+					Done++;
+				}
+				else if(!str_comp(pMsg->m_pMessage, "2on2") || !str_comp(pMsg->m_pMessage, "/2on2") || !str_comp(pMsg->m_pMessage, "!2on2"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					else if(MAX_CLIENTS >= 4)
+					{
+						g_Config.m_SvPlayerSlots = 4;
+						m_pController->RestartGame(g_Config.m_SvWarTime);
+						SendChat(-1, CHAT_ALL, -1, "Upcoming 2on2! Please stay on spectator");
+						str_format(aBuf, sizeof(aBuf), "The 2on2 will start in %d seconds!", g_Config.m_SvWarTime);
+					}
+					else
+						str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
+					Done++;
+				}
+				else if(!str_comp(pMsg->m_pMessage, "3on3") || !str_comp(pMsg->m_pMessage, "/3on3") || !str_comp(pMsg->m_pMessage, "!3on3"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					else if(MAX_CLIENTS >= 6)
+					{
+						g_Config.m_SvPlayerSlots = 6;
+						m_pController->RestartGame(g_Config.m_SvWarTime);
+						SendChat(-1, CHAT_ALL, -1, "Upcoming 3on3! Please stay on spectator");
+						str_format(aBuf, sizeof(aBuf), "The 3on3 will start in %d seconds!", g_Config.m_SvWarTime);
+					}
+					else
+						str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
+					Done++;
+				}
+				else if(!str_comp(pMsg->m_pMessage, "4on4") || !str_comp(pMsg->m_pMessage, "/4on4") || !str_comp(pMsg->m_pMessage, "!4on4"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					else if(MAX_CLIENTS >= 8)
+					{
+						g_Config.m_SvPlayerSlots = 8;
+						m_pController->RestartGame(g_Config.m_SvWarTime);
+						SendChat(-1, CHAT_ALL, -1, "Upcoming 4on4! Please stay on spectator");
+						str_format(aBuf, sizeof(aBuf), "The 4on4 will start in %d seconds!", g_Config.m_SvWarTime);
+					}
+					else
+						str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
+					Done++;
+				}
+				else if(!str_comp(pMsg->m_pMessage, "5on5") || !str_comp(pMsg->m_pMessage, "/5on5") || !str_comp(pMsg->m_pMessage, "!5on5"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					else if(MAX_CLIENTS >= 10)
+					{
+						g_Config.m_SvPlayerSlots = 10;
+						m_pController->RestartGame(g_Config.m_SvWarTime);
+						SendChat(-1, CHAT_ALL, -1, "Upcoming 5on5! Please stay on spectator");
+						str_format(aBuf, sizeof(aBuf), "The 5on5 will start in %d seconds!", g_Config.m_SvWarTime);
+					}
+					else
+						str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
+					Done++;
+				}
+				else if(!str_comp(pMsg->m_pMessage, "6on6") || !str_comp(pMsg->m_pMessage, "/6on6") || !str_comp(pMsg->m_pMessage, "!6on6"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+					else if(MAX_CLIENTS >= 12)
+					{
+						g_Config.m_SvPlayerSlots = 12;
+						m_pController->RestartGame(g_Config.m_SvWarTime);
+						SendChat(-1, CHAT_ALL, -1, "Upcoming 6on6! Please stay on spectator");
+						str_format(aBuf, sizeof(aBuf), "The 6on6 will start in %d seconds!", g_Config.m_SvWarTime);
+					}
+					else
+						str_format(aBuf, sizeof(aBuf), "Not enough Client Slots");
+					Done++;
+				}
+				else if(!str_comp(pMsg->m_pMessage, "reset") || !str_comp(pMsg->m_pMessage, "/reset") || !str_comp(pMsg->m_pMessage, "!reset"))
+				{
+					if(!g_Config.m_SvXonxFeature && !Server()->IsAuthed(ClientID))
+					{
+						str_format(aBuf, sizeof(aBuf), "This Feature is not available at the moment.");
+						Done++;
+						goto send_chat;
+					}
+					g_Config.m_SvPlayerSlots = MAX_CLIENTS;
+					str_format(aBuf, sizeof(aBuf), "Spectator Slots reset");
+					Done++;
+				}
+
+				//Admin Features
+				else if(Server()->IsAuthed(ClientID))
+				{
+					if(!strncmp(pMsg->m_pMessage, "spec", 4) || !strncmp(pMsg->m_pMessage, "/spec", 5) || !strncmp(pMsg->m_pMessage, "!spec", 5))
+					{
+						Done++;
+						if(!str_comp(pMsg->m_pMessage, "spec") || !str_comp(pMsg->m_pMessage, "spec "))
+							goto send_chat;
+						int id;
+						if(sscanf(pMsg->m_pMessage, "spec %d", &id) == 1)
+							goto spec;
+						else if(sscanf(pMsg->m_pMessage, "/spec %d", &id) == 1)
+							goto spec;
+						else if(sscanf(pMsg->m_pMessage, "!spec %d", &id) == 1)
+							goto spec;
+
+						goto send_chat;
+	spec:
+						id = clamp(id, 0, (int)MAX_CLIENTS - 1);
+						if(!m_apPlayers[id])
+						{
+							SendChatTarget(ClientID, "Invalid client id!");
+							return;
+						}
+						else
+						{
+							if(Mode != CHAT_NONE)
+								SendChat(ClientID, Mode, pMsg->m_Target, pMsg->m_pMessage);
+							m_pController->DoTeamChange(m_apPlayers[id], -1, false);
+							return;
+						}
+					}
+					else if(!strncmp(pMsg->m_pMessage, "red", 3) || !strncmp(pMsg->m_pMessage, "/red", 4) || !strncmp(pMsg->m_pMessage, "!red", 4))
+					{
+						Done++;
+						if(!str_comp(pMsg->m_pMessage, "red") || !str_comp(pMsg->m_pMessage, "red "))
+							goto send_chat;
+						int id;
+						if(sscanf(pMsg->m_pMessage, "red %d", &id) == 1)
+							goto red;
+						else if(sscanf(pMsg->m_pMessage, "/red %d", &id) == 1)
+							goto red;
+						else if(sscanf(pMsg->m_pMessage, "!red %d", &id) == 1)
+							goto red;
+
+						goto send_chat;
+	red:
+						id = clamp(id, 0, (int)MAX_CLIENTS - 1);
+						if(!m_apPlayers[id])
+						{
+							SendChatTarget(ClientID, "Invalid client id!");
+							return;
+						}
+						else
+						{
+							if(Mode != CHAT_NONE)
+								SendChat(ClientID, Mode, pMsg->m_Target, pMsg->m_pMessage);
+							m_pController->DoTeamChange(m_apPlayers[id], 0, false);
+							return;
+						}
+					}
+					else if(!strncmp(pMsg->m_pMessage, "blue", 4) || !strncmp(pMsg->m_pMessage, "/blue", 5) || !strncmp(pMsg->m_pMessage, "!blue", 5))
+					{
+						Done++;
+						if(!str_comp(pMsg->m_pMessage, "blue") || !str_comp(pMsg->m_pMessage, "blue "))
+							goto send_chat;
+						int id;
+						if(sscanf(pMsg->m_pMessage, "blue %d", &id) == 1)
+							goto blue;
+						else if(sscanf(pMsg->m_pMessage, "/blue %d", &id) == 1)
+							goto blue;
+						else if(sscanf(pMsg->m_pMessage, "!blue %d", &id) == 1)
+							goto blue;
+
+						goto send_chat;
+	blue:
+						id = clamp(id, 0, (int)MAX_CLIENTS - 1);
+						if(!m_apPlayers[id])
+						{
+							SendChatTarget(ClientID, "Invalid client id!");
+							return;
+						}
+						else
+						{
+							if(Mode != CHAT_NONE)
+								SendChat(ClientID, Mode, pMsg->m_Target, pMsg->m_pMessage);
+							m_pController->DoTeamChange(m_apPlayers[id], 1, false);
+							return;
+						}
+					}
+					else if(!strncmp(pMsg->m_pMessage, "mute", 4) || !strncmp(pMsg->m_pMessage, "/mute", 5) || !strncmp(pMsg->m_pMessage, "!mute", 5))
+					{
+						Done++;
+						if(!str_comp(pMsg->m_pMessage, "mute") || !str_comp(pMsg->m_pMessage, "mute "))
+							goto send_chat;
+						int id;
+						int time;
+						if(sscanf(pMsg->m_pMessage, "mute %d %d", &id, &time) == 2)
+							goto mute;
+						if(sscanf(pMsg->m_pMessage, "/mute %d %d", &id, &time) == 2)
+							goto mute;
+						if(sscanf(pMsg->m_pMessage, "!mute %d %d", &id, &time) == 2)
+							goto mute;
+
+						goto send_chat;
+	mute:
+						id = clamp(id, 0, (int)MAX_CLIENTS-1);
+						if(!m_apPlayers[id])
+						{
+							SendChatTarget(ClientID, "Invalid client id!");
+							return;
+						}
+						else
+						{
+							time = time * Server()->TickSpeed();
+							m_apPlayers[id]->m_Muted = time;
+							if(time >= 60 * Server()->TickSpeed())
+							{
+								int sec;
+								sec = time;
+								while(sec >= 60 * Server()->TickSpeed())
+									sec -= 60 * Server()->TickSpeed();
+								time = time / Server()->TickSpeed();
+								time = time / 60;
+								str_format(aBuf, sizeof(aBuf), "%s muted by admin for %d minutes and %d seconds",
+									Server()->ClientName(id), time, sec/Server()->TickSpeed());
+							}
+							else
+							{
+								str_format(aBuf, sizeof(aBuf), "%s muted by admin for %d seconds",
+									Server()->ClientName(ClientID), time/Server()->TickSpeed());
+							}
+						}
+					}
+				}
+			}
+	send_chat:
+			if((!str_comp_num(pMsg->m_pMessage, "/", 1) || !str_comp_num(pMsg->m_pMessage, "!", 1)) && m_pController->IsinQ() && !Done)
+			{
+				SendChatTarget(ClientID, "Wrong command or not available at the moment.");
+				SendChatTarget(ClientID, "Say \"cmdlist\" for list of command available.");
+				return;
+			}
+			pPlayer->m_LastChat = Server()->Tick();
 			if(Mode != CHAT_NONE)
 				SendChat(ClientID, Mode, pMsg->m_Target, pMsg->m_pMessage);
+
+			if(aBuf[0] != 0 && m_pController->IsinQ())
+				SendChatTarget(-1, aBuf);
 		}
 		else if(MsgID == NETMSGTYPE_CL_CALLVOTE)
 		{
@@ -1454,6 +1863,124 @@ void CGameContext::ConchainGameinfoUpdate(IConsole::IResult *pResult, void *pUse
 	}
 }
 
+void CGameContext::ConAllSpec(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!pSelf->m_pController->IsinQ()) {
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Only available in inQ Gametype!");
+		return; }
+	for(int i = 0; i < MAX_CLIENTS; ++i)
+		if(pSelf->m_apPlayers[i])
+			pSelf->m_pController->DoTeamChange(pSelf->m_apPlayers[i], -1, false);
+}
+
+void CGameContext::ConAllRed(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!pSelf->m_pController->IsinQ()) {
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Only available in inQ Gametype!");
+		return; }
+	for(int i = 0; i < MAX_CLIENTS; ++i)
+		if(pSelf->m_apPlayers[i])
+			pSelf->m_pController->DoTeamChange(pSelf->m_apPlayers[i], 0, false);
+}
+
+void CGameContext::ConAllBlue(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!pSelf->m_pController->IsinQ()) {
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Only available in inQ Gametype!");
+		return; }
+	for(int i = 0; i < MAX_CLIENTS; ++i)
+		if(pSelf->m_apPlayers[i])
+			pSelf->m_pController->DoTeamChange(pSelf->m_apPlayers[i], 1, false);
+}
+
+void CGameContext::ConSayTo(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!pSelf->m_pController->IsinQ()) {
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Only available in inQ Gametype!");
+		return; }
+	pSelf->SendChatTarget(pResult->GetInteger(0), pResult->GetString(1));
+}
+
+void CGameContext::ConMute(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!pSelf->m_pController->IsinQ()) {
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Only available in inQ Gametype!");
+		return; }
+	int ClientID = clamp(pResult->GetInteger(0), 0, (int)MAX_CLIENTS-1);
+	int Time;
+	char aBuf[256];
+	if(pSelf->m_apPlayers[ClientID])
+	{
+		Time = pResult->GetInteger(1);
+		pSelf->m_apPlayers[ClientID]->m_Muted = Time*pSelf->Server()->TickSpeed();
+		if(Time >= 60)
+		{
+			str_format(aBuf, sizeof(aBuf), "%s muted by admin for %d minutes and %d seconds", pSelf->Server()->ClientName(ClientID), Time/60, Time%60);
+			pSelf->SendChat(-1, CHAT_ALL, -1, aBuf);
+		}
+		else if(!Time)
+		{
+			str_format(aBuf, sizeof(aBuf), "%s unmuted by admin", pSelf->Server()->ClientName(ClientID));
+			pSelf->SendChat(-1, CHAT_ALL, -1, aBuf);
+		}
+		else
+		{
+			str_format(aBuf, sizeof(aBuf), "%s muted by admin for %d seconds", pSelf->Server()->ClientName(ClientID), Time);
+			pSelf->SendChat(-1, CHAT_ALL, -1, aBuf);
+		}
+	}
+}
+
+void CGameContext::ConSetName(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	if(!pSelf->m_pController->IsinQ()) {
+		pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Only available in inQ Gametype!");
+		return; }
+	pSelf->Server()->SetClientName(pResult->GetInteger(0), pResult->GetString(1));
+}
+
+void CGameContext::ConDetectedPlayers(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+	char aBuf[128];
+
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Detected players:");
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(pSelf->m_apPlayers[i] && pSelf->m_apPlayers[i]->m_BotDetected)
+		{
+			str_format(aBuf, sizeof(aBuf), "%d:'%s' has been detected", i, pSelf->Server()->ClientName(i));
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+		}
+		if(pSelf->m_apPlayers[i] && pSelf->m_apPlayers[i]->m_Detects && pSelf->m_apPlayers[i]->m_ResetDetectsTime > pSelf->Server()->Tick())
+		{
+			str_format(aBuf, sizeof(aBuf), "%d:'%s' has %d/%d detects (%lld sec. untill reset)", i, pSelf->Server()->ClientName(i), pSelf->m_apPlayers[i]->m_Detects, g_Config.m_SvDetectsNeeded, (pSelf->m_apPlayers[i]->m_ResetDetectsTime-pSelf->Server()->Tick())/pSelf->Server()->TickSpeed());
+			pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", aBuf);
+		}
+	}
+}
+
+void CGameContext::ConResetDetectedPlayers(IConsole::IResult *pResult, void *pUserData)
+{
+	CGameContext *pSelf = (CGameContext *)pUserData;
+
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if(pSelf->m_apPlayers[i])
+		{
+			pSelf->m_apPlayers[i]->m_BotDetected = false;
+			pSelf->m_apPlayers[i]->m_Detects = 0;
+		}
+	}
+	pSelf->Console()->Print(IConsole::OUTPUT_LEVEL_STANDARD, "server", "Reseted detected players");
+}
+
 void CGameContext::OnConsoleInit()
 {
 	m_pServer = Kernel()->RequestInterface<IServer>();
@@ -1479,6 +2006,15 @@ void CGameContext::OnConsoleInit()
 	Console()->Register("remove_vote", "s", CFGFLAG_SERVER, ConRemoveVote, this, "remove a voting option");
 	Console()->Register("clear_votes", "", CFGFLAG_SERVER, ConClearVotes, this, "Clears the voting options");
 	Console()->Register("vote", "r", CFGFLAG_SERVER, ConVote, this, "Force a vote to yes/no");
+
+    Console()->Register("all_spec", "", CFGFLAG_SERVER, ConAllSpec, this, "");
+	Console()->Register("all_red", "", CFGFLAG_SERVER, ConAllRed, this, "");
+	Console()->Register("all_blue", "", CFGFLAG_SERVER, ConAllBlue, this, "");
+	Console()->Register("say_to", "ir", CFGFLAG_SERVER, ConSayTo, this, "");
+	Console()->Register("set_name", "ir", CFGFLAG_SERVER, ConSetName, this, "");
+	Console()->Register("mute", "ii", CFGFLAG_SERVER, ConMute, this, "");
+	Console()->Register("detected", "", CFGFLAG_SERVER, ConDetectedPlayers, this, "Shows currently detected players");
+	Console()->Register("reset_detected", "", CFGFLAG_SERVER, ConResetDetectedPlayers, this, "Reset current detected players");
 }
 
 void CGameContext::OnInit()
@@ -1499,18 +2035,62 @@ void CGameContext::OnInit()
 	m_Collision.Init(&m_Layers);
 
 	// select gametype
-	if(str_comp_nocase(g_Config.m_SvGametype, "mod") == 0)
+	if(str_comp_nocase(g_Config.m_SvGametype, "mod") == 0) {
 		m_pController = new CGameControllerMOD(this);
-	else if(str_comp_nocase(g_Config.m_SvGametype, "ctf") == 0)
+		m_pController->MakeInstagib(false);
+		m_pController->MakeinQ("MOD", false); }
+	else if(str_comp_nocase(g_Config.m_SvGametype, "ctf") == 0) {
 		m_pController = new CGameControllerCTF(this);
-	else if(str_comp_nocase(g_Config.m_SvGametype, "lms") == 0)
+		m_pController->MakeInstagib(false);
+		m_pController->MakeinQ("CTF", false); }
+	else if(str_comp_nocase(g_Config.m_SvGametype, "lms") == 0) {
 		m_pController = new CGameControllerLMS(this);
-	else if(str_comp_nocase(g_Config.m_SvGametype, "lts") == 0)
-		m_pController = new CGameControllerLTS(this);
-	else if(str_comp_nocase(g_Config.m_SvGametype, "tdm") == 0)
+		m_pController->MakeInstagib(false);
+		m_pController->MakeinQ("LMS", false); }
+	else if(str_comp_nocase(g_Config.m_SvGametype, "tdm") == 0) {
 		m_pController = new CGameControllerTDM(this);
-	else
+		m_pController->MakeInstagib(false);
+		m_pController->MakeinQ("TDM", false); }
+	else if(str_comp_nocase(g_Config.m_SvGametype, "idm") == 0) {
 		m_pController = new CGameControllerDM(this);
+		m_pController->MakeInstagib(true);
+		m_pController->MakeinQ("iDM", false); }
+	else if(str_comp_nocase(g_Config.m_SvGametype, "ictf") == 0) {
+		m_pController = new CGameControllerCTF(this);
+		m_pController->MakeInstagib(true);
+		m_pController->MakeinQ("iCTF", false); }
+	else if(str_comp_nocase(g_Config.m_SvGametype, "itdm") == 0) {
+		m_pController = new CGameControllerTDM(this);
+		m_pController->MakeInstagib(true);
+		m_pController->MakeinQ("iTDM", false); }
+	else if(str_comp_nocase(g_Config.m_SvGametype, "dm*") == 0) {
+		m_pController = new CGameControllerDM(this);
+		m_pController->MakeInstagib(false);
+		m_pController->MakeinQ("DM*", true); }
+	else if(str_comp_nocase(g_Config.m_SvGametype, "ctf*") == 0) {
+		m_pController = new CGameControllerCTF(this);
+		m_pController->MakeInstagib(false);
+		m_pController->MakeinQ("CTF*", true); }
+	else if(str_comp_nocase(g_Config.m_SvGametype, "tdm*") == 0) {
+		m_pController = new CGameControllerTDM(this);
+		m_pController->MakeInstagib(false);
+		m_pController->MakeinQ("TDM*", true); }
+	else if(str_comp_nocase(g_Config.m_SvGametype, "idm*") == 0) {
+		m_pController = new CGameControllerDM(this);
+		m_pController->MakeInstagib(true);
+		m_pController->MakeinQ("iDM*", true); }
+	else if(str_comp_nocase(g_Config.m_SvGametype, "ictf*") == 0) {
+		m_pController = new CGameControllerCTF(this);
+		m_pController->MakeInstagib(true);
+		m_pController->MakeinQ("iCTF*", true); }
+	else if(str_comp_nocase(g_Config.m_SvGametype, "itdm*") == 0) {
+		m_pController = new CGameControllerTDM(this);
+		m_pController->MakeInstagib(true);
+		m_pController->MakeinQ("iTDM*", true); }
+	else {
+		m_pController = new CGameControllerDM(this);
+		m_pController->MakeInstagib(false);
+		m_pController->MakeinQ("DM", false); }
 
 	// create all entities from the game layer
 	CMapItemLayerTilemap *pTileMap = m_Layers.GameLayer();

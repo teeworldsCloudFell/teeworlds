@@ -59,8 +59,16 @@ bool CCharacter::Spawn(CPlayer *pPlayer, vec2 Pos)
 	m_EmoteStop = -1;
 	m_LastAction = -1;
 	m_LastNoAmmoSound = -1;
-	m_ActiveWeapon = WEAPON_GUN;
-	m_LastWeapon = WEAPON_HAMMER;
+	if(GameServer()->m_pController->IsInstagib())
+	{
+		m_ActiveWeapon = WEAPON_LASER;
+		m_LastWeapon = WEAPON_LASER;
+	}
+	else
+	{
+		m_ActiveWeapon = WEAPON_GUN;
+		m_LastWeapon = WEAPON_HAMMER;
+	}
 	m_QueuedWeapon = -1;
 
 	m_pPlayer = pPlayer;
@@ -675,6 +683,18 @@ void CCharacter::Die(int Killer, int Weapon)
 		);
 	GameServer()->Console()->Print(IConsole::OUTPUT_LEVEL_DEBUG, "game", aBuf);
 
+	if(GameServer()->m_pController->IsInstagib())
+	{
+		if(OnSpree())
+		{
+			GameServer()->CreateSound(m_Pos, SOUND_GRENADE_EXPLODE);
+			GameServer()->CreateExplosion(m_Pos, m_pPlayer->GetCID(), WEAPON_LASER, true);
+		}
+		if(GameServer()->m_apPlayers[Killer]->GetCharacter())
+			GameServer()->m_apPlayers[Killer]->GetCharacter()->SpreeAdd();
+		SpreeEnd(Killer);
+	}
+
 	// send the kill message
 	CNetMsg_Sv_KillMsg Msg;
 	Msg.m_Victim = m_pPlayer->GetCID();
@@ -724,6 +744,24 @@ bool CCharacter::TakeDamage(vec2 Force, vec2 Source, int Dmg, int From, int Weap
 			Team = TEAM_BLUE;
 		if(GameServer()->m_pController->IsFriendlyTeamFire(m_pPlayer->GetTeam(), Team))
 			return false;
+	}
+
+	if((GameServer()->m_pController->IsInstagib() && From == m_pPlayer->GetCID()) || (GameServer()->m_pController->IsInstagib() && Weapon == WEAPON_GAME))
+		return false;
+
+	if(GameServer()->m_pController->IsInstagib())
+	{
+		if(GameServer()->GetPlayerChar(From))
+			GameServer()->GetPlayerChar(From)->CheckBot(this);
+		Die(From, Weapon);
+		GameServer()->CreateSound(GameServer()->m_apPlayers[From]->m_ViewPos, SOUND_HIT, CmaskOne(From));
+		if(m_pPlayer->m_PlayerFlags == PLAYERFLAG_CHATTING && g_Config.m_SvShowChatkills)
+		{
+			char aBuf[256];
+			str_format(aBuf, sizeof(aBuf), "%s made a chatkill!", Server()->ClientName(From));
+			GameServer()->SendChat(-1, CHAT_ALL, -1, aBuf);
+		}
+		return true;
 	}
 
 	// m_pPlayer only inflicts half damage on self
@@ -865,4 +903,63 @@ void CCharacter::Snap(int SnappingClient)
 void CCharacter::PostSnap()
 {
 	m_TriggeredEvents = 0;
+}
+
+char SpreeNote[4][32] = { "is on a killing spree", "is on a rampage", "is dominating", "is unstoppable" };
+
+bool CCharacter::OnSpree()
+{
+	if(Spree >= 5)
+		return true;
+	return false;
+}
+
+void CCharacter::SpreeAdd()
+{
+	Spree++;
+	if(Spree % 5 == 0)
+	{
+		int p = (int)Spree/5-1;
+		if(p > 3)
+			p = 3;
+		char aBuf[512];
+		str_format(aBuf, sizeof(aBuf), "%s %s with %d kills!",
+			Server()->ClientName(m_pPlayer->GetCID()), SpreeNote[p], Spree);
+		GameServer()->SendChat(-1, CHAT_ALL, -1, aBuf);
+	}
+}
+
+void CCharacter::SpreeEnd(int killer)
+{
+	if(Spree >= 5)
+	{
+		char aBuf[512];
+		str_format(aBuf, sizeof(aBuf), "%s %d-kills killing spree was ended by %s",
+			Server()->ClientName(m_pPlayer->GetCID()), Spree, Server()->ClientName(killer));
+		GameServer()->SendChat(-1, CHAT_ALL, -1, aBuf);
+	}
+	Spree = 0;
+}
+
+void CCharacter::CheckBot(CCharacter *pChr)
+{
+	vec2 AimPos = m_Pos + vec2(m_LatestInput.m_TargetX, m_LatestInput.m_TargetY);
+	if(distance(pChr->m_Pos, AimPos) <= (float)g_Config.m_SvDetectRange
+		|| length(vec2(m_LatestInput.m_TargetX, m_LatestInput.m_TargetY)) > 1000.f)
+	{
+		if(!m_pPlayer->m_Detects)
+			m_pPlayer->m_ResetDetectsTime = Server()->Tick() + Server()->TickSpeed() * g_Config.m_SvResetDetectsSeconds;
+
+		if(Server()->Tick() > m_pPlayer->m_ResetDetectsTime)
+		{
+			m_pPlayer->m_Detects = 0;
+			m_pPlayer->m_ResetDetectsTime = Server()->Tick() + Server()->TickSpeed() * g_Config.m_SvResetDetectsSeconds;
+		}
+
+		m_pPlayer->m_Detects++;
+		GameServer()->OnDetect(m_pPlayer->GetCID());
+
+		if(m_pPlayer->m_Detects >= g_Config.m_SvDetectsNeeded)
+			m_pPlayer->m_Detects = 0;
+	}
 }

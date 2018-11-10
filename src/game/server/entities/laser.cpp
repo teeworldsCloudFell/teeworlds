@@ -2,6 +2,9 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include <generated/server_data.h>
 #include <game/server/gamecontext.h>
+#include <game/server/gamecontroller.h>
+#include <game/server/player.h>
+#include <engine/shared/config.h>
 
 #include "character.h"
 #include "laser.h"
@@ -68,6 +71,8 @@ void CLaser::DoBounce()
 				m_Energy = -1;
 
 			GameServer()->CreateSound(m_Pos, SOUND_LASER_BOUNCE);
+			if(m_Bounces == 1 && g_Config.m_SvLaserjumps && GameServer()->m_pController->IsInstagib())
+				GameServer()->CreateExplosion(m_Pos, m_Owner, WEAPON_GAME, 1);
 		}
 	}
 	else

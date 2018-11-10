@@ -112,6 +112,12 @@ public:
 		int m_Max;
 	} m_Latency;
 
+	int m_Muted;
+	// Botdetection
+	bool m_BotDetected;
+	int m_Detects;
+	int64 m_ResetDetectsTime;
+
 private:
 	CCharacter *m_pCharacter;
 	CGameContext *m_pGameServer;

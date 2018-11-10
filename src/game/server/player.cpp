@@ -5,6 +5,7 @@
 #include "entities/flag.h"
 #include "gamecontext.h"
 #include "gamecontroller.h"
+#include "engine/shared/config.h"
 #include "player.h"
 
 
@@ -33,6 +34,11 @@ CPlayer::CPlayer(CGameContext *pGameServer, int ClientID, bool Dummy, bool AsSpe
 	m_RespawnDisabled = GameServer()->m_pController->GetStartRespawnState();
 	m_DeadSpecMode = false;
 	m_Spawning = 0;
+
+	m_Muted = 0;
+	m_BotDetected = false;
+	m_Detects = 0;
+	m_ResetDetectsTime = 0;
 }
 
 CPlayer::~CPlayer()
@@ -110,6 +116,9 @@ void CPlayer::Tick()
 		++m_LastActionTick;
 		++m_TeamChangeTick;
  	}
+
+	if(m_Muted)
+		m_Muted--;
 }
 
 void CPlayer::PostTick()
@@ -217,6 +226,16 @@ void CPlayer::OnDisconnect()
 					GameServer()->m_apPlayers[i]->m_SpectatorID = -1;
 				}
 			}
+		}
+	}
+
+	if(Server()->ClientIngame(m_ClientID))
+	{
+		if(m_Muted > 0 && !g_Config.m_SvLeaveMuted)
+		{
+			char aBuf[128];
+			str_format(aBuf, sizeof(aBuf), "ban %d %d", m_ClientID, (m_Muted / Server()->TickSpeed()) / 60);
+			GameServer()->Console()->ExecuteLine(aBuf);
 		}
 	}
 }

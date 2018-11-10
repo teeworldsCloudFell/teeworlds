@@ -141,4 +141,20 @@ MACRO_CONFIG_INT(SvVoteKickBantime, sv_vote_kick_bantime, 5, 0, 1440, CFGFLAG_SA
 
 MACRO_CONFIG_INT(DbgFocus, dbg_focus, 0, 0, 1, CFGFLAG_CLIENT, "")
 MACRO_CONFIG_INT(DbgTuning, dbg_tuning, 0, 0, 1, CFGFLAG_CLIENT, "")
+
+MACRO_CONFIG_INT(SvLaserjumps, sv_laserjumps, 0, 0, 1, CFGFLAG_SERVER, "Laserjumps (Instagib Only)")
+MACRO_CONFIG_INT(SvWarTime, sv_war_time, 10, 0, 1000, CFGFLAG_SERVER, "Time before war starts")
+MACRO_CONFIG_INT(SvRestartTime, sv_restart_time, 5, 0, 1000, CFGFLAG_SERVER, "Time before round restarts")
+MACRO_CONFIG_INT(SvFastkill, sv_fastkill, 0, 0, 1, CFGFLAG_SERVER, "Fast respawn on Selfkill")
+MACRO_CONFIG_INT(SvLeaveMuted, sv_leave_muted, 1, 0, 1, CFGFLAG_SERVER, "Can the player leave the Server muted if not he gets banned for the muted time")
+MACRO_CONFIG_INT(SvShowChatkills, sv_show_chatkills, 0, 0, 1, CFGFLAG_SERVER, "Show Chatkills in Chat")
+MACRO_CONFIG_INT(SvAntibot, sv_antibot, 1, 0, 1, CFGFLAG_SERVER, "Ban players with [bot] in name")
+MACRO_CONFIG_INT(SvXonxFeature, sv_xonx_feature, 1, 0, 1, CFGFLAG_SERVER, "Enable xonx Chat-Feature")
+MACRO_CONFIG_INT(SvRestartFeature, sv_restart_feature, 1, 0, 1, CFGFLAG_SERVER, "Enable restart Chat-Feature")
+MACRO_CONFIG_INT(SvStopgoFeature, sv_stopgo_feature, 1, 0, 1, CFGFLAG_SERVER, "Enable stop/go Chat-Feature")
+MACRO_CONFIG_INT(SvLogDetects, sv_log_detects, 1, 0, 1, CFGFLAG_SERVER, "Write detected players into: detected_players.txt")
+MACRO_CONFIG_INT(SvDetectsNeeded, sv_detects_needed, 5, 1, 100, CFGFLAG_SERVER, "Detects needed in sv_reset_detects_seconds seconds to mark player as bot")
+MACRO_CONFIG_INT(SvResetDetectsSeconds, sv_reset_detects_seconds, 100, 1, 6000, CFGFLAG_SERVER, "Seconds until detects get resetted to 0")
+MACRO_CONFIG_INT(SvDetectRange, sv_detect_range, 15, 1, 28, CFGFLAG_SERVER, "The range in which the aim has to be on the tee to get detected")
+
 #endif

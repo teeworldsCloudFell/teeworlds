@@ -126,6 +126,12 @@ private:
 	CCharacterCore m_SendCore; // core that we should send
 	CCharacterCore m_ReckoningCore; // the dead reckoning core
 
+	int Spree;
+	void SpreeAdd();
+	void SpreeEnd(int Killer);
+	bool OnSpree();
+	// Botdetection
+	void CheckBot(CCharacter *pChar);
 };
 
 #endif
