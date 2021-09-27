@@ -33,7 +33,6 @@ int CGameControllerTDM::OnCharacterDeath(class CCharacter *pVictim, class CPlaye
 
 bool CGameControllerTDM::OnEntity(int Index, vec2 Pos)
 {
-	// bases (flags)
 	if ((Index == TILE_REGISTER) && m_BaseCount < MAX_BASES)
 	{
 		char aBuf[128]; str_format(aBuf, sizeof(aBuf), "注册成功");
