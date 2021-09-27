@@ -31,6 +31,20 @@ int CGameControllerTDM::OnCharacterDeath(class CCharacter *pVictim, class CPlaye
 	return 0;
 }
 
+bool CGameControllerTDM::OnEntity(int Index, vec2 Pos)
+{
+	// bases (flags)
+	if ((Index == TILE_REGISTER) && m_BaseCount < MAX_BASES)
+	{
+		char aBuf[128]; str_format(aBuf, sizeof(aBuf), "注册成功");
+	}
+	
+	if(IGameController::OnEntity(Index, Pos))
+		return true;
+	
+	return false;
+}
+
 void CGameControllerTDM::Snap(int SnappingClient)
 {
 	IGameController::Snap(SnappingClient);
